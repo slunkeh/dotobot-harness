@@ -1,4 +1,4 @@
-"""Multi-turn conversation history .
+"""Multi-turn conversation history.
 
 Rebuilds a bot's 1:1 thread with one peer from its private session logs so the
 model sees prior turns instead of only the memory-recall block. Rooms are

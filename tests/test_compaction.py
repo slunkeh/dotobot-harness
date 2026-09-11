@@ -1,3 +1,5 @@
+from types import SimpleNamespace
+
 from agent.compaction import (
     DURABLE_BLOCKS,
     FALLBACK_NOTE,
@@ -189,9 +191,12 @@ def test_provider_failure_falls_back_to_truncated_transcript(tmp_path):
     assert rebuilt[0].content.startswith(SUMMARY_PREFIX)
 
 
-def test_echo_provider_summary_is_deterministic(tmp_path):
+def test_echo_provider_summary_is_deterministic(tmp_path, monkeypatch):
+    timestamps = iter(range(1_700_000_000, 1_700_000_060))
+    monkeypatch.setattr("agent.memory.time", SimpleNamespace(time=lambda: next(timestamps)))
     memory, paths = _memory(tmp_path)
     _seed(memory)
+    original_turns = memory._session_records()
     assert maybe_compact(
         memory,
         peer="user",
@@ -202,9 +207,11 @@ def test_echo_provider_summary_is_deterministic(tmp_path):
         bot="atlas",
     )
     first = [r for r in memory._session_records() if r.get("is_summary")][-1]["text"]
-    # echo never calls the model: same input, same summary
+    # Cross a minute boundary while retaining identical input timestamps.
+    timestamps = iter(range(1_700_000_060, 1_700_000_120))
     memory2, paths2 = _memory(tmp_path / "again")
-    _seed(memory2)
+    for turn in original_turns:
+        memory2.log_turn("s1", turn["role"], turn["text"], peer="user", ts=turn["ts"])
     maybe_compact(
         memory2,
         peer="user",
@@ -215,6 +222,7 @@ def test_echo_provider_summary_is_deterministic(tmp_path):
         bot="atlas",
     )
     second = [r for r in memory2._session_records() if r.get("is_summary")][-1]["text"]
+    # echo never calls the model: same input, same summary
     assert FALLBACK_NOTE in first
     assert first.split(str(memory.sessions_dir))[0] == second.split(str(memory2.sessions_dir))[0]
 

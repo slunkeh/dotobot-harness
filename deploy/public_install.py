@@ -612,7 +612,9 @@ def main(argv=None, *, layout: Layout | None = None, runner=run, probe=wait_heal
                     "The installed release source was retained; edit install.json explicitly to change trust."
                 )
             if not config.get("ready"):
-                packages = ["python3", "curl", "ca-certificates"]
+                # Minimal Debian images can enable AppArmor in the kernel but
+                # omit its parser. Docker needs it to load the container profile.
+                packages = ["python3", "curl", "ca-certificates", "apparmor"]
                 # Reuse an existing engine, including Docker CE; installing the
                 # distro package over it can remove conflicting owner packages.
                 if shutil.which("docker") is None:

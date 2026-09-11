@@ -224,8 +224,8 @@ def split_point(turns: list[tuple[str, str, float]]) -> int:
     A summary turn is user-role but not a user message — it is skipped, so a
     recompaction folds it into the next summary instead of pinning it forever.
 
-    The seam never separates an assistant tool call from its tool result
-   . `_conversation` turns are text-only today, but a turn list
+    The seam never separates an assistant tool call from its tool result.
+    `_conversation` turns are text-only today, but a turn list
     that does carry `role="tool"` results (a steered follow-up can land a
     user message between a call and its result) gets the seam pulled back so
     the pair stays whole on the verbatim side.

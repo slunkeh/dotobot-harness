@@ -276,6 +276,35 @@ def test_existing_docker_engine_is_reused_without_replacing_its_package(
     assert all("agent-harness-machine" not in arg for call in calls for arg in call)
 
 
+@pytest.mark.parametrize("existing_docker", [False, True])
+def test_machine_build_has_apparmor_userspace_on_minimal_hosts(
+    host, tmp_path, monkeypatch, existing_docker
+):
+    """An enforcing kernel still needs the parser omitted by minimal Debian images."""
+    _, calls, _, runner, _ = host
+    monkeypatch.setattr(
+        installer.shutil,
+        "which",
+        lambda command: "/usr/bin/docker" if command == "docker" and existing_docker else None,
+    )
+    parser_installed = False
+
+    def enforcing_host(argv, **kwargs):
+        nonlocal parser_installed
+        if argv[:2] == ["apt-get", "install"] and "apparmor" in argv:
+            parser_installed = True
+        if argv[:2] == ["docker", "build"] and not parser_installed:
+            raise subprocess.CalledProcessError(
+                1, argv, stderr="docker-default profile requires apparmor_parser"
+            )
+        return runner(argv, **kwargs)
+
+    assert initial(host, tmp_path, runner=enforcing_host) == 0
+    assert parser_installed
+    packages = next(call for call in calls if call[:2] == ["apt-get", "install"])
+    assert ("docker.io" in packages) is not existing_docker
+
+
 def test_concurrent_install_cannot_create_or_replace_install_record(host, tmp_path, capsys):
     layout, calls, _, _, _ = host
     layout.config_dir.mkdir(parents=True)

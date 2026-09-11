@@ -9,6 +9,7 @@ machine the pool believed was fine.
 from __future__ import annotations
 
 import os
+import shlex
 import subprocess
 import sys
 from pathlib import Path
@@ -99,6 +100,48 @@ def test_the_machine_image_owns_the_shared_workspace():
     assert chown < user
     volume = next(ln for ln in lines if ln.startswith("VOLUME"))
     assert "/workspace" in volume and "/home/agent" in volume
+
+
+def test_machine_source_directories_remain_readable_after_private_umask(tmp_path):
+    """Execute the image's source-permission step on a real private extraction."""
+    text = (ROOT / "deploy" / "Dockerfile.machine").read_text(encoding="utf-8")
+    lines = text.splitlines()
+    copied = lines.index("COPY . /app")
+    user = lines.index("USER agent")
+    step = next(
+        (line for line in lines[copied + 1 : user] if line.startswith("RUN find /app ")), None
+    )
+    assert step is not None, "The non-root machine user must be able to traverse copied source"
+
+    previous = os.umask(0o077)
+    try:
+        app = tmp_path / "app"
+        package = app / "isolation"
+        package.mkdir(parents=True)
+        source = package / "machine_supervisor.py"
+        source.write_text("# source fixture\n")
+        source.chmod(0o644)  # Archive extraction preserves regular file modes.
+        executable = app / "helper"
+        executable.write_text("#!/bin/sh\n")
+        executable.chmod(0o755)
+        private_home = tmp_path / "home"
+        credentials = private_home / "credentials"
+        credentials.mkdir(parents=True)
+        key = credentials / "key"
+        key.write_text("private fixture")
+        (app / "outside").symlink_to(private_home, target_is_directory=True)
+    finally:
+        os.umask(previous)
+    retained = {
+        path: path.stat().st_mode & 0o777
+        for path in (source, executable, private_home, credentials, key)
+    }
+    assert package.stat().st_mode & 0o777 == 0o700
+    command = [str(app) if arg == "/app" else arg for arg in shlex.split(step.removeprefix("RUN "))]
+    subprocess.run(command, check=True)
+    assert app.stat().st_mode & 0o777 == 0o755
+    assert package.stat().st_mode & 0o777 == 0o755
+    assert {path: path.stat().st_mode & 0o777 for path in retained} == retained
 
 
 def test_the_machine_image_declares_a_healthcheck():

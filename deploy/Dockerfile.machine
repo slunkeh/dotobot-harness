@@ -60,6 +60,10 @@ RUN mkdir -p /etc/opt/chrome/policies/managed \
         > /etc/opt/chrome/policies/managed/harness.json
 
 COPY . /app
+# A checksum-verified release may be extracted under the owner's private umask.
+# Permit the machine user to traverse source directories; preserve file modes
+# and never follow links into private state outside the copied runtime tree.
+RUN find /app -type d -exec chmod 755 {} +
 WORKDIR /app
 
 # Desktop terminals (xterm) do not go through govern(). Replace /bin/rm with

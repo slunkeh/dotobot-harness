@@ -1,4 +1,4 @@
-"""Untrusted external content wrapping (, `agent/external.py`).
+"""Untrusted external content wrapping (`agent/external.py`).
 
 Network-backed tool results are bounded, normalized, and wrapped in random
 boundary markers before the model sees them. The id is fresh per wrap, so

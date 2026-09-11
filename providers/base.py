@@ -6,8 +6,8 @@ the agent, tools, and memory do not care which vendor answers.
 Design goals:
 * Streaming and non-streaming chat completions.
 * Tool / function calls surfaced in a vendor-neutral shape.
-* Auth that covers an API key today and an OAuth token-refresh hook tomorrow
- , without the call sites changing.
+* Auth that covers an API key today and an OAuth token-refresh hook tomorrow,
+  without the call sites changing.
 """
 
 from __future__ import annotations
