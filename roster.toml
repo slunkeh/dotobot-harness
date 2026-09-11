@@ -1,0 +1,9 @@
+# Bot roster.
+#
+# A new harness home starts empty. Create bots from the Mac/iOS app (or
+# POST /api/bots). This file is only a seed for $HARNESS_HOME/roster.json on
+# first serve — it is not copied again after that, and it does not replace
+# bots someone already has.
+#
+# For a local CLI demo with sample bots, copy roster.example.toml over this
+# file. Tests write their own rosters and do not depend on this one.

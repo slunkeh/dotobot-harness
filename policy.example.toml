@@ -1,0 +1,125 @@
+# Action policy (optional). Copy to `$HARNESS_HOME/policy.toml` to switch on.
+#
+# There is no policy by default and that is deliberate: a harness with no
+# policy.toml behaves exactly as it did before this file existed. Not
+# configuring a policy is a choice; mistyping one is an accident, so a file
+# that exists and cannot be parsed refuses everything instead of being ignored.
+#
+# Every tool call passes through `agent/govern.py`, which classifies it, asks
+# this policy, writes a row to `$HARNESS_HOME/audit/<bot>.jsonl`, and only then
+# runs the handler. Read the trail with those files; a refusal names the rule.
+
+# "enforce" blocks. "dry-run" decides and records, and lets everything through.
+#
+# Start here. Write your rules, run the bots for a day, read the audit trail for
+# rows with decision = "dry-run", and only then switch to "enforce". A rule you
+# have not watched against real traffic is a rule that will refuse somebody's
+# work at the wrong moment.
+mode = "dry-run"
+
+# Evaluated FIRST. Any rule that matches refuses, whatever `allow` says.
+deny = [
+  # A bare string matches the tool name (glob).
+  # "create_bot",
+
+  # A table matches on any of: tool, intent, target, bot, origin.
+  #
+  # `intent` is usually what you want. It describes what an action DOES rather
+  # than which tool was called, because a button is activated by a click OR by
+  # Enter OR by Space — a rule naming `computer_click` closes one of three
+  # doors. Intents: run_command, activate, type, navigate, read, write_state,
+  # read_secret, type_secret, message, manage, ui, read_tool, write_tool,
+  # unknown.
+  #
+  # `rm -rf /`, `rm -rf ~`, and deletes of system dirs / $HARNESS_HOME are
+  # already refused by agent/shellguard.py — no rule needed, and an allow
+  # cannot re-open them. Use a glob here only to forbid *more* (e.g. any rm):
+  # { intent = "run_command", target = "*rm -rf*" },
+  # { intent = "read_secret" },
+  #
+  # `origin` is how the turn was scheduled: "dream" for dream turns ("idle"
+  # in their first release), "routine" for cron work, empty for chat. Dream
+  # turns already hold back write_tool / secrets / manage / unknown by
+  # default (agent/govern.py); a deny here narrows further, an allow naming
+  # origin = "dream" widens.
+  #
+  # { origin = "dream", intent = "run_command" },
+  #
+  # `exposure` is "web" once this turn has put web content in front of the
+  # model (a screenshot, an unfurled link) and empty before that. A web page
+  # can carry text written to look like instructions, so exposed turns already
+  # escalate run_command / secrets / write_tool / manage / unknown by default
+  # (agent/govern.py): to a confirm card when a person is there, to a refusal
+  # otherwise. A deny here narrows further; an allow naming exposure = "web"
+  # widens. Note `run_command` curl output does NOT set the taint — only the
+  # browser-facing tools do.
+  #
+  # { exposure = "web", intent = "write_tool" },
+  #
+  # `type_secret` is separate from `read_secret` on purpose: reading tells a bot
+  # whether a credential exists, typing puts it into a login box. To match
+  # openbot's posture exactly — a person confirms every time a stored secret is
+  # typed — put it in `ask` rather than `deny`:
+  #
+  # ask = [{ intent = "type_secret" }]
+  # { tool = "run_command", bot = "researcher" },
+
+  # Connector and MCP tools are split by effect for the same reason, so one
+  # rule forbids every vendor write rather than naming nine tools:
+  #
+  # { intent = "write_tool" },
+  # { intent = "write_tool", tool = "linear_*" },
+  #
+  # For a connector this repo ships, the write list in connectors/effects.py is
+  # authoritative — somebody read its tools, so anything not on it is a read.
+  # For a custom MCP server nobody here reviewed, anything not positively
+  # recognised as a read verb is treated as a WRITE. That asymmetry is
+  # deliberate: guessing "read" about an unknown verb is how a rule forbidding
+  # writes lets one through.
+
+  # Keep unattended web-exposed shell refused (the built-in only speaks when
+  # no rule decided; an ask on run_command+web would otherwise park a card).
+  { intent = "run_command", exposure = "web", origin = "routine" },
+  { intent = "run_command", exposure = "web", origin = "dream" },
+]
+
+# Evaluated between deny and allow: something already forbidden is not worth
+# asking about, and something merely permitted may still warrant a person
+# looking at it. A matching rule shows a confirm card and waits for the answer.
+# Suggested auto-review (also seeded on first `harness serve` if no policy.toml).
+# Require-approval for secrets typed into a page, vendor writes, and a shell
+# after the turn has viewed the web. Unattended web-exposed shell is denied
+# above rather than parking a 24h confirm card.
+ask = [
+  { intent = "type_secret" },
+  { intent = "write_tool" },
+  { intent = "run_command", exposure = "web" },
+]
+
+# Evaluated only if nothing denied. An EMPTY allow list means "deny rules only",
+# which is the shape most people want: forbid two things, leave the rest alone.
+# A NON-empty allow list flips it — anything not matched is refused.
+#
+# The flip is also how a navigation allowlist is written: glob patterns have
+# no negation, so "deny every site except the intranet" cannot be a deny rule.
+# Write it as an allow list naming the permitted destinations, plus the other
+# intents the bots still need:
+#
+# allow = [
+#   { intent = "navigate", target = "https://intranet.example.com/*" },
+#   { intent = "run_command" }, { intent = "activate" }, { intent = "type" },
+#   { intent = "read" }, { intent = "write_state" }, { intent = "read_tool" },
+#   { intent = "message" }, { intent = "ui" },
+# ]
+#
+# (`navigate` covers computer_open, preview_link and post_image — the ways a
+# bot reaches out to a web host. It cannot see where a click inside the
+# browser leads; URL-level control of in-page navigation is future work.)
+allow = []
+
+# Per-bot policy REPLACES the global one entirely rather than merging, so the
+# question "what applies to this bot" has one answer in one place.
+#
+# [bots.researcher]
+# mode = "enforce"
+# deny = [{ intent = "run_command" }, { intent = "manage" }]

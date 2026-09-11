@@ -1,0 +1,58 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dotobot"
+dynamic = ["version"]
+description = "Dotobot: self-hosted multi-bot agent harness (Hermes patterns, not a fork)."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "Apache-2.0" }
+authors = [{ name = "Dotobot contributors" }]
+urls = { Homepage = "https://dotobot.com", Repository = "https://github.com/slunkeh/dotobot-harness" }
+keywords = ["agents", "multi-agent", "orchestrator", "self-hosted"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: Apache Software License",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Software Development :: Libraries :: Application Frameworks",
+]
+
+dependencies = []
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0",
+  "ruff>=0.6",
+]
+
+[project.scripts]
+dotobot = "harness.boot:main"
+harness = "harness.boot:main"
+
+[tool.setuptools]
+packages = ["harness", "agent", "providers", "connectors", "isolation", "channels"]
+
+[tool.setuptools.dynamic]
+version = { attr = "harness.version.__version__" }
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+extend-exclude = ["cloud"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+ignore = ["E501"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+pythonpath = ["."]
+markers = [
+  "timeout: per-test wall-clock cap in seconds (see tests/conftest.py)",
+]

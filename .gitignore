@@ -1,0 +1,32 @@
+# Development output
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+build/
+dist/
+.DS_Store
+
+# Local harness homes, credentials, and generated configuration
+shared/
+.env
+.env.*
+!.env.example
+credentials/
+policy.toml
+roster.json
+connectors.json
+link-key
+public-url
+serve.json
+state.sqlite*
+machine-state/
+browser/
+memory/
+usage/
+
+# Local release artifacts
+*.tar
+*.tar.gz

@@ -1,0 +1,61 @@
+# Optional local template — not seeded onto a new account.
+# Copy to roster.toml if you want sample bots on this machine, then export
+# the matching keys:
+#
+#   export ANTHROPIC_API_KEY=sk-ant-...     # for provider = "claude"
+#   export XAI_API_KEY=xai-...              # for provider = "grok" (or sign in with xAI OAuth)
+#   export OPENAI_API_KEY=sk-...            # for provider = "codex"
+#
+# Keys can also live in <home>/credentials/<ENV_NAME> (chmod 600) instead of
+# env, and can be set from the Mac app (Manage -> providers). Omit `model` to
+# use the provider's default.
+
+[[bots]]
+name = "atlas"
+role = "a terse research assistant"
+personality = "You are precise and cite sources. You prefer bullet points."
+provider = "claude"
+model = "claude-3-5-sonnet-latest"
+auth_ref = "anthropic"          # -> ANTHROPIC_API_KEY
+avatar = "compass"
+# Opt-in dreaming (harness/dreaming.py): while nobody is messaging the bot,
+# `harness serve` schedules short self-directed dream turns — consolidate
+# recent experience into memory, reflect on what could have gone better,
+# note ideas for next time — with exponential backoff
+# (HARNESS_DREAM_MIN_SECS..HARNESS_DREAM_MAX_SECS), a daily token allowance
+# (HARNESS_DREAM_TOKENS), and side-effect tools held back by the gate. Off
+# by default — an unattended bot spending tokens is a choice. The first
+# release spelled this `idle_think`; that key still works.
+# dreaming = true
+
+[[bots]]
+name = "nova"
+role = "a friendly writing partner"
+personality = "You are warm and encouraging. You turn notes into clean prose."
+provider = "grok"
+model = "grok-4.6"
+auth_ref = "xai"                # -> XAI_API_KEY (or xAI OAuth tokens)
+avatar = "sparkles"
+
+[[bots]]
+name = "guide"
+role = "the product guide — tips on getting the most out of this app"
+personality = """You give short, concrete tips about this app: bot-to-bot handoffs \
+(@mentions), rich chat cards (tables, progress, confirm, link and file cards), \
+routines (scheduled jobs), skills and private memory, secure secrets, connectors \
+(GitHub, Linear), bot machines, and creating new bots from chat. When asked what \
+the app can do, show a show_table card of tips (columns: Topic, Tip, Try it) \
+instead of prose — your harness-tips skill has the full list. Offer one concrete \
+next step, never a wall of text."""
+provider = "claude"
+model = "claude-3-5-sonnet-latest"
+auth_ref = "anthropic"          # -> ANTHROPIC_API_KEY
+avatar = "lightbulb"
+
+# [[bots]]
+# name = "codey"
+# role = "a pragmatic coding helper"
+# provider = "codex"
+# model = "gpt-4o-mini"
+# auth_ref = "openai"           # -> OPENAI_API_KEY
+# avatar = "terminal"

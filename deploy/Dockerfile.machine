@@ -1,0 +1,112 @@
+# Bot machine image (machines backend): one sandboxed computer per bot.
+#
+# The machine is a jail with exactly the user surface — Chrome, a file
+# manager, a terminal — on its own Xvfb display. No harness state is mounted
+# in; the only writable mount is the machine's named home volume. The agent
+# runs on the HOST and drives this machine over `docker exec`; state syncs
+# via `docker cp` (isolation/machines.py).
+#
+# Container identity/secrets contract (applied at `docker run` by
+# isolation/machines.py — not baked in here): owner/schema/runtime-hash
+# labels under com.agent-harness.machine*, and any machine secrets arrive as
+# 0600 files on a read-only /run/harness bind mount (env vars carry only the
+# file paths, never values).
+#
+#   docker build -t agent-harness-machine -f deploy/Dockerfile.machine .
+
+FROM python:3.12-slim
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        xvfb xauth x11-utils \
+        openbox tint2 feh xcompmgr adwaita-icon-theme fonts-dejavu \
+        thunar xterm chromium \
+        imagemagick ffmpeg xdotool scrot xclip procps \
+        git nodejs npm unzip \
+    && rm -rf /var/lib/apt/lists/*
+
+# Imported API routines commonly use Node. Fail the build if the base distro
+# supplies an unsupported runtime, instead of leaving a user's bot blocked.
+RUN node -e "if (Number(process.versions.node.split('.')[0]) < 20) process.exit(1)" \
+    && npm --version && git --version && unzip -v >/dev/null
+
+# Official Google Chrome (not Debian Chromium). ARM64 and amd64 debs both exist
+# at this URL; Chromium stays as a fallback if the deb cannot be fetched.
+RUN apt-get update && apt-get install -y --no-install-recommends wget ca-certificates \
+    && ARCH="$(dpkg --print-architecture)" \
+    && wget -q -O /tmp/google-chrome.deb \
+        "https://dl.google.com/linux/direct/google-chrome-stable_current_${ARCH}.deb" \
+    && apt-get install -y --no-install-recommends /tmp/google-chrome.deb \
+    && rm -f /tmp/google-chrome.deb \
+        /etc/apt/sources.list.d/google-chrome.list \
+        /etc/apt/sources.list.d/google-chrome.sources \
+    && rm -rf /var/lib/apt/lists/*
+
+# uid/gid 1000 matches MACHINE_OWNER in isolation/machines.py (docker cp
+# preserves tar ownership, so synced-in files must belong to this user).
+RUN useradd --create-home --uid 1000 agent
+
+# The shared project directory (MACHINE_WORKSPACE). isolation/machines.py
+# mounts one named volume here into every machine on the harness home; a
+# fresh volume copies this directory's ownership, so it must exist and belong
+# to `agent` BEFORE the first mount — the jail has no CAP_CHOWN to fix it up.
+RUN mkdir -p /workspace && chown 1000:1000 /workspace
+
+# Bots drive logged-in sites inside a jailed container (human can take over).
+# Chrome's default Safe Browsing store is ~3.5 GB per machine and is not
+# harness state — turn it off so it is never downloaded. The stop janitor
+# still deletes any leftover copy.
+RUN mkdir -p /etc/opt/chrome/policies/managed \
+    && printf '%s\n' '{"SafeBrowsingProtectionLevel": 0}' \
+        > /etc/opt/chrome/policies/managed/harness.json
+
+COPY . /app
+WORKDIR /app
+
+# Desktop terminals (xterm) do not go through govern(). Replace /bin/rm with
+# the same sensitive-path check run_command uses; the real binary is kept
+# off PATH so `rm -rf /` typed at the desktop is refused too.
+RUN mkdir -p /usr/lib/harness \
+    && mv /bin/rm /usr/lib/harness/rm.real \
+    && install -m 0755 /app/deploy/machine_rm.py /bin/rm
+
+ENV DISPLAY=:0 \
+    HOME=/home/agent \
+    HARNESS_MACHINE=1 \
+    HARNESS_SHARED_DISPLAY=0 \
+    HARNESS_HOME=/home/agent/.harness-local \
+    HARNESS_BROWSER_NO_SANDBOX=1 \
+    PYTHONUNBUFFERED=1
+
+USER agent
+
+# the machine's own persistent disk (survives stop; stop is never rm), and
+# the shared project directory (one volume per harness home, every machine)
+VOLUME ["/home/agent", "/workspace"]
+
+# Readiness the engine reports about the container, so the backend does not
+# have to know how to look inside it.
+#
+# Before this, `MachineBackend._container_running` was `state == "running"` and
+# nothing else, so the only failure it could see was the whole container
+# exiting. A machine whose Xvfb had died — or whose openbox/Chrome never came
+# up — kept the supervisor alive reaping children and read as perfectly
+# healthy, while every GUI action against it failed.
+#
+# `display_bound()` is the same probe the supervisor already uses to refuse a
+# contaminated startup: it connects to the X socket rather than trusting the
+# file to exist, so a stale socket with nothing behind it reads as down.
+#
+# `import harness` comes FIRST (same as CMD). tests/test_machine_health.py
+# runs this exact command so a future rename cannot reintroduce a cold
+# isolation → harness → isolation cycle silently.
+#
+# start-period has to cover Xvfb plus the openbox/tint2/Chrome bringup on a
+# cold machine, which is why it is minutes rather than seconds. Anyone
+# debugging a machine can pass --no-healthcheck.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=90s --retries=3 \
+    CMD ["python", "-c", "import harness, sys; from isolation.machine_supervisor import display_bound; sys.exit(0 if display_bound() else 1)"]
+
+# Same import order as HEALTHCHECK: harness first, then the supervisor.
+# `python -m isolation.machine_supervisor` loads isolation/__init__ cold and
+# used to die on the isolation → harness → isolation cycle.
+CMD ["python", "-c", "import harness; from isolation.machine_supervisor import main; raise SystemExit(main())"]

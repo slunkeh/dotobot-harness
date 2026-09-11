@@ -1,0 +1,39 @@
+.git
+clients
+tests
+docs
+cloud
+dist
+shared
+**/__pycache__
+**/*.pyc
+.pytest_cache
+*.egg-info
+**/.DS_Store
+*.tar
+*.tar.gz
+
+# Local state and operator secrets. Both Dockerfiles `COPY . /app`, and the
+# machine image is the bot's jail, so anything left here would be readable
+# by every bot via run_command. Nothing in the runtime needs these.
+.env
+.env.*
+!.env.example
+credentials/
+policy.toml
+roster.json
+connectors.json
+link-key
+serve.json
+state.sqlite
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+*.sqlite-journal
+machine-state/
+browser/
+memory/
+usage/
+.claude/
+.github/
+.ruff_cache
