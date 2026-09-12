@@ -68,6 +68,7 @@ agent/charts.py
 agent/commands.py
 agent/compaction.py
 agent/computer.py
+agent/contentfilter.py
 agent/context.py
 agent/echoguard.py
 agent/embeddings.py

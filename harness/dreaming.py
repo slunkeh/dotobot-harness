@@ -182,6 +182,10 @@ def fire_due(
     for bot in bots:
         if not wants_dreams(bot):
             continue
+        if getattr(bot, "blocked", False):
+            # Blocked (guideline 1.2): no turn of any origin until the owner
+            # unblocks it — the same rule `recipients_for` applies to chat.
+            continue
         name = bot.name
         state = load_state(paths, name)
         last_tick = float(state.get("last_tick") or 0.0)

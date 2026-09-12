@@ -89,6 +89,11 @@ class Bot:
     # follow the account default in settings.json. Either side can override
     # the other, so this is a tri-state, not a bool.
     caveman: bool | None = None
+    # Blocked by the owner (App Review Guideline 1.2: a way to block the
+    # author beside Report). A blocked bot stays on the roster, keeps its
+    # memory and settings, and is never dispatched a turn until unblocked
+    # (`PATCH /api/bots/<name>` `blocked`).
+    blocked: bool = False
     voice_provider: str | None = None
     elevenlabs_voice_id: str | None = None
 
@@ -139,6 +144,7 @@ class Bot:
             "dreaming": self.dreaming,
             "private_browser": self.private_browser,
             "caveman": self.caveman,
+            "blocked": self.blocked,
             "voice_provider": self.voice_provider,
             "elevenlabs_voice_id": self.elevenlabs_voice_id,
         }
@@ -222,6 +228,7 @@ def _bot_from_entry(entry: dict, seen: set[str]) -> Bot:
         dreaming=bool(entry.get("dreaming", entry.get("idle_think", False))),
         private_browser=bool(entry.get("private_browser", False)),
         caveman=caveman_flag(entry.get("caveman")),
+        blocked=bool(entry.get("blocked", False)),
         voice_provider=voice_override(entry.get("voice_provider")),
         elevenlabs_voice_id=voice_override(entry.get("elevenlabs_voice_id"), voice=True),
     )

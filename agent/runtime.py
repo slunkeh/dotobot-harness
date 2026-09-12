@@ -58,6 +58,8 @@ from .caveman import enabled_for as _caveman_enabled
 from .commands import find_skill, is_builtin, parse_slash
 from .compaction import maybe_compact
 from .computer import GatedComputer, HostComputer
+from .contentfilter import PROMPT as _CONTENT_FILTER_PROMPT
+from .contentfilter import enabled as _content_filter_enabled
 from .context import ConnectorCatalogue, protected_loop_tokens
 from .embeddings import recall_token_budget, resolve_embedder
 from .external import wrap_external
@@ -1180,6 +1182,9 @@ class Agent:
         # every turn so a toggle in either Settings lands on the next reply.
         if _caveman_enabled(self.bot, self.paths):
             parts.append(_CAVEMAN_PROMPT)
+        # Content filter: account-wide, on by default, re-read every turn.
+        if _content_filter_enabled(self.paths):
+            parts.append(_CONTENT_FILTER_PROMPT)
         if consult:
             parts.append(_CONSULT_PROMPT)
         parts.extend(_intent_prompts(incoming_text, room=room))
