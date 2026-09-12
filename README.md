@@ -84,6 +84,7 @@ python3 -m venv .venv
 pip install -e '.[dev]'
 python3 -m ruff check harness agent providers connectors isolation channels deploy tests
 python3 -m pytest
+python3 -m harness --help
 ```
 
 Public tests are an explicitly selected runtime suite with their own collection
@@ -98,10 +99,14 @@ remain subject to their respective trademark/asset rights. The paid native apps
 and account backend are not included. See [LICENSE](LICENSE) and
 [SECURITY.md](SECURITY.md).
 
-This initial public repository has no GitHub Actions workflows or access to
-private runners. Run the checks above locally. Automated contribution checks
-must use a separate, disposable environment with no private network or secrets
-before they can be enabled.
+GitHub Actions runs these checks on pushes and pull requests using standard
+GitHub-hosted Ubuntu runners with Python 3.11, 3.12 and 3.13. Jobs use read-only
+repository permissions and no private runners, networks or secrets. CI does not
+publish releases or prove full Linux computer-use installation.
+
+The public CI workflow is maintained in `.github/workflows/ci.yml` in this
+repository. Preserve it when refreshing an exported source tree; private
+repository workflows must not be imported.
 
 Before publishing the standard installer, maintainers must configure and verify
 `https://releases.dotobot.com/harness/manifest.json` and the release archives it
