@@ -290,3 +290,23 @@ def test_voice_recall_and_remember(tmp_path):
     )
     hit = run_voice_tool(orch, "atlas", "recall", {"query": "reddit chrome"})
     assert "Reddit in Chrome" in hit
+
+
+def test_explicit_openai_voice_default_overrides_native_backend(tmp_path, monkeypatch):
+    from harness.voice import set_voice_settings
+
+    paths = HarnessPaths.resolve(tmp_path / "home")
+    paths.ensure_layout([])
+    monkeypatch.setattr("harness.voice._xai_token", lambda _p: "xai")
+    monkeypatch.setattr("harness.voice._openai_token", lambda _p: "openai")
+    result = set_voice_settings(paths, {"provider": "openai"})
+    assert result["provider"] == "openai"
+    assert result["available"] is True
+    assert resolve_backend(paths, "grok") == "openai"
+    assert resolve_backend(paths, "claude") == "openai"
+    assert resolve_backend(paths, "grok", "grok") == "grok"
+    assert resolve_backend(paths, "grok", "auto") == "grok"
+    monkeypatch.setattr("harness.voice._openai_token", lambda _p: None)
+    assert voice_status(paths)["available"] is False
+    with pytest.raises(VoiceError, match="OpenAI"):
+        resolve_backend(paths, "grok")

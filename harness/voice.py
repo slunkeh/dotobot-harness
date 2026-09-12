@@ -138,8 +138,8 @@ def set_voice_settings(paths, changes: dict) -> dict:
 
     data = _load_settings(paths)
     if "provider" in changes:
-        if changes["provider"] not in {"auto", "grok", "elevenlabs"}:
-            raise VoiceError("Voice provider must be auto, grok or elevenlabs")
+        if changes["provider"] not in {"auto", "grok", "openai", "elevenlabs"}:
+            raise VoiceError("Voice provider must be auto, grok, openai or elevenlabs")
         data["voice_provider"] = changes["provider"]
     if "elevenlabs_voice_id" in changes:
         value = changes["elevenlabs_voice_id"]
@@ -163,6 +163,10 @@ def resolve_backend(paths, bot_provider: str = "", voice_provider: str | None = 
     if choice == "grok":
         if not _xai_token(paths):
             raise VoiceError("Grok voice is unavailable. Connect Grok in LLM Providers.")
+        return choice
+    if choice == "openai":
+        if not _openai_token(paths):
+            raise VoiceError("OpenAI voice is unavailable. Connect OpenAI in Providers.")
         return choice
     # Auto deliberately considers only legacy voice backends.
     avail = available_backends(paths)
