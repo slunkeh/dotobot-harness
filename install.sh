@@ -106,6 +106,8 @@ fi
 if ! command -v docker >/dev/null 2>&1; then
     echo 'Docker is required. Installing Docker using its official installer.'
     docker_stage=$(mktemp -d)
+    setup_log="$docker_stage/setup.log"
+    (umask 077; : > "$setup_log")
     if [ "$(uname -s)" = Darwin ]; then
         arch=arm64; [ "$(uname -m)" != x86_64 ] || arch=amd64
         curl -fL --proto '=https' --tlsv1.2 "https://desktop.docker.com/mac/main/$arch/Docker.dmg" -o "$docker_stage/Docker.dmg"
@@ -120,7 +122,11 @@ if ! command -v docker >/dev/null 2>&1; then
         hdiutil detach "$docker_stage/mount"
     else
         curl -fsSL --proto '=https' https://get.docker.com -o "$docker_stage/install-docker.sh"
-        if [ "$(id -u)" -eq 0 ]; then sh "$docker_stage/install-docker.sh"; else sudo sh "$docker_stage/install-docker.sh"; fi
+        if [ "$(id -u)" -eq 0 ]; then
+            dotobot_step "[--------------------] 0/5  Installing Docker" sh "$docker_stage/install-docker.sh"
+        else
+            dotobot_step "[--------------------] 0/5  Installing Docker" sudo sh "$docker_stage/install-docker.sh"
+        fi
     fi
     rm -rf "$docker_stage"
 fi
