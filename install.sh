@@ -26,6 +26,52 @@ Existing system-service installs retain their original update procedure.
 HELP
 return ;;
 esac
+# No prompts or terminal escapes when redirected or used by automation.
+interactive=0
+[ ! -t 1 ] || [ "${TERM:-dumb}" = dumb ] || interactive=1
+accent= reset=
+if [ "$interactive" -eq 1 ] && [ -z "${NO_COLOR+x}" ]; then
+    accent=$'\033[1;36m'; reset=$'\033[0m'
+fi
+printf '%s' "$accent"
+cat <<'LOGO'
+       _       _        _           _
+    __| | ___ | |_ ___ | |__   ___ | |_
+   / _` |/ _ \| __/ _ \| '_ \ / _ \| __|
+  | (_| | (_) | || (_) | |_) | (_) | |_
+   \__,_|\___/ \__\___/|_.__/ \___/ \__|
+
+  Your team. Your server.
+LOGO
+printf '%s\n' "$reset"
+
+dotobot_step() {
+    local label=$1 status=0 pid tick=0
+    shift
+    printf '\n  %s\n' "$label"
+    if [ "$interactive" -eq 1 ]; then
+        "$@" <&0 >>"$setup_log" 2>&1 &
+        pid=$!
+        trap 'kill "$pid" 2>/dev/null || true; wait "$pid" 2>/dev/null || true; exit 130' INT TERM
+        while kill -0 "$pid" 2>/dev/null; do
+            printf '\r  [%*s====%*s] Working...' "$((tick % 16))" '' "$((16 - tick % 16))" ''
+            tick=$((tick + 1))
+            sleep 0.2
+        done
+        wait "$pid" || status=$?
+        trap - INT TERM
+        printf '\r%60s\r' ''
+    else
+        "$@" >>"$setup_log" 2>&1 || status=$?
+    fi
+    if [ "$status" -ne 0 ]; then
+        printf '\n  Setup stopped. Your diagnostic log: %s\n' "$setup_log" >&2
+        tail -n 20 "$setup_log" >&2
+    fi
+    return "$status"
+}
+
+printf '  [--------------------] 0/5  Checking Docker\n'
 case "$(uname -s)" in Linux|Darwin) ;; *) echo 'Use Linux, macOS, or a Linux shell with Docker integration.' >&2; return 1;; esac
 if [ "$(uname -s)" = Darwin ] && [ "$(id -u)" -eq 0 ]; then
     echo 'Run this installer as your normal Mac user; it requests administrator permission only when needed.' >&2
@@ -119,11 +165,14 @@ if [ "$maintenance" -eq 1 ]; then
     "${docker_cmd[@]}" run --rm --mount "type=bind,src=$root,dst=$root" --mount "type=bind,src=$socket,dst=/var/run/docker.sock" "$image" python deploy/container_install.py --root "$root" "$@"
     return
 fi
+setup_log="$root/setup.log"
+(umask 077; : > "$setup_log")
+chmod 600 "$setup_log"
 stage=$(mktemp -d "$root/download.XXXXXXXX")
 # The release is downloaded and verified inside Python's container: the host
 # needs Docker, curl and Bash, not a particular Python or Linux distribution.
 manifest=${HARNESS_RELEASE_MANIFEST:-https://releases.dotobot.com/harness/manifest.json}
-"${docker_cmd[@]}" run --rm -i --user "$(id -u):$(id -g)" --mount "type=bind,src=$stage,dst=$stage" python:3.12-slim python - "$manifest" "$stage" <<'PY'
+dotobot_step "[####----------------] 1/5  Downloading and verifying the release" "${docker_cmd[@]}" run --rm -i --user "$(id -u):$(id -g)" --mount "type=bind,src=$stage,dst=$stage" python:3.12-slim python - "$manifest" "$stage" <<'PY'
 import hashlib
 import json
 from pathlib import Path, PurePosixPath
@@ -196,9 +245,9 @@ with tarfile.open(archive) as tar:
 if not (release / 'deploy/container_install.py').is_file():
     raise SystemExit('This release predates the container installer. Try again after the self-hosted release is published.')
 PY
-"${docker_cmd[@]}" build --iidfile "$stage/server-image" -f "$stage/release/deploy/Dockerfile" "$stage/release"
+dotobot_step "[########------------] 2/5  Building your server" "${docker_cmd[@]}" build --iidfile "$stage/server-image" -f "$stage/release/deploy/Dockerfile" "$stage/release"
 image=$(cat "$stage/server-image")
-"${docker_cmd[@]}" run --rm --mount "type=bind,src=$root,dst=$root" --mount "type=bind,src=$socket,dst=/var/run/docker.sock" -e "DOTOBOT_DOCKER_SOCKET=$socket" "$image" python deploy/container_install.py --root "$root" --source "$stage/release" --image "$image" "$@"
+"${docker_cmd[@]}" run --rm --mount "type=bind,src=$root,dst=$root" --mount "type=bind,src=$socket,dst=/var/run/docker.sock" -e "DOTOBOT_DOCKER_SOCKET=$socket" -e "DOTOBOT_SETUP_LOG=$setup_log" -e "DOTOBOT_INSTALL_TTY=$interactive" "$image" python deploy/container_install.py --root "$root" --source "$stage/release" --image "$image" "$@"
 rm -rf "$stage"
 }
 dotobot_install "$@"

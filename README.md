@@ -16,6 +16,11 @@ extend the security support lifetime of an end-of-life host OS.
 curl -fsSL https://dotobot.com/install.sh | bash
 ```
 
+The installer shows live build activity and finishes with one private `dotobot_`
+link code to paste into the app. Build diagnostics are retained in `setup.log`
+inside the installation directory; redirected output stays plain text. Existing
+`harness_` codes remain valid in compatible clients.
+
 The installer reuses a working local Docker engine. If Docker is missing, it
 uses Docker's official Linux installation script or downloads Docker Desktop on
 macOS. Administrator permission may be requested. On macOS, complete Docker

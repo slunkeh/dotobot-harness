@@ -6,7 +6,7 @@ to connect — no manual URL/token entry, no config files. The key is persisted 
 `$HARNESS_HOME/link-key` so it stays stable across restarts (rotate with
 `harness link --rotate`).
 
-The link code is `harness_<base64url(json{"url","key"})>`.
+The link code is `dotobot_<base64url(json{"url","key"})>`.
 """
 
 from __future__ import annotations
@@ -102,18 +102,21 @@ def advertised_url(
 
 def link_code(url: str, key: str) -> str:
     payload = json.dumps({"url": url, "key": key}).encode("utf-8")
-    code = "harness_" + base64.urlsafe_b64encode(payload).decode("ascii").rstrip("=")
+    code = "dotobot_" + base64.urlsafe_b64encode(payload).decode("ascii").rstrip("=")
     # The code is the key in base64 clothing: the scrubber knows the raw key
     # but not this form, so register it too — the pairing banner is printed
     # at first run and would otherwise land in run/server/serve.log in the clear.
     register_secret(code, "LINK_CODE")
+    register_secret("harness_" + code.removeprefix("dotobot_"), "LINK_CODE")
     return code
 
 
 def decode_link_code(code: str) -> dict:
     text = code.strip()
-    if text.startswith("harness_"):
-        text = text[len("harness_") :]
+    for prefix in ("dotobot_", "harness_"):
+        if text.startswith(prefix):
+            text = text[len(prefix) :]
+            break
     padding = "=" * (-len(text) % 4)
     data = base64.urlsafe_b64decode(text + padding)
     return json.loads(data)
