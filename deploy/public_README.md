@@ -66,7 +66,9 @@ Updates are manual. The candidate server and computer images build before the
 running server stops. Failed replacement restores the previous server when
 possible. State is never rolled back: keep backups before an update that
 migrates data. Closing a client does not stop the server. Docker restarts the
-server after its engine restarts; Docker Desktop must be running on macOS.
+server after its engine restarts, and the controller starts the saved bot roster.
+This also starts bots that were manually stopped, matching the system-service
+startup behaviour. Docker Desktop must be running on macOS.
 Uninstall retains data by default and never removes Docker or other services.
 Images/build cache may remain reusable after uninstall; no broad Docker prune
 is performed. `--port NUMBER` selects a different localhost port on first install.

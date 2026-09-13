@@ -10,7 +10,7 @@ import sys
 
 def main() -> int:
     command = [sys.executable, "-m", "harness", "--backend", "machines"]
-    child = subprocess.Popen(command + ["serve", "--host", "0.0.0.0", "--port", "8765"])
+    child = subprocess.Popen(command + ["serve", "--up", "--host", "0.0.0.0", "--port", "8765"])
     stopping = False
 
     def stop(_signum, _frame):

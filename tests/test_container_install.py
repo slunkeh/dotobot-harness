@@ -304,3 +304,38 @@ def test_health_probe_executes_and_checks_release_version(tmp_path, monkeypatch)
     installer.ready({"name": "controller", "version": "1.2.3"})
     with pytest.raises(AssertionError):
         installer.ready({"name": "controller", "version": "9.9.9"})
+
+
+def test_controller_restart_starts_roster_and_quiesces_before_exit(monkeypatch):
+    import container_entrypoint as entrypoint
+
+    from harness.cli import build_parser
+
+    events = []
+    handlers = {}
+
+    class Server:
+        def __init__(self, command):
+            args = build_parser().parse_args(command[3:])
+            assert args.backend == "machines"
+            assert args.up, "Controller restart must bring the persisted roster back up"
+            events.append("start")
+
+        def wait(self):
+            handlers[entrypoint.signal.SIGTERM](None, None)
+            handlers[entrypoint.signal.SIGTERM](None, None)
+            return 0
+
+        def terminate(self):
+            events.append("terminate")
+
+    def down(command, **kwargs):
+        assert command[-1] == "down"
+        events.append("sync-and-stop")
+        return SimpleNamespace(returncode=0)
+
+    monkeypatch.setattr(entrypoint.subprocess, "Popen", Server)
+    monkeypatch.setattr(entrypoint.subprocess, "run", down)
+    monkeypatch.setattr(entrypoint.signal, "signal", lambda sig, fn: handlers.update({sig: fn}))
+    assert entrypoint.main() == 0
+    assert events == ["start", "sync-and-stop", "terminate"]
