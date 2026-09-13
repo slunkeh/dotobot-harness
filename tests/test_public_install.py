@@ -96,7 +96,7 @@ def test_fresh_install_is_private_persistent_and_manual(host, tmp_path, capsys):
     assert (layout.home / "public-url").read_text().strip() == "https://bots.example.com"
     assert ("https://bots.example.com", "1.0.0") in probes
     assert ["systemctl", "disable", "--now", installer.TIMER] in calls
-    assert "Link code: harness_" in capsys.readouterr().out
+    assert "Link code: dotobot_" in capsys.readouterr().out
     assert "HARNESS_HOME=" + str(layout.home) in layout.wrapper.read_text()
 
 
@@ -325,7 +325,7 @@ def test_failed_https_does_not_print_code_or_mark_ready(host, tmp_path, capsys):
 
     assert initial(host, tmp_path, probe=fail) == 1
     assert not json.loads(layout.config.read_text())["ready"]
-    assert "harness_" not in capsys.readouterr().out
+    assert "dotobot_" not in capsys.readouterr().out
 
 
 def test_rerun_preserves_settings_key_proxy_and_update_policy(host, tmp_path, capsys):

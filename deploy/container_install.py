@@ -12,6 +12,7 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
 import time
 from pathlib import Path
 
@@ -27,7 +28,34 @@ class InstallError(RuntimeError):
 
 
 def docker(*args: str, check: bool = True, capture: bool = True):
-    return subprocess.run(["docker", *args], check=check, capture_output=capture, text=True)
+    if capture:
+        return subprocess.run(["docker", *args], check=check, capture_output=True, text=True)
+    # Build chatter stays out of the result panel; retain diagnostics privately.
+    log = os.environ.get("DOTOBOT_SETUP_LOG")
+    with open(log, "a+") if log else tempfile.TemporaryFile(mode="w+") as output:
+        process = subprocess.Popen(["docker", *args], stdout=output, stderr=output, text=True)
+        tick = 0
+        try:
+            while True:
+                try:
+                    status = process.wait(timeout=0.2)
+                    break
+                except subprocess.TimeoutExpired:
+                    if os.environ.get("DOTOBOT_INSTALL_TTY") == "1":
+                        marker = " " * (tick % 16) + "===="
+                        print(f"\r  [{marker:<20}] Working...", end="", flush=True)
+                        tick += 1
+        except BaseException:
+            process.terminate()
+            process.wait()
+            raise
+        if os.environ.get("DOTOBOT_INSTALL_TTY") == "1":
+            print("\r" + " " * 60 + "\r", end="", flush=True)
+        if status and check:
+            output.seek(0)
+            print("\n".join(output.read().splitlines()[-20:]), file=sys.stderr)
+            raise subprocess.CalledProcessError(status, ["docker", *args])
+        return subprocess.CompletedProcess(["docker", *args], status, "", "")
 
 
 def inspect(kind: str, name: str) -> dict | None:
@@ -214,9 +242,20 @@ def finish(config: dict) -> None:
         if config["address"]
         else f"http://127.0.0.1:{config['port']}"
     )
-    print(f"Dotobot {config['version']} is ready at {url}")
-    print("Private link code: " + link_code(url, key))
-    print("Keep this code private. Paste it into Add server in the app.")
+    code = link_code(url, key)
+    print("\n  [####################] 5/5  Ready\n")
+    print("  +----------------------------------------------------------+")
+    print("  |  DOTOBOT IS READY                                        |")
+    print("  +----------------------------------------------------------+")
+    print(f"\n  Version  {config['version']}\n  Server   {url}")
+    print("\n  YOUR PRIVATE LINK CODE\n")
+    print("  " + code)
+    print("\n  Paste this into Dotobot > Your servers > Link a server.")
+    print("  Add your first server, or another alongside your existing ones.")
+    print("  Keep this code private: it grants access to your server.")
+    if not config["address"]:
+        print("\n  Local connection only. From another computer, use an SSH")
+        print("  tunnel or configure HTTPS with --ip / --domain.")
 
 
 def install(config: dict, source: Path, image: str) -> None:
@@ -238,6 +277,8 @@ def install(config: dict, source: Path, image: str) -> None:
     tag = f"dotobot-machine:{identity}-{version[1]}"
     # Build before changing the running server. Save immutable image IDs so a
     # later build cannot change the old container's machine-image selection.
+    print("\n  [############--------] 3/5  Building your bot computer", flush=True)
+    print("  The first build can take several minutes.", flush=True)
     docker(
         "build",
         "-t",
@@ -250,6 +291,7 @@ def install(config: dict, source: Path, image: str) -> None:
     candidate["machine_image"] = inspect("image", tag)["Id"]
     if candidate["address"]:
         docker("pull", CADDY_IMAGE, capture=False)
+    print("\n  [################----] 4/5  Starting and checking your server", flush=True)
     (root / "state").mkdir(exist_ok=True, mode=0o700)
     (root / "https").mkdir(exist_ok=True, mode=0o700)
     ensure_network(candidate)

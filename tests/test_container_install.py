@@ -256,7 +256,8 @@ output.write_text('#!/bin/sh\\n/bin/cp "{payload}" "{fakebin / "docker"}"\\n/bin
 ''',
     )
     result = subprocess.run(
-        ["/bin/bash", str(ROOT / "install.sh")],
+        ["/bin/bash"],
+        input=(ROOT / "install.sh").read_text(),
         text=True,
         capture_output=True,
         env=dict(os.environ, PATH=str(fakebin), HOME=str(tmp_path), DOTOBOT_HOME=str(root)),
@@ -268,6 +269,9 @@ output.write_text('#!/bin/sh\\n/bin/cp "{payload}" "{fakebin / "docker"}"\\n/bin
     assert "container_install.py --root" in log
     assert "dst=/var/run/docker.sock" in log
     assert not list(root.glob("download.*"))
+    assert (root / "setup.log").stat().st_mode & 0o777 == 0o600
+    assert "\x1b" not in result.stdout
+    assert "5  Building your server" in result.stdout
 
 
 def test_data_deletion_never_guesses_volume_ownership_from_prefix(tmp_path, monkeypatch):
@@ -339,3 +343,66 @@ def test_controller_restart_starts_roster_and_quiesces_before_exit(monkeypatch):
     monkeypatch.setattr(entrypoint.signal, "signal", lambda sig, fn: handlers.update({sig: fn}))
     assert entrypoint.main() == 0
     assert events == ["start", "sync-and-stop", "terminate"]
+
+
+def test_result_panel_shows_one_private_code_after_health_check(tmp_path, monkeypatch, capsys):
+    from harness.linking import decode_link_code
+
+    c = dict(config(tmp_path), version="1.2.3")
+    state = Path(c["root"]) / "state"
+    state.mkdir()
+    (state / "link-key").write_text("panel-test-key")
+    checked = []
+    monkeypatch.setattr(installer, "ready", lambda value: checked.append(value))
+    installer.finish(c)
+    out = capsys.readouterr().out
+    assert checked == [c]
+    codes = [line.strip() for line in out.splitlines() if line.strip().startswith("dotobot_")]
+    assert len(codes) == 1
+    assert decode_link_code(codes[0])["key"] == "panel-test-key"
+    assert "panel-test-key" not in out and "harness_" not in out
+    assert "5/5  Ready" in out and "YOUR PRIVATE LINK CODE" in out
+    assert "dotobot://" not in out and "Press any key" not in out
+
+
+def test_failed_health_never_prints_success_or_link_code(tmp_path, monkeypatch, capsys):
+    c = dict(config(tmp_path), version="1.2.3")
+    monkeypatch.setattr(
+        installer, "ready", lambda _: (_ for _ in ()).throw(installer.InstallError("not healthy"))
+    )
+    with pytest.raises(installer.InstallError, match="not healthy"):
+        installer.finish(c)
+    assert capsys.readouterr().out == ""
+
+
+@pytest.mark.parametrize("exit_status", [0, 7])
+def test_terminal_progress_preserves_piped_input_and_exit_status(tmp_path, exit_status):
+    import os
+    import pty
+    import shlex
+
+    script = (ROOT / "install.sh").read_text()
+    function = script.split("dotobot_step() {", 1)[1].split("\n}\n", 1)[0]
+    log = tmp_path / "build.log"
+    command = (
+        "dotobot_step() {"
+        + function
+        + "\n}\n"
+        + "interactive=1\nsetup_log="
+        + shlex.quote(str(log))
+        + "\n"
+        + f"dotobot_step 'Building' /bin/sh -c 'cat; exit {exit_status}' <<'INPUT'\n"
+        + "piped release verifier\nINPUT\n"
+    )
+    master, slave = pty.openpty()
+    try:
+        result = subprocess.run(
+            ["/bin/bash", "-c", command], stdout=slave, stderr=subprocess.PIPE, timeout=15
+        )
+    finally:
+        os.close(slave)
+        os.close(master)
+    assert result.returncode == exit_status
+    assert log.read_text() == "piped release verifier\n"
+    if exit_status:
+        assert str(log).encode() in result.stderr

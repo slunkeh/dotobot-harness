@@ -25,7 +25,7 @@ def test_key_is_stable_and_rotatable(tmp_path):
 
 def test_link_code_roundtrip():
     code = link_code("http://192.168.1.5:8765", "abc123")
-    assert code.startswith("harness_")
+    assert code.startswith("dotobot_")
     decoded = decode_link_code(code)
     assert decoded == {"url": "http://192.168.1.5:8765", "key": "abc123"}
 
@@ -135,3 +135,28 @@ def test_server_public_url_does_not_replace_loopback_tools_address(tmp_path, mon
     finally:
         server.server_close()
         orch.down()
+
+
+def test_dotobot_code_and_legacy_code_decode_to_same_connection():
+    import base64
+
+    payload = (
+        base64.urlsafe_b64encode(
+            json.dumps({"url": "https://bots.example.com", "key": "test-key"}).encode()
+        )
+        .decode()
+        .rstrip("=")
+    )
+    expected = {"url": "https://bots.example.com", "key": "test-key"}
+    for prefix in ("dotobot_", "harness_", ""):
+        assert decode_link_code(prefix + payload) == expected
+    assert link_code(**expected).startswith("dotobot_")
+
+
+def test_both_branded_and_legacy_codes_are_scrubbed():
+    from harness.redaction import scrub
+
+    code = link_code("https://bots.example.com", "redaction-test-key")
+    legacy = "harness_" + code.removeprefix("dotobot_")
+    assert code not in scrub(code)
+    assert legacy not in scrub(legacy)
