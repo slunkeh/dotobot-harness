@@ -13,11 +13,13 @@ and keeps the harness API on loopback. It does not change an existing harness or
 reverse proxy installation.
 
 ```sh
-curl -fsSL https://dotobot.com/install.sh | sudo sh -s -- --ip YOUR_PUBLIC_IP
+curl -fsSL https://dotobot.com/install.sh | bash
 ```
 
-A domain is optional: use `--domain bots.example.com` instead if its DNS points
-to your server. With neither option, enter your public IP or domain at the prompt.
+The installer requests administrator permission through sudo, then prompts for
+your public IP or optional domain. To supply the address directly, use
+`bash -s -- --ip YOUR_PUBLIC_IP` after the pipe, or
+`bash -s -- --domain bots.example.com` if its DNS points to your server.
 The script installs Python, Docker, a checksum-verified official Caddy release,
 the bot-computer image and a systemd service, then checks HTTPS
 before printing a private link code. Paste it into **Add server** in the Dotobot

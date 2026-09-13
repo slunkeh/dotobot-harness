@@ -1,6 +1,8 @@
-#!/bin/sh
+#!/bin/bash
 # Install a self-hosted Dotobot server. The apps are sold separately.
-# curl -fsSL https://dotobot.com/install.sh | sudo sh -s -- --ip YOUR_PUBLIC_IP
+# curl -fsSL https://dotobot.com/install.sh | bash
+# Load the complete installer before running it: stdin may be a curl pipe.
+dotobot_install() {
 set -eu
 
 case "${1:-}" in
@@ -8,7 +10,7 @@ case "${1:-}" in
         cat <<'HELP'
 Dotobot server installer (Ubuntu 24.04 / Debian 12, amd64 or arm64)
 
-curl -fsSL https://dotobot.com/install.sh | sudo sh -s -- --ip YOUR_PUBLIC_IP
+curl -fsSL https://dotobot.com/install.sh | bash
 
 --ip ADDRESS        public IPv4 or IPv6 address; no domain needed
 --domain NAME       optional DNS name pointing to this server
@@ -18,7 +20,8 @@ curl -fsSL https://dotobot.com/install.sh | sudo sh -s -- --ip YOUR_PUBLIC_IP
 --link              print the installed server's link code after checking HTTPS
 
 When neither address option is supplied, enter a public IP or domain at the prompt.
-Requires root and inbound TCP 80/443 for Caddy's HTTPS certificate. IP certificates
+Requests administrator permission with sudo when needed.
+Requires inbound TCP 80/443 for Caddy's HTTPS certificate. IP certificates
 renew automatically; private/LAN addresses cannot receive public IP certificates.
 No Dotobot account is needed on the server. Existing installations retain their
 state, link key, address and update policy.
@@ -41,7 +44,23 @@ for LEGACY_DIR in "${HARNESS_INSTALL_DIR:-}" "$LEGACY_HOME/.dotobot" "$LEGACY_HO
 done
 
 [ "$(uname -s)" = Linux ] || { echo 'The server installer supports Linux; install the apps from the App Store.' >&2; exit 1; }
-[ "$(id -u)" -eq 0 ] || { echo 'Run this installer with sudo (see --help).' >&2; exit 1; }
+if [ "$(id -u)" -ne 0 ]; then
+    [ -n "${BASH_VERSION:-}" ] || {
+        echo 'Run: curl -fsSL https://dotobot.com/install.sh | bash' >&2
+        exit 1
+    }
+    command -v sudo >/dev/null 2>&1 || {
+        echo 'Administrator permission is required. Install sudo or run this installer as root.' >&2
+        exit 1
+    }
+    echo 'Dotobot needs administrator permission to install packages and system services.' >&2
+    # Serialize the loaded function instead of re-reading an exhausted pipe or
+    # downloading a second copy. Pass settings and options as literal arguments.
+    exec sudo /bin/bash -c "$(declare -f dotobot_install)
+export HARNESS_RELEASE_MANIFEST=\"\$1\" HARNESS_INSTALL_DIR=\"\$2\"
+shift 2
+dotobot_install \"\$@\"" dotobot-install "${HARNESS_RELEASE_MANIFEST:-}" "${HARNESS_INSTALL_DIR:-}" "$@"
+fi
 # Never adopt a managed/personal server merely because it uses the same paths.
 if [ -f /etc/dotobot-server/install.json ] && [ -f /opt/harness/current/deploy/public_install.py ]; then
     exec /usr/bin/python3 /opt/harness/current/deploy/public_install.py "$@"
@@ -144,3 +163,7 @@ if not (release / 'deploy/public_install.py').is_file():
     raise SystemExit('This release predates the public installer. Try again after the self-hosted release is published.')
 PY
 python3 "$STAGE/release/deploy/public_install.py" --release-tree "$STAGE/release" --release-manifest "$STAGE/manifest.json" --manifest-url "$MANIFEST" "$@"
+
+}
+
+dotobot_install "$@"
