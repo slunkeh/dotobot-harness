@@ -21,3 +21,13 @@ local-development escape hatch and does not provide those isolation guarantees.
 Keep the operating system, Docker and Caddy patched. Dotobot updates are manual
 unless you opt in; a successful download or service restart is not a substitute
 for checking your workflows. Keep backups of harness state and Docker volumes.
+
+## Container controller
+
+The Docker installer gives the harness controller access to the local Docker
+engine socket. Treat it as a trusted administrator of that engine and host.
+The socket is never mounted into bot computers. Each bot receives only its own
+home, the shared project volume, and its explicitly granted read-only script
+credential directory. Default local installs publish the API on loopback only;
+use the HTTPS address options for remote access. Container packaging does not
+make an unsupported host operating system secure.

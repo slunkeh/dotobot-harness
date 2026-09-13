@@ -160,6 +160,9 @@ deploy/public_SECURITY.md
 deploy/public_conftest.py
 deploy/public_export.py
 deploy/public_install.py
+deploy/container_install.py
+deploy/container_entrypoint.py
+deploy/system_install.sh
 deploy/release_manifest.py
 deploy/terminal-icon.png
 deploy/updater.py
@@ -325,3 +328,5 @@ tests/test_public_export.py
 tests/test_persona.py
 tests/test_feature_coverage.py
 tests/test_multi_server.py
+
+tests/test_container_install.py
