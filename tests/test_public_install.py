@@ -463,7 +463,7 @@ def test_release_redirects_cannot_change_origin_or_downgrade():
 
 
 def test_bootstrap_rejects_bad_checksum_before_extracting(tmp_path, monkeypatch):
-    script = (ROOT / "install.sh").read_text().split("<<'PY'\n", 1)[1].split("\nPY\n", 1)[0]
+    script = (ROOT / "deploy/system_install.sh").read_text().split("<<'PY'\n", 1)[1].split("\nPY\n", 1)[0]
     data = b"not-an-archive"
     manifest = {
         "version": "1.0.0",
@@ -485,7 +485,7 @@ def test_bootstrap_rejects_bad_checksum_before_extracting(tmp_path, monkeypatch)
 
 
 def test_bootstrap_extracts_without_tarfile_filter_support(tmp_path, monkeypatch):
-    script = (ROOT / "install.sh").read_text().split("<<'PY'\n", 1)[1].split("\nPY\n", 1)[0]
+    script = (ROOT / "deploy/system_install.sh").read_text().split("<<'PY'\n", 1)[1].split("\nPY\n", 1)[0]
     raw = io.BytesIO()
     with tarfile.open(fileobj=raw, mode="w:gz") as tar:
         content = b"# verified release installer\n"
@@ -519,7 +519,7 @@ def test_bootstrap_extracts_without_tarfile_filter_support(tmp_path, monkeypatch
 
 
 def test_bootstrap_rejects_archive_path_escape(tmp_path, monkeypatch):
-    script = (ROOT / "install.sh").read_text().split("<<'PY'\n", 1)[1].split("\nPY\n", 1)[0]
+    script = (ROOT / "deploy/system_install.sh").read_text().split("<<'PY'\n", 1)[1].split("\nPY\n", 1)[0]
     raw = io.BytesIO()
     with tarfile.open(fileobj=raw, mode="w:gz") as archive:
         info = tarfile.TarInfo("../escaped")
@@ -627,3 +627,57 @@ def test_health_requires_authenticated_resource_even_if_health_is_public(monkeyp
     assert not installer.health("https://owned.example.com", "wrong", "1.0.0")
     assert installer.health("https://owned.example.com", "correct", "1.0.0")
     assert ("/api/bots", "Bearer wrong") in requests
+
+
+@pytest.mark.parametrize("piped", [True, False])
+def test_bootstrap_requests_sudo_and_preserves_payload_and_arguments(tmp_path, piped):
+    commands = tmp_path / "bin"
+    commands.mkdir()
+    capture = tmp_path / "sudo.json"
+    for name, body in {
+        "uname": "#!/bin/sh\necho Linux\n",
+        "id": "#!/bin/sh\necho 1000\n",
+        "sudo": (
+            f"#!{sys.executable}\nimport json, sys\n"
+            f"open({str(capture)!r}, 'w').write(json.dumps(sys.argv[1:]))\n"
+            "sys.exit(23)\n"
+        ),
+    }.items():
+        path = commands / name
+        path.write_text(body)
+        path.chmod(0o755)
+    env = dict(os.environ, PATH=f"{commands}:/usr/bin:/bin", HOME=str(tmp_path))
+    env.pop("SUDO_USER", None)
+    env["HARNESS_RELEASE_MANIFEST"] = "https://releases.example.com/custom.json"
+    env["HARNESS_INSTALL_DIR"] = str(tmp_path / "source checkout")
+    args = ["--domain", "bots.example.com", "--no-auto-update"]
+    command = ["/bin/bash", "-s", "--", *args] if piped else [
+        "/bin/bash", str(ROOT / "deploy/system_install.sh"), *args
+    ]
+    result = subprocess.run(
+        command, input=(ROOT / "deploy/system_install.sh").read_text() if piped else None,
+        env=env, text=True, capture_output=True,
+    )
+    assert capture.exists(), result.stderr
+    assert result.returncode == 23  # A denied/failed sudo must stop installation.
+    elevated = json.loads(capture.read_text())
+    assert elevated[:2] == ["/bin/bash", "-c"]
+    assert elevated[4:6] == [env["HARNESS_RELEASE_MANIFEST"], env["HARNESS_INSTALL_DIR"]]
+    assert elevated[6:] == args
+    # Replay only --help: proves the complete script survived the pipe and is
+    # valid after serialization, without invoking real sudo or host operations.
+    replay = subprocess.run(
+        [*elevated[:6], "--help"], env=env, text=True, capture_output=True,
+    )
+    assert replay.returncode == 0, replay.stderr
+    assert "curl -fsSL https://dotobot.com/install.sh | bash" in replay.stdout
+    assert "Release checksum mismatch" in elevated[2]
+
+
+def test_bootstrap_help_needs_no_sudo():
+    result = subprocess.run(
+        ["/bin/bash", str(ROOT / "deploy/system_install.sh"), "--help"],
+        text=True, capture_output=True,
+    )
+    assert result.returncode == 0
+    assert "| bash" in result.stdout

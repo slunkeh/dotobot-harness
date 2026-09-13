@@ -295,7 +295,10 @@ def cmd_serve(args) -> int:
         # not the old full-width host taskbar.
         os.environ.setdefault("HARNESS_DESKTOP_STYLE", "machine")
         os.environ.setdefault("HARNESS_BROWSER_NO_SANDBOX", "1")
-    ensure(desktop=args.desktop)
+    # Machine computers contain their own desktop tools. A containerised
+    # controller must not install X11/ffmpeg packages on every startup.
+    if args.backend != "machines" or args.desktop:
+        ensure(desktop=args.desktop)
     return serve(
         home=args.home,
         roster_path=args.roster,
