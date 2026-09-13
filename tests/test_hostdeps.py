@@ -82,3 +82,15 @@ def test_ensure_silent_on_non_linux_without_apt(monkeypatch, capsys):
     captured = capsys.readouterr()
     assert captured.out == ""
     assert captured.err == ""
+
+
+def test_machine_server_does_not_install_host_desktop_packages(monkeypatch):
+    from harness import cli, server
+
+    calls = []
+    monkeypatch.setattr(hostdeps, "ensure", lambda **kwargs: calls.append(kwargs))
+    monkeypatch.setattr(server, "serve", lambda **kwargs: 0)
+    assert cli.cmd_serve(cli.build_parser().parse_args(["serve"])) == 0
+    assert calls == []
+    assert cli.cmd_serve(cli.build_parser().parse_args(["--backend", "process", "serve"])) == 0
+    assert calls == [{"desktop": False}]
