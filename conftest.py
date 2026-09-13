@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-MINIMUM_TESTS = 3046
+MINIMUM_TESTS = 3054
 
 
 def pytest_collection_modifyitems(config, items):

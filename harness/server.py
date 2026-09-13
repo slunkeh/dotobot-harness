@@ -148,7 +148,16 @@ from .mcp_oauth import OAuthError as MCPOAuthError
 from .netguard import install_safe_redirects
 from .orchestrator import Orchestrator
 from .persona import PersonaError
-from .prefs import account_prefs, caveman_default, set_caveman, set_llm_defaults, set_user_avatar
+from .prefs import (
+    ConsentError,
+    account_prefs,
+    caveman_default,
+    record_consents,
+    set_caveman,
+    set_content_filter,
+    set_llm_defaults,
+    set_user_avatar,
+)
 from .readiness import provider_readiness
 from .recipes import RecipeError
 from .recipes import catalog as recipe_catalog
@@ -877,6 +886,13 @@ class _Handler(BaseHTTPRequestHandler):
                 # Every bot that follows the account just changed its
                 # effective flag: re-fan the roster so both apps repaint.
                 self._push_lists(bots=True)
+            if "content_filter" in data:
+                set_content_filter(self.orch.paths, bool(data.get("content_filter")))
+            if "consents" in data:
+                try:
+                    record_consents(self.orch.paths, data.get("consents"))
+                except ConsentError as exc:
+                    return self._send_json({"error": str(exc)}, 400)
             return self._send_json(account_prefs(self.orch.paths))
         return self._send_json({"error": "not found", "path": path}, 404)
 
@@ -953,6 +969,8 @@ class _Handler(BaseHTTPRequestHandler):
                     # legacy key for app builds from the idle-think release
                     "idle_think": bool(getattr(b, "dreaming", False)),
                     "private_browser": bool(getattr(b, "private_browser", False)),
+                    # Blocked by the owner: on the roster, never dispatched.
+                    "blocked": bool(getattr(b, "blocked", False)),
                     # Caveman mode: the bot's own tri-state override (null =
                     # follow the account) and what that resolves to today.
                     "caveman": caveman_own,
@@ -1685,6 +1703,8 @@ class _Handler(BaseHTTPRequestHandler):
         bot, rid = parsed
         try:
             self.orch.roster.get(bot)
+            if self.orch.is_blocked(bot):
+                return self._send_json({"error": f"{bot} is blocked; unblock it first"}, 409)
             row = run_now(
                 self.orch.paths,
                 bot,

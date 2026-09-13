@@ -66,7 +66,69 @@ def account_prefs(paths: HarnessPaths) -> dict[str, Any]:
     out: dict[str, Any] = dict(llm_defaults(paths))
     out["user_avatar"] = user_avatar(paths)
     out["caveman"] = caveman_default(paths)
+    out["content_filter"] = content_filter(paths)
+    out["consents"] = consents(paths)
     return out
+
+
+def content_filter(paths: HarnessPaths) -> bool:
+    """Account-wide content filter (`agent/contentfilter.py`). On until the
+    owner turns it off; there is no per-bot override."""
+    return bool(load(paths).get("content_filter", True))
+
+
+def set_content_filter(paths: HarnessPaths, on: bool) -> bool:
+    data = load(paths)
+    data["content_filter"] = bool(on)
+    save(paths, data)
+    return bool(on)
+
+
+def consents(paths: HarnessPaths) -> dict[str, int]:
+    """Third-party-AI consents the owner gave (App Review Guideline 5.1.2(i)):
+    `{"provider:<id>": <epoch seconds>, "connector:<type>": <epoch seconds>}`.
+    A soft gate — clients show the consent sheet before the first key,
+    OAuth or connector connect and record it here; the server never refuses
+    a call for a missing entry (installed clients keep working)."""
+    raw = load(paths).get("consents")
+    if not isinstance(raw, dict):
+        return {}
+    out: dict[str, int] = {}
+    for key, value in raw.items():
+        try:
+            out[str(key)] = int(value)
+        except (TypeError, ValueError):
+            continue
+    return out
+
+
+class ConsentError(ValueError):
+    pass
+
+
+def record_consents(paths: HarnessPaths, given: dict[str, Any]) -> dict[str, int]:
+    """Merge `{key: epoch seconds}` in. Keys are `<scope>:<id>` (scope one of
+    provider / connector / ai), at most 100 characters; a falsy value
+    withdraws the entry. Raises ConsentError on anything else."""
+    if not isinstance(given, dict):
+        raise ConsentError("consents must be an object")
+    data = load(paths)
+    current = dict(data.get("consents") or {}) if isinstance(data.get("consents"), dict) else {}
+    for key, value in given.items():
+        name = str(key or "").strip()
+        scope, _, ident = name.partition(":")
+        if not ident or scope not in ("provider", "connector", "ai") or len(name) > 100:
+            raise ConsentError(f"bad consent key {name!r}")
+        if not value:
+            current.pop(name, None)
+            continue
+        try:
+            current[name] = int(value)
+        except (TypeError, ValueError):
+            raise ConsentError(f"bad consent value for {name!r}") from None
+    data["consents"] = current
+    save(paths, data)
+    return {k: int(v) for k, v in current.items()}
 
 
 def caveman_default(paths: HarnessPaths) -> bool:
