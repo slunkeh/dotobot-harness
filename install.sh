@@ -29,7 +29,7 @@ esac
 # No prompts or terminal escapes when redirected or used by automation.
 interactive=0
 [ ! -t 1 ] || [ "${TERM:-dumb}" = dumb ] || interactive=1
-accent= reset=
+accent='' reset=''
 if [ "$interactive" -eq 1 ] && [ -z "${NO_COLOR+x}" ]; then
     accent=$'\033[1;36m'; reset=$'\033[0m'
 fi
@@ -135,7 +135,7 @@ if ! docker info >/dev/null 2>&1; then
     if [ "$(uname -s)" = Darwin ]; then
         echo 'Starting Docker Desktop. Complete its license and permission prompts if shown.'
         open -a Docker
-        for attempt in {1..120}; do
+        for _attempt in {1..120}; do
             docker info >/dev/null 2>&1 && break
             sleep 2
         done

@@ -331,3 +331,8 @@ tests/test_feature_coverage.py
 tests/test_multi_server.py
 
 tests/test_container_install.py
+tests/test_recipes.py
+tests/test_security_hardening.py
+tests/test_firewall_deployment.py
+tests/test_machine_image_build.py
+tests/test_runtime_release_tools.py
