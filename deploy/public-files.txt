@@ -336,3 +336,4 @@ tests/test_security_hardening.py
 tests/test_firewall_deployment.py
 tests/test_machine_image_build.py
 tests/test_runtime_release_tools.py
+tests/test_queue_management.py

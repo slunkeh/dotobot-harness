@@ -31,6 +31,9 @@ Endpoints (all under /api unless noted):
                                          context (logs, bot state, stream, audit)
     GET  /reports[/<id>]              -> newest-first summaries (?limit=50) / one report
     DELETE /reports/<id>              -> remove one
+    GET  /bots/<b>/queue              -> full waiting queue (running task excluded)
+    PATCH /bots/<b>/queue {ids:[...]}  -> persist complete waiting order; stale IDs: 409
+    DELETE /bots/<b>/queue/<id>       -> remove waiting work only; admitted item: 409
     POST /bots/<b>/restart            -> stop+spawn that bot (inbox kept)
     POST /chat            {bot,text}  -> text/event-stream of stream events
                                          (optional client_nonce: idempotent
@@ -845,6 +848,8 @@ class _Handler(BaseHTTPRequestHandler):
         if not self._authed():
             return self._send_json({"error": "unauthorized"}, 401)
         path = urlparse(self.path).path.rstrip("/")
+        if path.startswith("/api/bots/") and path.endswith("/queue"):
+            return self._edit_queue(path[len("/api/bots/"):-len("/queue")].strip("/"))
         if path.startswith("/api/rooms/"):
             return self._patch_room(path[len("/api/rooms/") :])
         if path.startswith("/api/bots/") and path.endswith("/soul"):
@@ -916,6 +921,9 @@ class _Handler(BaseHTTPRequestHandler):
         if not self._authed():
             return self._send_json({"error": "unauthorized"}, 401)
         path = urlparse(self.path).path.rstrip("/")
+        if path.startswith("/api/bots/") and "/queue/" in path:
+            name, _, rid = path[len("/api/bots/"):].partition("/queue/")
+            return self._edit_queue(name, remove_id=rid)
         if path.startswith("/api/voice/elevenlabs/"):
             return self._elevenlabs("DELETE")
         if path.startswith("/api/rooms/"):
@@ -2126,14 +2134,32 @@ class _Handler(BaseHTTPRequestHandler):
             bot = self.orch.roster.get(name)
         except RosterError as exc:
             return self._send_json({"error": str(exc)}, 404)
-        return self._send_json(
-            messaging.queue_state(
-                self.orch.paths,
-                bot.name,
-                busy=self.orch.control.is_busy(bot.name),
-                current_id=self.orch.control.busy_request(bot.name),
-            )
-        )
+        with messaging.queue_lock(self.orch.paths, bot.name):
+            busy, current = self.orch.control.busy_state(bot.name)
+            state = messaging.queue_state(self.orch.paths, bot.name, busy=busy, current_id=current)
+        return self._send_json(state)
+
+    def _edit_queue(self, name: str, remove_id: str | None = None):
+        try:
+            bot = self.orch.roster.get(name)
+        except RosterError as exc:
+            return self._send_json({"error": str(exc)}, 404)
+        data = self._read_json() if remove_id is None else {}
+        ids = data.get("ids") if isinstance(data, dict) else None
+        if remove_id is None and (not isinstance(ids, list) or not all(isinstance(i, str) for i in ids)):
+            return self._send_json({"error": "ids must be a list of request IDs"}, 400)
+        with messaging.queue_lock(self.orch.paths, bot.name):
+            busy, current = self.orch.control.busy_state(bot.name)
+            try:
+                if remove_id is not None:
+                    if not messaging.remove_queued(self.orch.paths, bot.name, remove_id, current_id=current):
+                        return self._send_json({"error": "This item is no longer waiting. Refresh the queue."}, 409)
+                else:
+                    messaging.reorder_queue(self.orch.paths, bot.name, ids, current_id=current)
+            except ValueError as exc:
+                return self._send_json({"error": str(exc)}, 409)
+            state = messaging.queue_state(self.orch.paths, bot.name, busy=busy, current_id=current)
+        return self._send_json(state)
 
     def _history_page(self) -> tuple[float | None, int]:
         qs = parse_qs(urlparse(self.path).query)
