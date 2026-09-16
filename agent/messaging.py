@@ -11,10 +11,12 @@ later behind the same `send` / `read_inbox` shape.
 
 from __future__ import annotations
 
+import fcntl
 import json
 import os
 import time
 import uuid
+from contextlib import contextmanager
 from dataclasses import asdict, dataclass, field, fields
 from pathlib import Path
 
@@ -197,6 +199,98 @@ def lane_of(msg: Msg) -> str:
     if (msg.frm or "user") in ("", "user"):
         return LANE_USER
     return LANE_AGENT
+
+
+@contextmanager
+def queue_lock(paths: HarnessPaths, name: str):
+    """Serialize queue edits with admission and steering across processes."""
+    directory = paths.inbox(name).parent
+    directory.mkdir(parents=True, exist_ok=True)
+    with (directory / ".queue.lock").open("a") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            fcntl.flock(lock, fcntl.LOCK_UN)
+
+
+def queue_order(paths: HarnessPaths, name: str) -> list[str]:
+    try:
+        value = json.loads((paths.inbox(name).parent / "queue-order.json").read_text())
+        return value if isinstance(value, list) and all(isinstance(i, str) for i in value) else []
+    except (OSError, ValueError):
+        return []
+
+
+def save_queue_order(paths: HarnessPaths, name: str, ids: list[str]) -> None:
+    from harness.fsutil import write_atomic
+
+    write_atomic(paths.inbox(name).parent / "queue-order.json", json.dumps(ids))
+
+
+def ordered_pending(paths: HarnessPaths, name: str) -> list[Msg]:
+    ranks = {rid: i for i, rid in enumerate(queue_order(paths, name))}
+    return sorted(
+        pending(paths, name),
+        key=lambda m: (
+            0 if m.now and m.id not in ranks and lane_of(m) == LANE_USER else 1,
+            ranks.get(m.id, len(ranks)),
+            LANE_ORDER.index(lane_of(m)),
+            m.ts,
+            m.id,
+        ),
+    )
+
+
+def waiting_items(paths: HarnessPaths, name: str, current_id: str | None) -> list[Msg]:
+    from .streaming import read_steered
+
+    def waiting(msg):
+        if msg.id == current_id:
+            return False
+        joined = read_steered(paths, msg.id) if current_id else None
+        return joined is None or joined.target_request_id != current_id
+
+    return [m for m in ordered_pending(paths, name) if waiting(m)]
+
+
+def reorder_queue(paths: HarnessPaths, name: str, ids: list[str], *, current_id=None):
+    """Caller holds queue_lock; reject stale snapshots instead of losing arrivals."""
+    waiting = [m.id for m in waiting_items(paths, name, current_id)]
+    if len(ids) != len(set(ids)) or set(ids) != set(waiting):
+        raise ValueError("The queue changed. Refresh and try again.")
+    save_queue_order(paths, name, ids)
+
+
+def remove_queued(paths: HarnessPaths, name: str, rid: str, *, current_id=None) -> bool:
+    """Caller holds queue_lock. Never cancel an admitted/running request."""
+    if rid not in {m.id for m in waiting_items(paths, name, current_id)}:
+        return False
+    for path, msg in read_inbox(paths, name):
+        if msg.id == rid and (msg.reply_to is None or msg.is_continuation):
+            from harness.statestore import store_for
+
+            from . import obligations, recovery
+            from .streaming import StreamWriter
+
+            archive = paths.processed(name)
+            archive.mkdir(parents=True, exist_ok=True)
+            try:
+                os.replace(path, archive / path.name)
+            except FileNotFoundError:
+                return False
+            recovery.settle_turn(store_for(paths), rid)
+            StreamWriter(paths, rid, room=msg.room).final("Removed from queue.", name)
+            if msg.frm == "user":
+                obligations.settle(paths, name)
+            else:
+                # A colleague waiting for this request must receive a terminal response.
+                send(
+                    paths, Msg(frm=name, text="Removed from queue by the user.", **msg.reply_target)
+                )
+            save_queue_order(paths, name, [i for i in queue_order(paths, name) if i != rid])
+            return True
+    return False
 
 
 def send(paths: HarnessPaths, msg: Msg) -> Path:
@@ -416,6 +510,7 @@ def newer_user(
     choice sweeps the box as skipped and the follow-up turn re-asks it,
     doubling the card with no visible message explaining why.
     """
+    manual = set(queue_order(paths, name))
     items = [
         m
         for _path, m in read_inbox(paths, name)
@@ -423,6 +518,7 @@ def newer_user(
         and (m.frm or "") == "user"
         and lane_of(m) == LANE_USER
         and m.id != current_id
+        and m.id not in manual
         and (m.now or not now_only)
         and ((m.text or "").strip() or m.attachments)
     ]
@@ -441,7 +537,12 @@ def newer_user(
     return items
 
 
-def take_steer(
+def take_steer(paths, name, current_id, **kwargs):
+    with queue_lock(paths, name):
+        return _take_steer(paths, name, current_id, **kwargs)
+
+
+def _take_steer(
     paths: HarnessPaths,
     name: str,
     current_id: str | None,
@@ -460,8 +561,11 @@ def take_steer(
     """
     want_room = room or None
     want_thread = thread_id or None
+    manual = set(queue_order(paths, name))
     taken: list[tuple[Path, Msg]] = []
     for path, msg in read_inbox(paths, name):
+        if msg.id in manual:
+            continue
         if msg.reply_to is not None:
             continue
         if current_id and msg.id == current_id:
@@ -495,6 +599,11 @@ def take_steer(
 
 
 def mark_now(paths: HarnessPaths, name: str, msg_id: str) -> bool:
+    with queue_lock(paths, name):
+        return _mark_now(paths, name, msg_id)
+
+
+def _mark_now(paths: HarnessPaths, name: str, msg_id: str) -> bool:
     """Promote a queued message to "Send now".
 
     Rewrites the inbox file with `now=True` so the runtime preempts the
@@ -505,6 +614,7 @@ def mark_now(paths: HarnessPaths, name: str, msg_id: str) -> bool:
         if msg.id != msg_id or msg.reply_to is not None:
             continue
         msg.now = True
+        save_queue_order(paths, name, [i for i in queue_order(paths, name) if i != msg.id])
         tmp = path.with_name(f".{path.name}.tmp")
         try:
             tmp.write_text(msg.to_json(), encoding="utf-8")
@@ -533,14 +643,28 @@ def queue_state(
     paths: HarnessPaths, name: str, *, busy: bool = False, current_id: str | None = None
 ) -> dict:
     """Follow-ups waiting behind the in-flight turn (`current_id` is excluded)."""
-    items = pending(paths, name)
-    if current_id:
-        items = [m for m in items if m.id != current_id]
+    items = waiting_items(paths, name, current_id)
+    manual = set(queue_order(paths, name))
     return {
         "bot": name,
         "busy": busy,
         "queued": len(items),
-        "items": [{"id": m.id, "text": m.text[:80], "ts": m.ts, "frm": m.frm} for m in items[:10]],
+        "editable": True,
+        "current_id": current_id,
+        "items": [
+            {
+                "id": m.id,
+                "text": handoff_visible_text(m.text),
+                "ts": m.ts,
+                "frm": m.frm,
+                "room": m.room,
+                "thread_id": m.thread_id,
+                "origin": m.origin,
+                "attachments": m.attachments,
+                "now": m.now and m.id not in manual,
+            }
+            for m in items
+        ],
     }
 
 
