@@ -1,3 +1,5 @@
+[![Dotobot — Your AI team. Your space.](docs/assets/dotobot-banner.png)](https://dotobot.com)
+
 # Dotobot harness
 
 An Apache-2.0 self-hosted multi-bot agent runtime. You own the server, its data,
