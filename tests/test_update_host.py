@@ -112,6 +112,7 @@ def test_version_tags_support_existing_tags_and_registry_ports():
 
 def test_preparation_crash_retains_original_image_on_retry(tmp_path, monkeypatch):
     from types import SimpleNamespace
+
     import pytest
 
     config, paths, root = setup(tmp_path)
