@@ -161,3 +161,32 @@ Before publishing the standard installer, maintainers must configure and verify
 references. Archives must use that same HTTPS origin; the installer rejects
 cross-origin downloads and checks their SHA-256 digests. Preparing this source
 tree does not configure the release domain or publish any releases.
+
+### Optional notification relay
+
+An operator can forward completed replies and input requests to an HTTPS push
+relay. The runtime does not contain Apple credentials and does not need a
+Dotobot account to run. Without a relay, existing HTTP/WebSocket behavior is
+unchanged.
+
+Set `HARNESS_PUSH_RELAY_URL`, or persist `{"url":"https://your-relay.example/push/events"}`
+in `$HARNESS_HOME/push-relay.json`, then restart the controller through its
+normal lifecycle. The file option survives container/controller upgrades.
+The relay URL is operator-controlled; clients cannot change the destination.
+
+An authenticated owner registers a relay-issued capability with
+`POST /api/push/subscriptions`, JSON `{"id":"<64 hex characters>","secret":"<64 hex characters>"}`.
+The capability authorizes delivery only, never account or harness access.
+The relay must bind it to the correct account/server/device, enforce notification
+preferences and revocation, and deduplicate `event_id`. No endpoint lists or
+returns registered capabilities.
+
+Completed nonempty replies, choices, secrets, takeover requests, confirmation /
+control-return cards and blocking blocks enter a private SQLite outbox.
+Prompt updates, resolutions and tool-only empty finals do not notify. Group
+notifications retain the group title and identify the speaking bot. Delivery
+runs off the chat path, refuses redirects, retries temporary failures for up to
+one hour, and retires revoked capabilities. Registrations expire after 90 days;
+clients renew them. Event receipts are retained for one day, with at most 100
+registrations and 10,000 outbox rows. A relay must keep its dedupe identity stable
+across retries, including an uncertain network response.

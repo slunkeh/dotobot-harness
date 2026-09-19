@@ -73,6 +73,7 @@ import json
 import os
 import re
 import time
+import uuid
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -294,12 +295,16 @@ class StreamWriter:
                 self._emit_message(streaming=True)
 
     def takeover(self, bot: str, reason: str) -> None:
-        self._emit({"type": "takeover", "bot": bot, "reason": reason})
+        self._emit({"type": "takeover", "bot": bot, "reason": reason, "id": uuid.uuid4().hex})
 
-    def secret_request(self, bot: str, name: str, reason: str, title: str | None = None) -> None:
+    def secret_request(
+        self, bot: str, name: str, reason: str, title: str | None = None,
+        *, prompt_id: str | None = None,
+    ) -> None:
         """Ask the user for a secret by NAME; the value never enters the stream."""
         ev: dict[str, Any] = {
             "type": "secret_request",
+            "id": prompt_id or uuid.uuid4().hex,
             "bot": bot,
             "name": name,
             "reason": reason,

@@ -70,6 +70,7 @@ def test_request_secret_emits_event_and_unblocks_on_store(tmp_path):
     ev = next(e for e in events if e.type == "secret_request")
     assert ev.bot == "atlas"
     assert ev.name == "DEMO_TOKEN"
+    assert ev.id
     assert ev.title == "Demo token"
     assert "deploy" in (ev.reason or "")
     assert "s3cret-value" not in (ev.reason or "")
