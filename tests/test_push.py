@@ -128,3 +128,26 @@ def test_server_registers_authenticated_capability_and_enqueues_real_broadcast(
         server.shutdown()
         server.server_close()
     assert orch.ws_hub.push_relay is None
+
+
+def test_distinct_input_requests_in_one_turn_survive_replay(tmp_path):
+    from agent.streaming import StreamReader, StreamWriter
+    from harness.paths import HarnessPaths
+    from harness.server import asdict_event
+
+    paths = HarnessPaths.resolve(tmp_path / "home")
+    paths.ensure_layout(["atlas"])
+    writer = StreamWriter(paths, "one-task")
+    writer.secret_request("atlas", "FIRST_TOKEN", "First service")
+    writer.secret_request("atlas", "SECOND_TOKEN", "Second service")
+    writer.takeover("atlas", "First sign-in")
+    writer.takeover("atlas", "Second sign-in")
+    relay = PushRelay(paths.home, "https://relay.example/push")
+    relay.register({"id": "a" * 64, "secret": "b" * 64})
+    events = list(StreamReader(paths, "one-task")._read_new())
+    for event in events:
+        frame = {**asdict_event(event), "request_id": "one-task"}
+        relay.enqueue(frame)
+        relay.enqueue(frame)
+    with sqlite3.connect(relay.path) as db:
+        assert db.execute("SELECT count(*) FROM outbox").fetchone()[0] == 4
