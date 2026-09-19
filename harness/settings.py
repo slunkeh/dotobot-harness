@@ -101,6 +101,7 @@ SETTINGS: tuple[Setting, ...] = (
     Setting(
         "HARNESS_PUBLIC_URL", "str", "", "public HTTPS origin for link codes and OAuth callbacks"
     ),
+    Setting("HARNESS_PUSH_RELAY_URL", "str", "", "optional HTTPS notification relay; overrides push-relay.json"),
     Setting("HARNESS_BOT", "str", "", "bot name, set by the orchestrator on each agent"),
     # -- the model turn ---------------------------------------------------
     Setting("HARNESS_HISTORY_TOKENS", "int", 8000, "per-turn history budget", minimum=0),
