@@ -35,6 +35,7 @@ harness/paths.py
 harness/persona.py
 harness/prefs.py
 harness/readiness.py
+harness/push.py
 harness/receipts.py
 harness/recipes.py
 harness/redaction.py

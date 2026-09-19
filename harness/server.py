@@ -379,6 +379,7 @@ class WSHub:
     def __init__(self) -> None:
         self._lock = threading.Lock()
         self._clients: list = []
+        self.push_relay = None
 
     def add(self, handler) -> None:
         with self._lock:
@@ -390,6 +391,11 @@ class WSHub:
             self._clients = [h for h in self._clients if h is not handler]
 
     def broadcast(self, frame: dict) -> None:
+        if self.push_relay is not None:
+            try:
+                self.push_relay.enqueue(frame)
+            except Exception:
+                pass  # Push persistence must never interrupt chat delivery.
         with self._lock:
             clients = list(self._clients)
         dead = []
@@ -781,6 +787,15 @@ class _Handler(BaseHTTPRequestHandler):
         if not self._authed():
             return self._send_json({"error": "unauthorized"}, 401)
         path = urlparse(self.path).path.rstrip("/")
+        if path == "/api/push/subscriptions":
+            relay = getattr(self.orch.ws_hub, "push_relay", None)
+            if relay is None:
+                return self._send_json({"error": "push_not_configured"}, 503)
+            try:
+                relay.register(self._read_json())
+            except ValueError:
+                return self._send_json({"error": "invalid_push_subscription"}, 400)
+            return self._send_json({"registered": True})
         if path.startswith("/api/voice/elevenlabs/"):
             return self._elevenlabs("POST")
         if path in {"/api/updates/start", "/api/updates/retry"}:
@@ -4169,6 +4184,20 @@ def make_server(
 ):
     if getattr(orch, "ws_hub", None) is None:
         orch.ws_hub = WSHub()
+    from .push import PushRelay, configured_url
+    push_url = configured_url(orch.paths.home)
+    if push_url and orch.ws_hub.push_relay is None:
+        def notification_titles(bot, room):
+            try:
+                author = orch.roster.get(bot).display_name()
+            except (KeyError, ValueError):
+                author = bot
+            try:
+                title = get_room(orch.paths, room).title if room else author
+            except (KeyError, ValueError, OSError):
+                title = room or author
+            return title, author
+        orch.ws_hub.push_relay = PushRelay(orch.paths.home, push_url, notification_titles)
     # The fencing epoch IS the boot id: one uuid per server instance, so an
     # epoch change tells clients their sequence state is from a dead server.
     boot_id = uuid.uuid4().hex
@@ -4185,7 +4214,17 @@ def make_server(
         },
     )
     advertised = advertised_url(host, port, public_url, home=orch.paths.home)
-    httpd = ThreadingHTTPServer((host, port), handler)
+    class PushHTTPServer(ThreadingHTTPServer):
+        def server_close(self):
+            relay = getattr(orch.ws_hub, "push_relay", None)
+            if relay is not None:
+                relay.close()
+                orch.ws_hub.push_relay = None
+            super().server_close()
+
+    httpd = PushHTTPServer((host, port), handler)
+    if orch.ws_hub.push_relay is not None:
+        orch.ws_hub.push_relay.start()
     httpd.public_url = (
         advertised_url(host, httpd.server_address[1], public_url, home=orch.paths.home)
         if port == 0
