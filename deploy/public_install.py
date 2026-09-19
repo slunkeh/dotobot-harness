@@ -491,17 +491,17 @@ def apply_release(
         # The first service bridge must also preserve the stopped roster. Old
         # controllers do not record explicit stop markers, so capture live
         # records before activating the bridge. Never infer all roster bots ran.
-        from harness import update_state
-        from harness.paths import HarnessPaths
-
-        paths = HarnessPaths.resolve(layout.home)
-        with update_state.operation_lock(paths):
-            existing = update_state.read(paths)
+        # This installer can still be running from a pre-bridge release; do
+        # not import new runtime modules before the new source is selected.
+        journal = layout.home / "update-operation.json"
+        with (layout.home / "update.lock").open("a") as bridge_lock:
+            fcntl.flock(bridge_lock, fcntl.LOCK_EX)
+            existing = json.loads(journal.read_text()) if journal.exists() else {}
             if existing and existing.get("stage") not in {"complete", "cancelled"}:
                 raise InstallError("An existing fleet operation must be resolved before bridging")
             running = []
-            for record in paths.run.glob("*.json"):
-                data = update_state.read_json(record)
+            for record in (layout.home / "run").glob("*.json"):
+                data = json.loads(record.read_text())
                 if not data.get("bot") or not data.get("pid"):
                     continue
                 try:
@@ -509,11 +509,12 @@ def apply_release(
                 except ProcessLookupError:
                     continue
                 running.append(data["bot"])
-            update_state.save(paths, {
+            write_private(journal, json.dumps({
                 "id": "service-bridge", "stage": "rolling", "bots": [],
                 "target": {"version": version}, "previous_version": previous,
                 "running_before": running, "started_at": time.time(),
-            })
+                "updated_at": time.time(),
+            }))
     try:
         runner(["docker", "tag", f"{IMAGE}:{version}", IMAGE])
         updater.flip_current(layout.root, version)

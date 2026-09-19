@@ -696,6 +696,14 @@ def test_service_bridge_records_only_running_bots(host, tmp_path, monkeypatch):
         if pid == 456:
             raise ProcessLookupError()
     monkeypatch.setattr(installer.os, "kill", alive)
+    # Installed pre-bridge scripts cannot import the new runtime modules yet.
+    import builtins
+    original_import = builtins.__import__
+    def without_new_runtime(name, *args, **kwargs):
+        if name == "harness" or name.startswith("harness."):
+            raise ImportError("new runtime is not selected yet")
+        return original_import(name, *args, **kwargs)
+    monkeypatch.setattr(builtins, "__import__", without_new_runtime)
     installer.apply_release(layout, new, json.loads(layout.config.read_text()), runner=runner, probe=probe)
     operation = json.loads((layout.home / "update-operation.json").read_text())
     assert operation["running_before"] == ["active"]
