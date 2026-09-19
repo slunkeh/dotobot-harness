@@ -283,7 +283,8 @@ SETTINGS: tuple[Setting, ...] = (
     ),
     # -- updates ----------------------------------------------------------
     Setting("HARNESS_AUTO_ROLL", "bool", False, "roll agents automatically on update"),
-    Setting("HARNESS_ROLL_SPACING", "float", 30.0, "seconds between agent rolls", minimum=0),
+    Setting("HARNESS_ROLL_SPACING", "float", 0.0, "seconds between agent rolls", minimum=0),
+    Setting("HARNESS_RELEASE_ROOT", "path", "/opt/harness", "mounted immutable release directory for the persistent controller"),
     Setting("HARNESS_RELEASE_MANIFEST", "str", "", "release manifest URL"),
     Setting(
         "HARNESS_RELEASE_ALLOW_INSECURE",

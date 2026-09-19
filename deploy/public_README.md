@@ -62,16 +62,47 @@ curl -fsSL https://dotobot.com/install.sh | bash -s -- --uninstall
 curl -fsSL https://dotobot.com/install.sh | bash -s -- --uninstall --delete-data
 ```
 
-Updates are manual. The candidate server and computer images build before the
-running server stops. Failed replacement restores the previous server when
-possible. State is never rolled back: keep backups before an update that
-migrates data. Closing a client does not stop the server. Docker restarts the
-server after its engine restarts, and the controller starts the saved bot roster.
-This also starts bots that were manually stopped, matching the system-service
-startup behaviour. Docker Desktop must be running on macOS.
-Uninstall retains data by default and never removes Docker or other services.
-Images/build cache may remain reusable after uninstall; no broad Docker prune
-is performed. `--port NUMBER` selects a different localhost port on first install.
+Updates remain owner-controlled. Supported installations expose **Server updates**
+in the Mac/iPhone settings and accept the existing CLI update request. A durable
+operation prepares verified artifacts, reconnects the controller, then updates
+one affected bot at a time. Current tasks finish first; queued messages remain
+held until the bot confirms its runtime and health. Human control and approvals
+are never interrupted automatically. A failure pauses the rollout with progress
+and recovery details available after reconnecting.
+
+Compatible controller changes preserve running agents. Agent-only changes reuse
+the existing computer and its home without copying browser profiles. Image
+changes take a verified snapshot and retain the same persistent volume. The
+updater retains previous release artifacts; it never restores an old data
+snapshot over newer work.
+
+Legacy Docker controllers require an explicit bridge migration. Stop all bots
+through the normal lifecycle, then rerun the bootstrap with `--update
+--bridge-upgrades`. Recorded agents block the migration. Their state, volumes,
+network and address are retained, and stopped bots remain stopped. The new
+controller supervisor reloads the server without replacing its container; a
+separate, installation-owned worker executes update requests. Controller base-image
+or incompatible state/protocol changes require a stopped-fleet migration.
+
+The API advertises `harness_updates_v1`: authenticated `GET /api/updates/preview`
+and `GET /api/updates` provide availability and durable progress; `POST
+/api/updates/start` accepts the preview's `version`, and `POST /api/updates/retry`
+reconciles a paused operation. Old clients continue using existing endpoints.
+Release builders pass `--runtime-root` to `deploy/release_manifest.py` to include
+verified runtime fingerprints. Missing metadata cannot authorize skipping bot
+restarts or automatic rollback. Maintain `UPDATE_PROTOCOL` and `STATE_SCHEMA`
+in `harness/runtime_identity.py` when their compatibility contracts change.
+
+System-service installations add a request-polling timer without changing the
+existing automatic-release preference. `HARNESS_AUTO_ROLL=0` disables implicit
+rolls, while explicitly requested upgrades still proceed. `HARNESS_ROLL_SPACING`
+can add a delay between bots; the default is zero because readiness already
+serializes the rollout.
+
+Closing a client does not stop the server. Docker Desktop must be running on
+macOS. Uninstall retains data by default and never removes Docker or other
+services. Images/build cache may remain reusable; no broad Docker prune runs.
+`--port NUMBER` selects a different localhost port on first install.
 
 Existing system-service installations retain their original update commands
 (`sudo dotobot-server --update`) and data locations. The new bootstrap delegates

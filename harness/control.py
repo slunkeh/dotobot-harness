@@ -280,6 +280,11 @@ class Control:
         return self._save(state, "request_takeover", reason=reason)
 
     def take_over(self, bot: str, holder: str | None = None) -> ControlState:
+        from agent.messaging import queue_lock
+        with queue_lock(self.paths, bot):
+            return self._take_over(bot, holder)
+
+    def _take_over(self, bot: str, holder: str | None = None) -> ControlState:
         """Human takes control (in response to a request, or unprompted)."""
         state = self.state(bot)
         state.mode = MODE_TAKEOVER
@@ -355,6 +360,13 @@ class Control:
 
     # -- teach ------------------------------------------------------------
     def start_teach(
+        self, bot: str, holder: str | None = None, *, recording: bool = False
+    ) -> ControlState:
+        from agent.messaging import queue_lock
+        with queue_lock(self.paths, bot):
+            return self._start_teach(bot, holder, recording=recording)
+
+    def _start_teach(
         self, bot: str, holder: str | None = None, *, recording: bool = False
     ) -> ControlState:
         state = self.state(bot)

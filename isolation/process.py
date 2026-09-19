@@ -43,7 +43,10 @@ class ProcessBackend(IsolationBackend):
 
     def _record(self, handle: BotHandle) -> None:
         self.paths.run.mkdir(parents=True, exist_ok=True)
+        from harness.runtime_identity import current_identity
         data = {
+            "identity": current_identity(),
+            "release_root": str(Path(__file__).resolve().parents[1]),
             "bot": handle.bot,
             "backend": handle.backend,
             "pid": handle.pid,
@@ -66,7 +69,7 @@ class ProcessBackend(IsolationBackend):
             bot=bot,
             backend=self.id,
             pid=data.get("pid"),
-            meta={"version": data.get("version"), "started": data.get("started")},
+            meta={"version": data.get("version"), "started": data.get("started"), "identity": data.get("identity"), "release_root": data.get("release_root")},
         )
         handle.status = self.status(handle)
         return handle
@@ -79,11 +82,16 @@ class ProcessBackend(IsolationBackend):
         self.paths.run.mkdir(parents=True, exist_ok=True)
         log_path: Path = self.paths.log_file(bot)
         log_fh = open(log_path, "a", encoding="utf-8")  # noqa: SIM115 - lives with the child
+        # Pin lazy imports to this immutable release, never the current symlink.
+        release_root = str(Path(__file__).resolve().parents[1])
+        env = {**os.environ, "PYTHONPATH": release_root}
         proc = subprocess.Popen(
             [sys.executable, *argv],
             stdout=log_fh,
             stderr=subprocess.STDOUT,
             start_new_session=True,  # own process group; scoped signals
+            cwd=release_root,
+            env=env,
         )
         handle = BotHandle(bot=bot, backend=self.id, pid=proc.pid, status=Status.RUNNING)
         self._record(handle)

@@ -681,3 +681,31 @@ def test_bootstrap_help_needs_no_sudo():
     )
     assert result.returncode == 0
     assert "| bash" in result.stdout
+
+
+def test_service_bridge_records_only_running_bots(host, tmp_path, monkeypatch):
+    layout, _, _, runner, probe = host
+    assert initial(host, tmp_path) == 0
+    new = release(tmp_path, "1.0.1")
+    (new / "harness/update_state.py").write_text("# bridge capability")
+    run_dir = layout.home / "run"
+    run_dir.mkdir(exist_ok=True)
+    (run_dir / "active.json").write_text(json.dumps({"bot": "active", "pid": 123}))
+    (run_dir / "stopped.json").write_text(json.dumps({"bot": "stopped", "pid": 456}))
+    def alive(pid, signal):
+        if pid == 456:
+            raise ProcessLookupError()
+    monkeypatch.setattr(installer.os, "kill", alive)
+    # Installed pre-bridge scripts cannot import the new runtime modules yet.
+    import builtins
+    original_import = builtins.__import__
+    def without_new_runtime(name, *args, **kwargs):
+        if name == "harness" or name.startswith("harness."):
+            raise ImportError("new runtime is not selected yet")
+        return original_import(name, *args, **kwargs)
+    monkeypatch.setattr(builtins, "__import__", without_new_runtime)
+    installer.apply_release(layout, new, json.loads(layout.config.read_text()), runner=runner, probe=probe)
+    operation = json.loads((layout.home / "update-operation.json").read_text())
+    assert operation["running_before"] == ["active"]
+    assert operation["stage"] == "rolling"
+    assert operation["target"]["version"] == "1.0.1"

@@ -487,6 +487,34 @@ def apply_release(
         )
         old_image = result.stdout.strip()
     key = (layout.home / "link-key").read_text().strip()
+    if previous and (tree / "harness/update_state.py").exists():
+        # The first service bridge must also preserve the stopped roster. Old
+        # controllers do not record explicit stop markers, so capture live
+        # records before activating the bridge. Never infer all roster bots ran.
+        # This installer can still be running from a pre-bridge release; do
+        # not import new runtime modules before the new source is selected.
+        journal = layout.home / "update-operation.json"
+        with (layout.home / "update.lock").open("a") as bridge_lock:
+            fcntl.flock(bridge_lock, fcntl.LOCK_EX)
+            existing = json.loads(journal.read_text()) if journal.exists() else {}
+            if existing and existing.get("stage") not in {"complete", "cancelled"}:
+                raise InstallError("An existing fleet operation must be resolved before bridging")
+            running = []
+            for record in (layout.home / "run").glob("*.json"):
+                data = json.loads(record.read_text())
+                if not data.get("bot") or not data.get("pid"):
+                    continue
+                try:
+                    os.kill(int(data["pid"]), 0)
+                except ProcessLookupError:
+                    continue
+                running.append(data["bot"])
+            write_private(journal, json.dumps({
+                "id": "service-bridge", "stage": "rolling", "bots": [],
+                "target": {"version": version}, "previous_version": previous,
+                "running_before": running, "started_at": time.time(),
+                "updated_at": time.time(),
+            }))
     try:
         runner(["docker", "tag", f"{IMAGE}:{version}", IMAGE])
         updater.flip_current(layout.root, version)
@@ -513,6 +541,8 @@ def apply_release(
 
 
 def finish(layout: Layout, config: dict, args, *, runner=run, probe=wait_health) -> None:
+    from update_service import install as install_update_worker
+    install_update_worker(layout, config, write=write_private, runner=runner)
     version = updater.current_version(layout.root)
     if not version:
         raise InstallError("No installed release found.")
@@ -664,9 +694,26 @@ def main(argv=None, *, layout: Layout | None = None, runner=run, probe=wait_heal
                 probe("http://127.0.0.1:8765", key, version)
                 probe(public_origin(config["domain"]), key, version)
             elif args.update:
-                _, tree = download_release(config["manifest_url"], layout.root)
-                if updater.release_version(tree) != updater.current_version(layout.root):
-                    apply_release(layout, tree, config, runner=runner, probe=probe)
+                worker = layout.config_dir / "update-host.json"
+                if worker.exists():
+                    manifest = updater.load_manifest(config["manifest_url"])
+                    if manifest["version"] == updater.current_version(layout.root):
+                        finish(layout, config, args, runner=runner, probe=probe)
+                        return 0
+                    key = (layout.home / "link-key").read_text().strip()
+                    request = urllib.request.Request(
+                        "http://127.0.0.1:8765/api/updates/start",
+                        data=json.dumps({"version": manifest["version"]}).encode(),
+                        headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
+                    )
+                    with urllib.request.urlopen(request, timeout=60) as response:
+                        operation = json.load(response)
+                    print(f"Update {operation.get('id')}: {operation.get('stage')}; progress is available in the apps.")
+                else:
+                    # Bridge installation: preserve agents under KillMode=process.
+                    _, tree = download_release(config["manifest_url"], layout.root)
+                    if updater.release_version(tree) != updater.current_version(layout.root):
+                        apply_release(layout, tree, config, runner=runner, probe=probe)
             finish(layout, config, args, runner=runner, probe=probe)
             return 0
     except (

@@ -209,6 +209,7 @@ class Orchestrator:
 
     def _start_bot(self, name: str) -> BotHandle:
         with self._lifecycle_lock(name):
+            (self.paths.run / f"{name}.stopped").unlink(missing_ok=True)
             handle = self.backend.spawn(name, self._agent_argv(name))
             self._clear_startup_error(name)
             return handle
@@ -303,6 +304,7 @@ class Orchestrator:
 
     def _stop_bot(self, name: str) -> None:
         with self._lifecycle_lock(name):
+            write_atomic(self.paths.run / f"{name}.stopped", "1")
             self._starting.pop(name, None)
             with self._restart_lock:
                 self._restarts.pop(name, None)
@@ -365,6 +367,7 @@ class Orchestrator:
                     if self._restarts.get(name, (None, None))[1] is not future:
                         return
                     self.roster.get(name)
+                    (self.paths.run / f"{name}.stopped").unlink(missing_ok=True)
                     self._starting.pop(name, None)
                     handle = self._handle(name)
                     if handle:

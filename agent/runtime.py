@@ -3023,6 +3023,9 @@ class Agent:
             quiet = now - getattr(run, "last_output", run.started)
             if quiet >= silence:
                 return "silence", quiet
+        from harness.update_state import held
+        if held(self.paths, self.bot.name):
+            return None, None
         waited: float | None = None
         manual = set(messaging.queue_order(self.paths, self.bot.name))
         for m in messaging.pending(self.paths, self.bot.name):
@@ -3107,7 +3110,8 @@ class Agent:
         """End of the drain window: re-stamp anything still live and reject
         messages that arrived during the drain with an explicit restart error
         rather than queueing them into a dying process."""
-        if self._drain_ts is None:
+        from harness.update_state import held
+        if self._drain_ts is None or held(self.paths, self.bot.name):
             return
         recovery.stamp_shutdown(self.statestore, self.bot.name)
         rejected = recovery.reject_drain_arrivals(self.paths, self.bot.name, since=self._drain_ts)
@@ -3127,6 +3131,11 @@ class Agent:
             # Arrivals are answered with a restart error by drain_shutdown.
             return False
         with messaging.queue_lock(self.paths, self.bot.name):
+            from harness import update_state
+            if update_state.held(self.paths, self.bot.name) and self.scheduler.zombies:
+                return False  # Escaped workers must finish before acknowledging a safe restart.
+            if update_state.acknowledge(self.paths, self.bot.name):
+                return False
             answers_queued = False
             try:
                 messaging.queue_prompt_answers(self.paths, self.bot.name)
