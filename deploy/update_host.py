@@ -157,7 +157,26 @@ def apply(config, *, runner=run, fetch=updater.fetch_release, health=None):
             runner(["docker", "image", "inspect", tag])
             # Versioned source and image exist before activation. The old image
             # remains tagged for recovery; never prune before fleet completion.
-            runner(["docker", "tag", machine_image, version_tag(machine_image, previous)])
+            # Persist the original immutable image ID before changing any alias.
+            # A crash after alias activation must not relabel the new image as
+            # the previous one on retry.
+            if not operation.get("previous_machine_image"):
+                inspected = runner(
+                    ["docker", "image", "inspect", "--format", "{{.Id}}", machine_image]
+                )
+                operation["previous_machine_image"] = inspected.stdout.strip()
+                if not operation["previous_machine_image"]:
+                    raise RuntimeError("Cannot identify the previous machine image for rollback")
+                with state.operation_lock(paths):
+                    state.save(paths, operation)
+            runner(
+                [
+                    "docker",
+                    "tag",
+                    operation["previous_machine_image"],
+                    version_tag(machine_image, previous),
+                ]
+            )
             runner(["docker", "tag", tag, machine_image])
         with state.operation_lock(paths):
             operation["stage"] = "installing_controller"

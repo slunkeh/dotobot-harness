@@ -108,3 +108,34 @@ def test_version_tags_support_existing_tags_and_registry_ports():
     assert (
         update_host.version_tag("registry:5000/machine", "1.2.3") == "registry:5000/machine:1.2.3"
     )
+
+
+def test_preparation_crash_retains_original_image_on_retry(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+    import pytest
+
+    config, paths, root = setup(tmp_path)
+    monkeypatch.setattr(update_host.updater, "load_manifest", lambda _: {"version": "1.1.0"})
+    commands = []
+    interrupted = False
+
+    def runner(args):
+        nonlocal interrupted
+        commands.append(args)
+        if args[:3] == ["docker", "image", "inspect"]:
+            return SimpleNamespace(stdout="sha256:original\n")
+        if args == ["docker", "tag", "test-image:1.1.0", "test-image"] and not interrupted:
+            interrupted = True
+            raise KeyboardInterrupt()  # process death after alias activation
+        return SimpleNamespace(stdout="")
+
+    with pytest.raises(KeyboardInterrupt):
+        update_host.apply(config, runner=runner, fetch=lambda *a: root / "releases/1.1.0")
+    assert update_state.read(paths)["previous_machine_image"] == "sha256:original"
+    commands.clear()
+    update_host.apply(
+        config, runner=runner, fetch=lambda *a: root / "releases/1.1.0", health=lambda: "1.1.0"
+    )
+    assert ["docker", "tag", "sha256:original", "test-image:1.0.0"] in commands
+    assert not any("--format" in command for command in commands)
+    assert update_state.read(paths)["stage"] == "rolling"
