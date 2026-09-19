@@ -12,7 +12,7 @@ curl -fsSL https://dotobot.com/install.sh | bash
 --ip ADDRESS        public IPv4/IPv6 for HTTPS on ports 80 and 443
 --domain NAME       optional DNS name pointing to this server
 --port NUMBER       localhost port (default 8765; retain on later commands)
---update            build the latest release, then replace the server
+--update            request the latest release with per-bot progress
 --link              check the installed server and print its private link code
 --uninstall         stop/remove Dotobot containers, retaining data and Docker
 --delete-data       with --uninstall, also delete all Dotobot data

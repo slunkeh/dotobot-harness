@@ -51,6 +51,7 @@ def build_manifest(
     rollback: bool = False,
     app_sha256: str | None = None,
     app_version: str | None = None,
+    runtime_identity: dict | None = None,
 ) -> dict:
     prev = prev or {}
     latest_app = prev.get("latest_app_version") or None
@@ -76,6 +77,8 @@ def build_manifest(
         "app_download_url": app_url,
         "app_sha256": app_digest,
     }
+    if runtime_identity is not None:
+        manifest["runtime_identity"] = runtime_identity
     if rollback:
         # The updater refuses an older version unless the manifest says the
         # move backwards is deliberate (deploy/updater.py apply_update).
@@ -107,6 +110,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--version", required=True)
     parser.add_argument("--sha256", default="", help="required unless --pins-only")
+    parser.add_argument("--runtime-root", help="verified source tree to fingerprint")
     parser.add_argument("--base", required=True, help="public base URL of the harness/ prefix")
     parser.add_argument("--rollout", type=int, default=100)
     parser.add_argument("--prev-url", default="", help="URL of the currently served manifest")
@@ -164,6 +168,11 @@ def main(argv: list[str] | None = None) -> int:
         app_sha256=args.app_sha256 or None,
         app_version=args.app_version,
     )
+    if args.runtime_root:
+        from pathlib import Path
+        sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+        from harness.runtime_identity import identity
+        manifest["runtime_identity"] = identity(Path(args.runtime_root))
     json.dump(manifest, sys.stdout, indent=2)
     sys.stdout.write("\n")
     return 0

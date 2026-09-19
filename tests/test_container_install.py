@@ -60,7 +60,7 @@ def test_foreign_container_is_refused_before_any_mutation(tmp_path, monkeypatch)
     monkeypatch.setattr(installer, "inspect", lambda *a: {"Config": {"Labels": {}}})
     monkeypatch.setattr(installer, "docker", lambda *a, **kw: pytest.fail("must not mutate"))
     with pytest.raises(installer.InstallError, match="another installation"):
-        installer.install(c, tmp_path, "candidate")
+        installer.install(c, tmp_path, "candidate", bridge=True)
 
 
 def test_image_build_failure_keeps_running_server(tmp_path, monkeypatch):
@@ -82,7 +82,7 @@ def test_image_build_failure_keeps_running_server(tmp_path, monkeypatch):
 
     monkeypatch.setattr(installer, "docker", docker)
     with pytest.raises(subprocess.CalledProcessError):
-        installer.install(c, tmp_path, "candidate")
+        installer.install(c, tmp_path, "candidate", bridge=True)
     assert len(calls) == 1 and calls[0][0] == "build"
 
 
@@ -198,7 +198,7 @@ def test_failed_update_restores_previous_server_and_retains_state(tmp_path, monk
 
     monkeypatch.setattr(installer, "docker", docker)
     with pytest.raises(installer.InstallError, match="unhealthy"):
-        installer.install(c, tmp_path, "candidate-server")
+        installer.install(c, tmp_path, "candidate-server", bridge=True)
     assert existing == {c["name"]}
     assert checked == ["old-server"]
     assert json.loads((root / "install.json").read_text()) == c
@@ -406,3 +406,26 @@ def test_terminal_progress_preserves_piped_input_and_exit_status(tmp_path, exit_
     assert log.read_text() == "piped release verifier\n"
     if exit_status:
         assert str(log).encode() in result.stderr
+
+
+def test_legacy_bridge_requires_stopped_agents(tmp_path, monkeypatch):
+    c = config(tmp_path)
+    monkeypatch.setattr(installer, "owned", lambda *a: {"Id": "old"})
+    calls = []
+    monkeypatch.setattr(installer, "docker", lambda *a, **kw: calls.append(a))
+    with pytest.raises(installer.InstallError, match="bridge-upgrades"):
+        installer.install(c, tmp_path, "candidate")
+    run = Path(c["root"]) / "state/run"
+    run.mkdir(parents=True)
+    (run / "atlas.json").write_text(json.dumps({"bot": "atlas", "pid": 1234}))
+    with pytest.raises(installer.InstallError, match="Stop all bots"):
+        installer.install(c, tmp_path, "candidate", bridge=True)
+    assert not calls
+
+
+def test_supervised_controller_mounts_release_root_and_preserves_agents(tmp_path):
+    c = dict(config(tmp_path), machine_image="machine:current", upgrade_supervisor=True)
+    args = installer.runtime_args(c, "controller:stable")
+    assert f"type=bind,src={c['root']},dst={c['root']}" in args
+    assert "/app/deploy/controller_supervisor.py" in args
+    assert "--backend" in args

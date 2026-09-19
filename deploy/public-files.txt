@@ -337,3 +337,14 @@ tests/test_firewall_deployment.py
 tests/test_machine_image_build.py
 tests/test_runtime_release_tools.py
 tests/test_queue_management.py
+
+harness/update_state.py
+harness/runtime_identity.py
+harness/updates.py
+harness/update_api.py
+deploy/update_host.py
+deploy/controller_supervisor.py
+tests/test_predictable_updates.py
+deploy/update_service.py
+tests/test_update_host.py
+harness/update_rollback.py

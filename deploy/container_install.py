@@ -149,11 +149,18 @@ def runtime_args(config: dict, image: str) -> list[str]:
         "-e",
         "HARNESS_MACHINE_CPUS=2",
     ]
+    if config.get("upgrade_supervisor"):
+        args += ["--mount", f"type=bind,src={root},dst={root}",
+                 "-e", f"HARNESS_RELEASE_ROOT={root}"]
     if config["address"]:
         args += ["-e", f"HARNESS_PUBLIC_URL={public_origin(config['address'])}"]
     else:
         args += ["-p", f"127.0.0.1:{config['port']}:8765"]
-    return args + [image]
+    command = [image]
+    if config.get("upgrade_supervisor"):
+        command += ["python", "/app/deploy/controller_supervisor.py", "--backend", "machines",
+                    "serve", "--up", "--host", "0.0.0.0", "--port", "8765"]
+    return args + command
 
 
 def ready(config: dict, timeout: float = 120) -> None:
@@ -258,10 +265,24 @@ def finish(config: dict) -> None:
         print("  tunnel or configure HTTPS with --ip / --domain.")
 
 
-def install(config: dict, source: Path, image: str) -> None:
+def install(config: dict, source: Path, image: str, *, bridge: bool = False) -> None:
     root, name = Path(config["root"]), config["name"]
     identity = config["identity"]
     old = owned("container", name, identity)
+    if old and config.get("upgrade_supervisor") and not bridge:
+        raise InstallError("Use the app's server-update controls for this installation; container replacement would stop agents.")
+    if old:
+        if not bridge:
+            raise InstallError("This installation needs --bridge-upgrades after stopping its bots. State and containers were left unchanged.")
+        # The legacy PID-1 stops all agents on exit. A bridge migration must
+        # never interrupt them, including agents waiting for human approval.
+        for record in (root / "state" / "run").glob("*.json"):
+            try:
+                data = json.loads(record.read_text())
+            except (OSError, ValueError):
+                raise InstallError("Unreadable agent record; resolve it before the bridge migration") from None
+            if data.get("bot") and data.get("pid"):
+                raise InstallError("Stop all bots before the bridge migration; recorded agents remain")
     previous = name + "-previous"
     if owned("container", previous, identity):
         raise InstallError(
@@ -273,7 +294,15 @@ def install(config: dict, source: Path, image: str) -> None:
     version = re.search(r'__version__\s*=\s*[\'"]([0-9]+\.[0-9]+\.[0-9]+)', version_file)
     if not version:
         raise InstallError("Release has no valid version.")
-    candidate = dict(config, version=version[1], image=image)
+    candidate = dict(config, version=version[1], image=image, upgrade_supervisor=True)
+    release = root / "releases" / version[1]
+    if not release.exists():
+        shutil.copytree(source, release, ignore=lambda directory, names: [
+            n for n in names if n in {".git", "__pycache__"}
+            or Path(directory) / n == root
+        ])
+    selected = root / "current"
+    previous_release = selected.resolve() if selected.is_symlink() else None
     tag = f"dotobot-machine:{identity}-{version[1]}"
     # Build before changing the running server. Save immutable image IDs so a
     # later build cannot change the old container's machine-image selection.
@@ -288,7 +317,9 @@ def install(config: dict, source: Path, image: str) -> None:
         str(source),
         capture=False,
     )
-    candidate["machine_image"] = inspect("image", tag)["Id"]
+    inspect("image", tag)["Id"]  # Verify the build before selecting its alias.
+    candidate["machine_image"] = f"dotobot-machine:{identity}-current"
+    docker("tag", tag, candidate["machine_image"])
     if candidate["address"]:
         docker("pull", CADDY_IMAGE, capture=False)
     print("\n  [################----] 4/5  Starting and checking your server", flush=True)
@@ -299,7 +330,16 @@ def install(config: dict, source: Path, image: str) -> None:
     if not (root / "install.json").exists():
         write_private(root / "install.json", json.dumps(candidate))
         write_private(root / "manager-image", image + "\n", 0o644)
+    staging = root / ".current-next"
+    staging.unlink(missing_ok=True)
+    staging.symlink_to(release)
+    staging.replace(selected)
     if old:
+        # The explicitly stopped roster must stay stopped after migration.
+        write_private(root / "state" / "update-operation.json", json.dumps({
+            "id": "bridge", "stage": "complete", "bots": [], "running_before": [],
+            "target": {"version": version[1]},
+        }))
         docker("stop", "--time", "240", name)
         docker("rename", name, previous)
     try:
@@ -311,6 +351,10 @@ def install(config: dict, source: Path, image: str) -> None:
             docker("stop", "--time", "240", name)
             docker("rm", name)
         if old:
+            if previous_release is not None:
+                staging.unlink(missing_ok=True)
+                staging.symlink_to(previous_release)
+                staging.replace(selected)
             docker("rename", previous, name)
             docker("start", name)
             ready(config)
@@ -318,8 +362,50 @@ def install(config: dict, source: Path, image: str) -> None:
         raise
     write_private(root / "install.json", json.dumps(candidate))
     write_private(root / "manager-image", image + "\n", 0o644)
+    install_update_worker(candidate, image)
     if old:
         docker("rm", previous)
+
+
+def request_update(config: dict) -> None:
+    # The linking key is read inside the controller, never a command argument.
+    script = """import json, os, pathlib, urllib.request
+home = pathlib.Path(os.environ['HARNESS_HOME'])
+info = json.loads((home / 'serve.json').read_text())
+base = 'http://127.0.0.1:' + str(info.get('port', 8765))
+headers = {'Authorization': 'Bearer ' + info['key'], 'Content-Type': 'application/json'}
+with urllib.request.urlopen(urllib.request.Request(base + '/api/updates/preview', headers=headers), timeout=60) as response:
+    preview = json.load(response)
+if not preview['can_start']:
+    print(preview.get('reason') or 'No newer release is available.')
+else:
+    request = urllib.request.Request(base + '/api/updates/start', headers=headers,
+        data=json.dumps({'version': preview['target_version']}).encode())
+    with urllib.request.urlopen(request, timeout=60) as response:
+        operation = json.load(response)
+    print('Update ' + operation['id'] + ': ' + operation['stage'] + '. Progress is available in the apps.')
+"""
+    result = docker("exec", config["name"], "python", "-c", script)
+    print(result.stdout.strip())
+
+
+def install_update_worker(config: dict, image: str) -> None:
+    root = Path(config["root"])
+    worker = config["name"] + "-updater"
+    existing = owned("container", worker, config["identity"])
+    if existing:
+        return
+    write_private(root / "update-host.json", json.dumps({
+        "root": str(root), "home": str(root / "state"), "container": config["name"],
+        "image": config["machine_image"], "health_url": "http://harness:8765",
+        "manifest_url": "https://releases.dotobot.com/harness/manifest.json",
+    }))
+    docker("run", "-d", "--name", worker, "--label", f"{LABEL}={config['identity']}",
+           "--restart", "unless-stopped", "--network", config["name"],
+           "--mount", f"type=bind,src={root},dst={root}",
+           "--mount", f"type=bind,src={config['socket']},dst=/var/run/docker.sock",
+           image, "python", "/app/deploy/update_host.py", "--config",
+           str(root / "update-host.json"), "--watch")
 
 
 def machines(config: dict) -> list[dict]:
@@ -338,7 +424,8 @@ def machines(config: dict) -> list[dict]:
 
 def uninstall(config: dict, delete_data: bool) -> None:
     root, identity = Path(config["root"]), config["identity"]
-    names = [config["name"], config["name"] + "-previous", config["name"] + "-https"]
+    names = [config["name"] + "-updater", config["name"],
+             config["name"] + "-previous", config["name"] + "-https"]
     for name in names:
         owned("container", name, identity)
     bots = machines(config)  # All ownership checks precede the first stop.
@@ -401,6 +488,8 @@ def main(argv=None) -> int:
     parser.add_argument("--root", type=Path, required=True)
     parser.add_argument("--source", type=Path)
     parser.add_argument("--image")
+    parser.add_argument("--bridge-upgrades", action="store_true",
+                        help="migrate a stopped legacy controller to persistent updates")
     address = parser.add_mutually_exclusive_group()
     address.add_argument("--ip", type=public_ip)
     address.add_argument("--domain", type=domain_name)
@@ -427,10 +516,12 @@ def main(argv=None) -> int:
                 finish(config)
             elif args.uninstall:
                 uninstall(config, args.delete_data)
+            elif args.update and config.get("upgrade_supervisor") and not args.bridge_upgrades:
+                request_update(config)
             else:
                 if not args.source or not args.image:
                     raise InstallError("Verified release source and server image are required.")
-                install(config, args.source, args.image)
+                install(config, args.source, args.image, bridge=args.bridge_upgrades)
         return 0
     except (InstallError, OSError, ValueError, subprocess.SubprocessError) as exc:
         print(f"Setup incomplete: {exc}", file=sys.stderr)

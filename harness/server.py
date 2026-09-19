@@ -668,10 +668,20 @@ class _Handler(BaseHTTPRequestHandler):
                     "bots": self.orch.roster.names(),
                     "version": __version__,
                     "boot_id": getattr(self, "boot_id", None),
+                    "capabilities": ["harness_updates_v1"],
                     "started_at": getattr(self, "started_at", None),
                     **app_release(self.orch.paths),
                 }
             )
+        if path == "/api/updates":
+            from .updates import snapshot
+            return self._send_json(snapshot(self.orch))
+        if path == "/api/updates/preview":
+            from .update_api import preview
+            try:
+                return self._send_json(preview(self.orch))
+            except Exception as exc:
+                return self._send_json({"error": scrub_secrets(str(exc))}, 503)
         if path == "/api/bots":
             return self._send_json(self._bots())
         if path == "/api/logs":
@@ -773,6 +783,16 @@ class _Handler(BaseHTTPRequestHandler):
         path = urlparse(self.path).path.rstrip("/")
         if path.startswith("/api/voice/elevenlabs/"):
             return self._elevenlabs("POST")
+        if path in {"/api/updates/start", "/api/updates/retry"}:
+            from . import update_api, updates
+            try:
+                if path.endswith("retry"):
+                    result = updates.retry(self.orch)
+                else:
+                    result = update_api.start(self.orch, self._read_json().get("version"))
+                return self._send_json(result, 202)
+            except Exception as exc:
+                return self._send_json({"error": scrub_secrets(str(exc))}, 409)
         if path == "/api/chat":
             return self._chat()
         if path == "/api/reports":
@@ -3003,6 +3023,7 @@ class _Handler(BaseHTTPRequestHandler):
                 "type": "hello",
                 "version": __version__,
                 "boot_id": getattr(self, "boot_id", None),
+                    "capabilities": ["harness_updates_v1"],
                 **app_release(self.orch.paths),
             }
         )
@@ -4376,7 +4397,17 @@ def serve(
 
         def _bring_up() -> None:
             try:
-                for h in orch.up():
+                from .update_state import read
+                operation = read(orch.paths)
+                if operation.get("running_before") is not None:
+                    names = [n for n in orch.roster.names()
+                             if (n in operation["running_before"] or
+                                 ((h := orch._handle(n)) and h.status.value == "running"))
+                             and not (orch.paths.run / f"{n}.stopped").exists()]
+                    handles = [orch._start_bot(n) for n in names]
+                else:
+                    handles = orch.up()
+                for h in handles:
                     print(f"started {h.bot} pid={h.pid}", flush=True)
             except Exception as exc:  # noqa: BLE001 - a sick spawn must not kill serve
                 print(f"bot bring-up failed: {exc}", file=sys.stderr, flush=True)
@@ -4395,7 +4426,9 @@ def serve(
         if hub is not None:
             hub.shutdown(retry_in=2.0)
         flush = getattr(orch.backend, "flush", None)
-        if flush is not None:
+        from .update_state import read
+        managed_update = read(orch.paths).get("stage") == "installing_controller"
+        if flush is not None and not managed_update:
             for name in orch.roster.names():
                 try:
                     flush(name)

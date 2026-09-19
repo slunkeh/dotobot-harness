@@ -539,6 +539,9 @@ def newer_user(
 
 def take_steer(paths, name, current_id, **kwargs):
     with queue_lock(paths, name):
+        from harness.update_state import held
+        if held(paths, name):
+            return []
         return _take_steer(paths, name, current_id, **kwargs)
 
 
@@ -600,6 +603,9 @@ def _take_steer(
 
 def mark_now(paths: HarnessPaths, name: str, msg_id: str) -> bool:
     with queue_lock(paths, name):
+        from harness.update_state import held
+        if held(paths, name):
+            return False
         return _mark_now(paths, name, msg_id)
 
 
