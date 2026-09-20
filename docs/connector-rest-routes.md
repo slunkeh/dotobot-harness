@@ -276,7 +276,7 @@ Live evidence for the third batch:
 | `impression` | Pending product identity: catalogue names Impression Digital agency; no verified public REST contract |
 | `indiefunnels` | Pending: Website API reference recovered; confirm IndieFunnels account exposes this API and customer domain |
 | `infusionsoft` | Implemented; request-contract tests pass; production account verification pending |
-| `inksprout` | Pending provider research and implementation |
+| `inksprout` | Pending: former API documentation URL fails in browser; current video editor API contract unverified |
 | `instabot` | Implemented master-key REST route; read/query contracts pass; live API key rejected; authenticated acceptance open |
 | `instagram` | Implemented both documented login hosts; request contracts pass; live invalid token rejected; authenticated acceptance open |
 | `instasent` | Route and offline request tests added; live verification pending |
@@ -1183,3 +1183,8 @@ The catalogue points to https://www.impressiondigital.com/, a marketing agency. 
 ## KingSumo account documentation requirement
 
 A [provider-team answer](https://appsumo.com/products/kingsumo/questions/do-you-have-any-details-for-api-integrat-673181/) dated May 15, 2024 says the API details are intentionally not public and are available in Lifetime account settings. This is stronger evidence than the previous unsuccessful documentation search, but remains an older statement rather than proof of current account access. The current public product listing still advertises custom API integrations in the Pro plan. Host/authentication remain pending account documentation. No plan was purchased and no giveaway was created.
+
+
+## Inksprout documentation link verification
+
+The catalogue's https://inksprout.co/docs/index.html displays Cannot GET /docs/index.html in the browser. The [current provider homepage](https://inksprout.co/) presents a video editor with bulk CSV and Blueprint workflows, but the inspected page supplies no REST host or authentication contract. Replaced the broken documentation pointer with the current product homepage and a precise limitation. This does not establish that no API exists; account documentation is still needed. No video, account or publishing action was created.

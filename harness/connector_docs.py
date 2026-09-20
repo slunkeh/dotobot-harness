@@ -896,8 +896,9 @@ _ROWS: list[tuple[str, str, str, str]] = [
     (
         "inksprout",
         "none",
-        "https://inksprout.co/docs/index.html",
-        "Only Zapier generic wrapper.",
+        "https://inksprout.co/",
+        "Current product is a video creation editor. The former /docs/index.html returns "
+        "Cannot GET in the browser. A current API host, key format and schema remain unverified.",
     ),
     (
         "instabot",
