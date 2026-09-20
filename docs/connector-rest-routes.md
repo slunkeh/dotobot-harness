@@ -3,11 +3,11 @@
 Scope: implement the 144 catalogue connectors identified with missing REST hosts.
 This is an implementation ledger, not a claim of live-account verification.
 
-Forty-four routes now have offline request-contract coverage through the real connector
+Forty-five routes now have offline request-contract coverage through the real connector
 registry and credential store. Tests assert the outbound origin, version prefix,
 credential header, query and JSON body. Credentials are never followed through
 HTTP redirects. Production authenticated reads and writes remain unverified for these
-forty-four routes. The remaining 100 connectors still need provider research and code.
+forty-five routes. The remaining 99 connectors still need provider research and code.
 
 ## Implemented routes
 
@@ -63,6 +63,7 @@ CloudConvert currently uses its production automatic-region API, not its sandbox
 | `infusionsoft` | [Provider documentation](https://developer.infusionsoft.com/postman-quick-start/) | Infusionsoft is now Keap. Store a Personal Access Token or Service Account Key. Authentication uses X-Keap-API-Key. Paths are relative to /crm/rest/v1, for example GET /contacts; JSON bodies follow the REST v1 schema. This route does not use legacy XML-RPC keys or OAuth bearer tokens. REST v2 is not covered by this v1 base. |
 | `ecologi` | [Provider documentation](https://docs.ecologi.com/) | Store the Ecologi Impact API key; authentication uses Bearer. Paths are relative to https://public.ecologi.com. POST /impact/trees takes a JSON number and test flag. Set test to true for non-billable test requests; live impact purchases are billed. Public reporting uses GET /users/USERNAME/trees and does not require authentication at the provider, although this connector currently requires a stored key. Idempotency-Key headers are not exposed; do not automatically retry purchase requests. |
 | `greenspark` | [Provider documentation](https://docs.getgreenspark.com/reference/authentication) | Store a Greenspark API key, not a Widget key. Authentication uses X-API-KEY. Paths are relative to the production /v1 API, for example GET /projects. Impact writes take JSON and may incur charges. This route uses production; the separate demo and sandbox environments are not configured. Plan eligibility and key permissions apply. |
+| `enormail` | [Provider documentation](https://developer.enormail.eu/) | Store the Enormail API key alone. HTTP Basic uses it as username with an empty password. Paths are relative to /api/1.0, for example GET /account.json. Keep the .json endpoint suffix. POST and PUT bodies are form encoded, including bracket notation for nested fields. Pass body as an object. DELETE parameters belong in the path query string. |
 
 ActiveCampaign host selection: [official base URL guidance](https://developers.activecampaign.com/reference/url).
 
@@ -198,7 +199,7 @@ Live evidence for the third batch:
 | `endorsal` | Pending provider research and implementation |
 | `engage` | Pending provider research and implementation |
 | `enginemailer` | Pending provider research and implementation |
-| `enormail` | Pending provider research and implementation |
+| `enormail` | Implemented; request contracts pass; authenticated account verification pending |
 | `esputnik` | Implemented; request-contract tests pass; production account verification pending |
 | `eventbrite` | Implemented; request-contract tests pass; production account verification pending |
 | `everwebinar` | Pending provider research and implementation |
@@ -382,3 +383,15 @@ authentication using the API key as username and an empty password, at
 https://api.enormail.eu/api/1.0. Request body encoding still needs verification.
 The old Flexmail developer.flexmail.eu hostname does not resolve; its current
 marketing API reference must be located before configuring that route.
+
+### Eleventh batch: Enormail
+
+2026-09-20: read, POST and PUT request tests failed before implementation and
+pass afterward. 240 focused tests pass; Ruff passes. The official
+[Enormail PHP transport](https://github.com/Enormail/enormail-php-api/blob/master/src/Enormail/Rest.php)
+confirms the host and form-encoded writes; the reference confirms that the
+Basic-auth password may be empty. Dotobot retains HTTPS certificate validation
+and refuses redirects. GET /account.json through a disposable bound connector
+with an invalid key returned HTTP 401 Authentication failed. No authenticated
+account operation or external write was performed. The previously pending
+Enormail body-format check is now resolved.

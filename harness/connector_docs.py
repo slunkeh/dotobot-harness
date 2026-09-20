@@ -542,9 +542,9 @@ _ROWS: list[tuple[str, str, str, str]] = [
     ),
     (
         "enormail",
-        "aggregator",
-        "https://zapier.com/mcp/enormail",
-        "Zapier/viaSocket only.",
+        "official",
+        "https://developer.enormail.eu/",
+        "Store the Enormail API key alone. HTTP Basic uses it as username with an empty password. Paths are relative to /api/1.0, for example GET /account.json. Keep the .json endpoint suffix. POST and PUT bodies are form encoded, including bracket notation for nested fields. Pass body as an object. DELETE parameters belong in the path query string.",
     ),
     (
         "esputnik",

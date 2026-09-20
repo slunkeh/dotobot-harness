@@ -673,3 +673,33 @@ def test_sheets_repeated_range_query(tmp_path):
         "ranges": ["Sheet1!A1:B2", "Sheet2!C1:D2"],
         "fields": ["spreadsheetId,sheets"],
     }
+
+
+@pytest.mark.parametrize("method", ["GET", "POST", "PUT"])
+def test_enormail_request_contract(tmp_path, method):
+    from urllib.parse import parse_qs
+
+    paths = HarnessPaths(home=tmp_path)
+    record = Connectors(paths).add("enormail", "Enormail", secret="fixture-key")
+    bound = tools_for_bot(paths, "atlas", record_ids={record["id"]})
+    if method == "GET":
+        name, args = "enormail_get", {"path": "/account.json"}
+    else:
+        name, args = (
+            "enormail_request",
+            {
+                "method": method,
+                "path": "/lists/fixture.json" if method == "PUT" else "/lists.json",
+                "body": {"title": "Fixture & list"},
+            },
+        )
+    with patch("connectors.generic._open", return_value=_response({})) as send:
+        assert "HTTP 200" in bound[name][1](args)
+    request = send.call_args.args[0]
+    assert request.full_url == "https://api.enormail.eu/api/1.0" + args["path"]
+    assert request.get_header("Authorization") == "Basic Zml4dHVyZS1rZXk6"
+    if method == "GET":
+        assert request.data is None
+    else:
+        assert request.get_header("Content-type") == "application/x-www-form-urlencoded"
+        assert parse_qs(request.data.decode()) == {"title": ["Fixture & list"]}
