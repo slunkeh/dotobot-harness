@@ -3,11 +3,11 @@
 Scope: implement the 144 catalogue connectors identified with missing REST hosts.
 This is an implementation ledger, not a claim of live-account verification.
 
-Sixty routes now have offline request-contract coverage through the real connector
+Sixty-one routes now have offline request-contract coverage through the real connector
 registry and credential store. Tests assert the outbound origin, version prefix,
 credential header, query and JSON body. Credentials are never followed through
 HTTP redirects. Production authenticated reads and writes remain unverified for these
-sixty routes. The remaining 84 connectors still need provider research and code.
+sixty-one routes. The remaining 83 connectors still need provider research and code.
 
 ## Implemented routes
 
@@ -19,6 +19,7 @@ CloudConvert currently uses its production automatic-region API, not its sandbox
 
 | Connector | Provider reference | Setup |
 |---|---|---|
+| `acumbamail` | [Provider documentation](https://acumbamail.com/apidoc/) | Store the auth token from My account > Preferences. Dotobot inserts auth_token into GET queries or POST form data from the secret store. Use function paths with trailing slashes, such as /getLists/. JSON is the default response format. Pass POST parameters as a body object; nested fields are form-encoded with bracket notation. Some GET functions can modify data too: select functions carefully. Do not include auth_token in tool arguments. |
 | `leaddyno` | [Provider documentation](https://support.leaddyno.com/hc/en-us/articles/21508238902173-Getting-Started-with-LeadDyno-API-Tracking) | Store the LeadDyno private API key from Account > Profile, not the public tracking key. It is sent in the documented key header. GET /visitors reads visitor records. POST /visitors takes a url field; body objects are form-encoded. Lead and purchase writes can change affiliate attribution; use only test data when checking writes. |
 | `emaillistverify` | [Provider documentation](https://api.emaillistverify.com/api-doc) | Store an EmailListVerify API key, sent in x-api-key. GET /credits reads balances without verifying an email. POST /emailJobs accepts JSON email and optional quality; poll /emailJobs/JOB_ID for completion. Verification operations consume credits. Multipart list uploads and binary downloads are not supported by the generic JSON tool. |
 | `giantcampaign` | [Provider documentation](https://giantcampaign.com/developers/) | Store the GiantCampaign API token. Dotobot adds the required api_token query parameter from the secret store; do not include it in tool arguments. GET /lists or /campaigns reads resources. The documented POST endpoints also pass parameters in the URL query: supply those non-secret parameters in path, using URL encoding. JSON-body acceptance is not verified. Sending campaigns or subscriber actions may trigger email. |
@@ -141,7 +142,7 @@ Live evidence for the third batch:
 | `acelle_mail` | Route and offline request tests added; live verification pending |
 | `activecampaign` | Route and offline request tests added; live verification pending |
 | `active_trail` | Route and offline request tests added; live verification pending |
-| `acumbamail` | Pending provider research and implementation |
+| `acumbamail` | Implemented; request contracts pass; authenticated account verification pending |
 | `acymailing` | Pending provider research and implementation |
 | `add_to_calendar_pro` | Pending provider research and implementation |
 | `adhook` | Pending provider research and implementation |
@@ -563,3 +564,17 @@ Bound reads with disposable stores and deliberately invalid keys returned
 HTTP 401 INVALID_API_KEY for EmailListVerify /credits and HTTP 401 Unauthorized
 for LeadDyno /visitors. No verification credits were spent and no affiliate
 tracking data was created. Authenticated account acceptance remains pending.
+
+## Acumbamail validation
+
+The [API reference](https://acumbamail.com/apidoc/) specifies function-based
+paths under /api/1/, GET parameters and POST form data. A trusted catalogue flag
+places the stored auth_token in the form for POST instead of the URL. Tests
+cover both methods, encoded credentials, nested fields, preserving the caller's
+body and refusing a credential override. The two positive cases failed before
+implementation; all three new cases pass. The focused suite passes 285 tests;
+Ruff passes.
+
+Bound GET and POST calls to /getLists/ with a disposable credential store and
+an invalid token both returned HTTP 401 Unauthorized. These are rejection checks,
+not authenticated list access. No live subscriber or campaign mutations ran.

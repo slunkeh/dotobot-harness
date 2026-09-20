@@ -47,9 +47,9 @@ _ROWS: list[tuple[str, str, str, str]] = [
     ),
     (
         "acumbamail",
-        "community",
-        "https://github.com/ever-works/awesome-mcp-servers/blob/master/details/acumbamail-mcp-server.md",
-        "Listed in awesome-mcp-servers.",
+        "official",
+        "https://acumbamail.com/apidoc/",
+        "Store the auth token from My account > Preferences. Dotobot inserts auth_token into GET queries or POST form data from the secret store. Use function paths with trailing slashes, such as /getLists/. JSON is the default response format. Pass POST parameters as a body object; nested fields are form-encoded with bracket notation. Some GET functions can modify data too: select functions carefully. Do not include auth_token in tool arguments.",
     ),
     (
         "acymailing",

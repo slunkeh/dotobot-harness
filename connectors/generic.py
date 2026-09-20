@@ -291,13 +291,17 @@ def _http(
     if style == "query":
         from harness.connectors import _CATALOG_TYPES
 
-        parameter = _CATALOG_TYPES[str(ctx.record["type"])]["auth_query"]
+        auth_config = _CATALOG_TYPES[str(ctx.record["type"])]
+        parameter = auth_config["auth_query"]
         supplied = urllib.parse.parse_qs(urllib.parse.urlsplit(url).query, keep_blank_values=True)
         if any(k == parameter or k.startswith(parameter + "[") for k in supplied) or (
             body is not None and parameter in body
         ):
             return "error: authentication comes from the connector secret store"
-        url += ("&" if "?" in url else "?") + urllib.parse.urlencode({parameter: key})
+        if auth_config.get("auth_in_form") and method != "GET":
+            body = {**(body or {}), parameter: key}
+        else:
+            url += ("&" if "?" in url else "?") + urllib.parse.urlencode({parameter: key})
     # Final boundary: a sentinel the model echoed into the path,
     # query, or body is substituted with its plaintext here; one that cannot
     # be unsealed raises before any I/O — the request is refused, never

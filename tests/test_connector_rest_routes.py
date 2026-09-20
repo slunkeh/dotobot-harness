@@ -990,3 +990,50 @@ def test_leaddyno_request_contract(tmp_path, method):
         assert parse_qs(req.data.decode()) == {"url": ["https://example.com/?afmc=fixture&x=1"]}
     else:
         assert req.data is None
+
+
+@pytest.mark.parametrize("method", ["GET", "POST"])
+def test_acumbamail_parameter_authentication(tmp_path, method):
+    from urllib.parse import parse_qs, urlsplit
+
+    paths = HarnessPaths(home=tmp_path)
+    record = Connectors(paths).add("acumbamail", "Acumbamail", secret="key&= +?")
+    bound = tools_for_bot(paths, "atlas", record_ids={record["id"]})
+    name = "acumbamail_get" if method == "GET" else "acumbamail_request"
+    with patch("connectors.generic._open", return_value=_response({})) as send:
+        assert "HTTP 200" in bound[name][1]({"method": method, "path": "/getLists/"})
+    req = send.call_args.args[0]
+    parts = urlsplit(req.full_url)
+    assert parts.netloc == "acumbamail.com"
+    assert parts.path == "/api/1/getLists/"
+    assert req.get_header("Authorization") is None
+    if method == "GET":
+        assert parse_qs(parts.query) == {"auth_token": ["key&= +?"]}
+        assert req.data is None
+    else:
+        assert parts.query == ""
+        assert parse_qs(req.data.decode()) == {"auth_token": ["key&= +?"]}
+        assert req.get_header("Content-type") == "application/x-www-form-urlencoded"
+
+
+def test_acumbamail_form_preserves_caller_body_and_refuses_override(tmp_path):
+    from urllib.parse import parse_qs
+
+    paths = HarnessPaths(home=tmp_path)
+    record = Connectors(paths).add("acumbamail", "Acumbamail", secret="fixture-key")
+    ctx = ConnectorContext(paths=paths, bot="atlas", record=record)
+    body = {"merge_fields": {"EMAIL": "fixture@example.com"}}
+    with patch("connectors.generic._open", return_value=_response({})) as send:
+        assert "HTTP 200" in generic._request(
+            ctx, {"method": "POST", "path": "/addSubscriber/", "body": body}
+        )
+    assert body == {"merge_fields": {"EMAIL": "fixture@example.com"}}
+    assert parse_qs(send.call_args.args[0].data.decode()) == {
+        "merge_fields[EMAIL]": ["fixture@example.com"],
+        "auth_token": ["fixture-key"],
+    }
+    with patch("connectors.generic._open") as send:
+        assert "secret store" in generic._request(
+            ctx, {"method": "POST", "path": "/getLists/", "body": {"auth_token": "override"}}
+        )
+    send.assert_not_called()
