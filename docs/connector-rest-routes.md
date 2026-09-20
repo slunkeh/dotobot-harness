@@ -1002,3 +1002,7 @@ The referenced official documentation URL is https://support.goodbits.io/article
 ## Exact Mails contract investigation
 
 The current [provider website](https://exactmails.com) states that account creation is needed for detailed API documentation. Its publicly served main.012f70bf.js references exactmails.xyz:8012/api/v1 and links its account dashboard at exactmail-dashboard.vercel.app. Older third-party examples use api.exactmails.com/api/v1. The website asset establishes that these names are provider-published, but not which host is the supported integration API or its authentication contract. No API host was guessed from frontend configuration. Account-level documentation remains needed; this connector remains pending.
+
+## Full-suite checkpoint at 109 routes
+
+At commit e6a77c5, the full runtime suite completed with 3,582 passed, 2 skipped and 2 failed in 309.70 seconds. The failures were test_listener_user_data_dirs_reads_listening_cmdline (assert False) and test_run_session_raises_when_display_stays_bound (did not raise RuntimeError). Both names and failing assertions match the previously reproduced baseline results at c33bb96. This run introduced no additional failing tests; it is not a fully green suite or authenticated provider acceptance. A short temporary test directory was used to avoid Unix socket path length failures. The focused connector suite remains 446 passed.
