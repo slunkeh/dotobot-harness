@@ -170,9 +170,9 @@ _ROWS: list[tuple[str, str, str, str]] = [
     ),
     (
         "benchmark_email",
-        "aggregator",
-        "https://composio.dev/toolkits/benchmark_email",
-        "Composio; also Zapier/Pipedream.",
+        "official",
+        "https://benchmarkemail.github.io/RESTful-API-v3/",
+        "Store a Benchmark Email API token. Uses AuthToken and application/json headers, including GET. Read lists with GET /Contact/ and query SearchFilter. Create a list with POST /Contact and body Data containing Name and Description. Response.Status must be 1; HTTP 200 alone can contain an application error. This is REST v3, not the legacy XML API.",
     ),
     (
         "bigmailer",
@@ -188,9 +188,9 @@ _ROWS: list[tuple[str, str, str, str]] = [
     ),
     (
         "botconversa",
-        "aggregator",
-        "https://mcp.pipedream.com/app/botconversa",
-        "Pipedream-generated.",
+        "official",
+        "https://backend.botconversa.com.br/swagger/",
+        "Store a BotConversa API key. Authentication uses API-KEY. Keep endpoint trailing slashes, for example GET /tags/ or /flows/. JSON writes are supported. POST /subscriber/ requires has_opt_in_whatsapp=true and actual contact consent. Messaging and flow endpoints can contact subscribers; adding the route does not authorize outreach.",
     ),
     (
         "brandfetch",
@@ -461,9 +461,9 @@ _ROWS: list[tuple[str, str, str, str]] = [
     ),
     (
         "easypromos",
-        "none",
-        "https://developers.easypromosapp.com/",
-        "General API docs. No MCP.",
+        "official",
+        "https://easypromos-apiref.redoc.ly/",
+        "Store an access token from the Easypromos account Utilities menu. Uses Bearer authentication; White Label or Corporate plan required. GET /promotions lists promotions; use paging.next_cursor for further pages. POST requests use JSON. Some participation operations also require a participant login token in the body. Legacy v1 endpoints are retired.",
     ),
     (
         "easysendy",

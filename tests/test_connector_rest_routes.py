@@ -15,6 +15,30 @@ from harness.paths import HarnessPaths
 # Literal expected requests intentionally independent of catalogue metadata.
 CASES = [
     (
+        "benchmark_email",
+        {},
+        "/Contact/",
+        "https://clientapi.benchmarkemail.com/Contact/",
+        "Authtoken",
+        "fixture-key",
+    ),
+    (
+        "botconversa",
+        {},
+        "/tags/",
+        "https://backend.botconversa.com.br/api/v1/webhook/tags/",
+        "Api-key",
+        "fixture-key",
+    ),
+    (
+        "easypromos",
+        {},
+        "/promotions",
+        "https://api.easypromosapp.com/v2/promotions",
+        "Authorization",
+        "Bearer fixture-key",
+    ),
+    (
         "klenty",
         {},
         "/user/fixture%40example.com/lists",
@@ -534,6 +558,29 @@ def test_4dem_malformed_auth_response_is_not_forwarded(tmp_path):
     "type_,path,url,body",
     [
         (
+            "benchmark_email",
+            "/Contact",
+            "https://clientapi.benchmarkemail.com/Contact",
+            {"Data": {"Name": "Fixture", "Description": "Test list"}},
+        ),
+        (
+            "botconversa",
+            "/subscriber/",
+            "https://backend.botconversa.com.br/api/v1/webhook/subscriber/",
+            {
+                "phone": "15555550100",
+                "first_name": "Fixture",
+                "last_name": "Test",
+                "has_opt_in_whatsapp": True,
+            },
+        ),
+        (
+            "easypromos",
+            "/participations/123/check_requirement/456",
+            "https://api.easypromosapp.com/v2/participations/123/check_requirement/456",
+            {"lt": "fixture-login-token"},
+        ),
+        (
             "klenty",
             "/user/fixture%40example.com/prospects",
             "https://api.klenty.com/apis/v1/user/fixture%40example.com/prospects",
@@ -775,12 +822,13 @@ def test_enormail_request_contract(tmp_path, method):
         assert parse_qs(request.data.decode()) == {"title": ["Fixture & list"]}
 
 
-def test_cometly_get_sends_required_content_type(tmp_path):
+@pytest.mark.parametrize("type_,path", [("cometly", "/events"), ("benchmark_email", "/Contact/")])
+def test_get_sends_required_content_type(tmp_path, type_, path):
     paths = HarnessPaths(home=tmp_path)
-    record = Connectors(paths).add("cometly", "Cometly", secret="fixture-key")
+    record = Connectors(paths).add(type_, type_, secret="fixture-key")
     ctx = ConnectorContext(paths=paths, bot="atlas", record=record)
     with patch("connectors.generic._open", return_value=_response({})) as send:
-        assert "HTTP 200" in generic._get(ctx, {"path": "/events"})
+        assert "HTTP 200" in generic._get(ctx, {"path": path})
     request = send.call_args.args[0]
     assert request.get_header("Content-type") == "application/json"
     assert request.get_header("Accept") == "application/json"

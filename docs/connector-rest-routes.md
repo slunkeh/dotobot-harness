@@ -3,11 +3,11 @@
 Scope: implement the 144 catalogue connectors identified with missing REST hosts.
 This is an implementation ledger, not a claim of live-account verification.
 
-Fifty-two routes now have offline request-contract coverage through the real connector
+Fifty-five routes now have offline request-contract coverage through the real connector
 registry and credential store. Tests assert the outbound origin, version prefix,
 credential header, query and JSON body. Credentials are never followed through
 HTTP redirects. Production authenticated reads and writes remain unverified for these
-fifty-two routes. The remaining 92 connectors still need provider research and code.
+fifty-five routes. The remaining 89 connectors still need provider research and code.
 
 ## Implemented routes
 
@@ -19,6 +19,9 @@ CloudConvert currently uses its production automatic-region API, not its sandbox
 
 | Connector | Provider reference | Setup |
 |---|---|---|
+| `easypromos` | [Provider documentation](https://easypromos-apiref.redoc.ly/) | Store an access token from the Easypromos account Utilities menu. Uses Bearer authentication; White Label or Corporate plan required. GET /promotions lists promotions; use paging.next_cursor for further pages. POST requests use JSON. Some participation operations also require a participant login token in the body. Legacy v1 endpoints are retired. |
+| `botconversa` | [Provider documentation](https://backend.botconversa.com.br/swagger/) | Store a BotConversa API key. Authentication uses API-KEY. Keep endpoint trailing slashes, for example GET /tags/ or /flows/. JSON writes are supported. POST /subscriber/ requires has_opt_in_whatsapp=true and actual contact consent. Messaging and flow endpoints can contact subscribers; adding the route does not authorize outreach. |
+| `benchmark_email` | [Provider documentation](https://benchmarkemail.github.io/RESTful-API-v3/) | Store a Benchmark Email API token. Uses AuthToken and application/json headers, including GET. Read lists with GET /Contact/ and query SearchFilter. Create a list with POST /Contact and body Data containing Name and Description. Response.Status must be 1; HTTP 200 alone can contain an application error. This is REST v3, not the legacy XML API. |
 | `klenty` | [Provider documentation](https://support.klenty.com/en/articles/3197537-getting-started-with-klenty-api) | Store the API key from Klenty Settings > Integrations. Authentication uses x-API-key. Paths include the account email, URL-encoded as a path segment: GET /user/ACCOUNT_EMAIL/lists. POST /user/ACCOUNT_EMAIL/prospects accepts a JSON object with Email and FirstName. Inspect response status for operation success. This route supports individual JSON objects; bulk prospect arrays are not supported. Starting cadences can send outreach. |
 | `humanitix` | [Provider documentation](https://api.humanitix.com/v1/documentation/json) | Store the public API key from Humanitix Account > Advanced. Authentication uses x-api-key. Production paths are relative to /v1, for example GET /events with query page=1, or /tags. The current API reference also lists bodyless POST /events/EVENT_ID/tickets/TICKET_ID/check-in and check-out. Event creation, event updates and ticket transfers require additional provider permission. Old console API keys do not work. Staging and optional location override headers are not configured. |
 | `campayn` | [Provider documentation](https://github.com/nebojsac/Campayn-API) | Store an API key from the Campayn Account section. Authentication uses Authorization: TRUEREST apikey=KEY. GET /lists.json reads lists. JSON writes such as POST /lists/LIST_ID/contacts.json add contacts; inspect success in the response. Keep the .json endpoint suffix. |
@@ -150,9 +153,9 @@ Live evidence for the third batch:
 | `autoklose` | Pending provider research and implementation |
 | `automizy` | Pending provider research and implementation |
 | `beamer` | Implemented; request-contract tests pass; production account verification pending |
-| `benchmark_email` | Pending provider research and implementation |
+| `benchmark_email` | Implemented; request contracts pass; authenticated account verification pending |
 | `bigmailer` | Route and offline request tests added; live verification pending |
-| `botconversa` | Pending provider research and implementation |
+| `botconversa` | Implemented; request contracts pass; authenticated account verification pending |
 | `brandmentions` | Pending provider research and implementation |
 | `builderall_mailingboss` | Pending provider research and implementation |
 | `buysellads` | Pending provider research and implementation |
@@ -191,7 +194,7 @@ Live evidence for the third batch:
 | `dynamic_content_snippet` | Pending provider research and implementation |
 | `dynapictures` | Route and offline request tests added; live verification pending |
 | `egoi` | Route and offline request tests added; live verification pending |
-| `easypromos` | Pending provider research and implementation |
+| `easypromos` | Implemented; request contracts pass; authenticated account verification pending |
 | `easysendy` | Pending provider research and implementation |
 | `echtpost_postcards` | Pending provider research and implementation |
 | `ecologi` | Implemented; request contracts pass; authenticated account verification pending |
@@ -466,3 +469,27 @@ account path, header and case-sensitive prospect fields. The focused suite passe
 A bound GET /user/fixture%40example.com/lists using a disposable credential store
 and invalid key returned HTTP 401 with reason invalidAPIKey. No prospects were
 created and no cadences started. Authenticated account verification remains pending.
+
+## Benchmark Email, BotConversa and Easypromos validation
+
+Six new request cases failed without their routes and pass after implementation.
+Coverage includes documented JSON list creation, subscriber creation and
+participation-requirement requests. A seventh case checks Benchmark Email's
+required JSON Content-Type on GET. The focused suite passes 260 tests; Ruff passes.
+
+Bound reads with disposable stores and deliberately invalid credentials returned:
+
+- Benchmark Email GET /Contact/: HTTP 401, Invalid/Missing AuthToken.
+- BotConversa GET /tags/: HTTP 403, Api key is not valid.
+- Easypromos GET /promotions: HTTP 403, invalid_token.
+
+These are rejection checks, not account acceptance tests. No live lists,
+subscribers, messages, or promotion entries were created.
+
+Benchmark's [official examples](https://benchmarkemail.github.io/RESTful-API-v3/)
+confirm its unversioned clientapi host and AuthToken; the interactive developer
+site timed out during research. BotConversa's
+[live schema](https://backend.botconversa.com.br/swagger/?format=openapi)
+confirms JSON, API-KEY and the /api/v1/webhook prefix. Easypromos'
+[current reference](https://easypromos-apiref.redoc.ly/) confirms v2 JSON and
+Bearer authentication. Its White Label/Corporate requirement is recorded above.
