@@ -3,11 +3,11 @@
 Scope: implement the 144 catalogue connectors identified with missing REST hosts.
 This is an implementation ledger, not a claim of live-account verification.
 
-One hundred routes now have offline request-contract coverage through the real connector
+One hundred and one routes now have offline request-contract coverage through the real connector
 registry and credential store. Tests assert the outbound origin, version prefix,
 credential header, query and JSON body. Credentials are never followed through
 HTTP redirects. Production authenticated reads and writes remain unverified for these
-one hundred routes. The remaining 44 connectors still need provider research and code.
+one hundred and one routes. The remaining 43 connectors still need provider research and code.
 
 ## Implemented routes
 
@@ -277,7 +277,7 @@ Live evidence for the third batch:
 | `indiefunnels` | Pending provider research and implementation |
 | `infusionsoft` | Implemented; request-contract tests pass; production account verification pending |
 | `inksprout` | Pending provider research and implementation |
-| `instabot` | Pending provider research and implementation |
+| `instabot` | Implemented master-key REST route; read/query contracts pass; live API key rejected; authenticated acceptance open |
 | `instagram` | Pending provider research and implementation |
 | `instasent` | Route and offline request tests added; live verification pending |
 | `jellyreach` | Pending provider research and implementation |
@@ -930,3 +930,12 @@ A disposable-store POST /balance/currentbalance with an invalid key and syntheti
 The [getting started guide](https://docs.asters.ai/api/overview/getting-started) specifies api.asters.ai/api/external/v1.0 and JSON headers. The [authentication guide](https://docs.asters.ai/api/overview/authentication) specifies x-api-key, as do endpoint references. Added workspace GET and POST /data/posts retrieval with nested date filters, plus GET Content-Type coverage.
 
 A disposable-store GET /workspaces using the documented header returned HTTP 200 with data=[] and error="x-asters-key Key Not Found". This conflicts with the documented header name and does not prove the route authenticates correctly. A real key and confirmation of the current header contract are still needed. No social posts were created. Focused suite: 414 passed; Ruff clean.
+
+
+## Instabot server REST route
+
+The [official server guide](https://docs.instabot.io/docs/serverapi) specifies api.instabot.io/v1, X-Instabot-Api-Key and a master-key Authorization prefix. Added trusted catalogue prefixes to header-pair authentication. Both keys remain in the connector secret store. [Object queries](https://docs.instabot.io/docs/serverapi-objects) support GET /users?type=all and JSON POST /users/query?type=all; both have request coverage. User-session authentication and binary files are outside this route.
+
+A disposable-store GET /users?type=all with invalid keys returned HTTP 400, API Key is invalid. This does not establish master-key acceptance. No users were created or changed. Focused suite: 416 passed; Ruff clean.
+
+Asters follow-up: documented x-api-key alone returned x-asters-key Key Not Found; x-asters-key alone returned API key is missing; both invalid headers returned x-asters-key Key Not Found. All were HTTP 200. These results do not resolve the current credential contract, so its documented route remains unchanged and authentication is still open.

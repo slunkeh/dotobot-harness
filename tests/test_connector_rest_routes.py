@@ -2164,3 +2164,28 @@ def test_asters_posts_json(tmp_path):
     with patch("connectors.generic._open", return_value=_response({})) as send:
         bound["asters_get"][1]({"path": "/workspaces"})
     assert send.call_args.args[0].get_header("Content-type") == "application/json"
+
+
+@pytest.mark.parametrize(
+    "method, path, body",
+    [
+        ("GET", "/users?type=all", None),
+        ("POST", "/users/query?type=all", {"name": "Fixture"}),
+    ],
+)
+def test_instabot_master_key_pair(tmp_path, method, path, body):
+    paths = HarnessPaths(home=tmp_path)
+    record = Connectors(paths).add(
+        "instabot", "Instabot", secret='["fixture-key", "fixture-master"]'
+    )
+    bound = tools_for_bot(paths, "atlas", record_ids={record["id"]})
+    name = "instabot_get" if method == "GET" else "instabot_request"
+    args = {"path": path} if method == "GET" else {"method": method, "path": path, "body": body}
+    with patch("connectors.generic._open", return_value=_response({})) as send:
+        assert "HTTP 200" in bound[name][1](args)
+    req = send.call_args.args[0]
+    assert req.full_url == "https://api.instabot.io/v1" + path
+    assert req.get_header("X-instabot-api-key") == "fixture-key"
+    assert req.get_header("Authorization") == "X-Instabot-Master-Api-Key fixture-master"
+    if body is not None:
+        assert json.loads(req.data) == body

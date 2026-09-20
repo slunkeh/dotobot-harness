@@ -1360,6 +1360,10 @@ STUBS: list[dict] = [
     },
     {
         "type": "instabot",
+        "api_base": "https://api.instabot.io/v1",
+        "auth_style": "header_pair",
+        "auth_headers": ["X-Instabot-Api-Key", "Authorization"],
+        "auth_header_prefixes": ["", "X-Instabot-Master-Api-Key "],
         "name": "Instabot",
         "auth": "api_key",
         "fields": [],

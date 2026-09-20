@@ -853,9 +853,9 @@ _ROWS: list[tuple[str, str, str, str]] = [
     ),
     (
         "instabot",
-        "none",
-        "https://zapier.com/mcp/instabot",
-        "Only Zapier generic wrapper.",
+        "official",
+        "https://docs.instabot.io/docs/serverapi",
+        'Store ["API_KEY", "MASTER_API_KEY"] as the secret JSON array. Uses X-Instabot-Api-Key and Authorization: X-Instabot-Master-Api-Key. GET /users?type=all lists anonymous and known users; POST /users/query?type=all searches using a JSON criteria object. Inspect apiStatusCode, apiStatusMessage and hasMoreRecords. User-session authentication and binary file transfers are not implemented.',
     ),
     (
         "instagram",

@@ -231,7 +231,11 @@ def _headers(ctx: ConnectorContext, secret: str) -> dict[str, str]:
             raise ValueError(
                 "store the credential as a JSON array of two nonempty printable ASCII strings"
             )
-        hdrs.update(zip(cat["auth_headers"], pair, strict=True))
+        prefixes = cat.get("auth_header_prefixes", ["", ""])
+        hdrs.update(
+            (name, prefix + value)
+            for name, prefix, value in zip(cat["auth_headers"], prefixes, pair, strict=True)
+        )
         return hdrs
     if style == "query":
         return hdrs
