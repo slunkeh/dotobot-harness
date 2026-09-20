@@ -714,8 +714,8 @@ _ROWS: list[tuple[str, str, str, str]] = [
     (
         "gitter",
         "none",
-        "https://developer.gitter.im/docs/",
-        "Largely legacy / merged into Matrix/Element.",
+        "https://spec.matrix.org/latest/client-server-api/",
+        "Gitter migrated to Matrix. Store a Matrix access token for its gitter.ems.host homeserver, not an old Gitter token. Paths omit /_matrix/client/v3. GET /account/whoami. Token lifecycle, sync loops and encrypted-room key management are not implemented. Current local DNS resolution of the advertised host failed; live access remains unverified.",
     ),
     (
         "gmail",

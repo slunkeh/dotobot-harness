@@ -3,11 +3,11 @@
 Scope: implement the 144 catalogue connectors identified with missing REST hosts.
 This is an implementation ledger, not a claim of live-account verification.
 
-One hundred and nineteen routes now have offline request-contract coverage through the real connector
+One hundred and twenty routes now have offline request-contract coverage through the real connector
 registry and credential store. Tests assert the outbound origin, version prefix,
 credential header, query and JSON body. Credentials are never followed through
 HTTP redirects. Production authenticated reads and writes remain unverified for these
-one hundred and nineteen routes. The remaining 25 connectors still need provider research and code.
+one hundred and twenty routes. The remaining 24 connectors still need provider research and code.
 
 ## Implemented routes
 
@@ -252,7 +252,7 @@ Live evidence for the third batch:
 | `getswift` | Pending provider research and implementation |
 | `giantcampaign` | Implemented; request contracts pass; authenticated account verification pending |
 | `gist` | Implemented; request contracts pass; authenticated account verification pending |
-| `gitter` | Pending provider research and implementation |
+| `gitter` | Matrix route implemented from provider discovery; advertised host fails local DNS; live acceptance blocked |
 | `gobio_link` | Pending provider research and implementation |
 | `goodbits` | Pending: website, API and support hosts fail DNS resolution; official API contract unavailable |
 | `google_ad_manager` | Implemented REST route; authenticated account acceptance pending |
@@ -1084,3 +1084,10 @@ The specification limits this REST service to contact management and refers camp
 The [provider history](https://retention.com/about-r) confirms GetEmails became Retention.com. The [authentication guide](https://docs.retention.com/docs/authentication) specifies api.retention.com/api/v1 and api-id/api-key headers. Added the current host and a stored JSON credential array [API ID, API key]. The guide inconsistently names authenticate in a heading but uses /validate in its examples; the live /validate endpoint was verified.
 
 A disposable-store GET /validate returned HTTP 401 Invalid API Key or ID for invalid credentials. Focused suite: 477 passed; Ruff clean. The [getting-started guide](https://docs.retention.com/docs/getting-started) emphasizes suppression-file uploads and webhooks. The generic JSON route does not implement multipart file uploads or webhook delivery, so this host addition does not complete those business workflows. No files or contact data were uploaded; authenticated account acceptance remains open.
+
+
+## Gitter Matrix route
+
+Gitter's [migration announcement](https://blog.gitter.im/2023/02/13/gitter-has-fully-migrated-to-matrix/) confirms its move to Matrix. A fresh read of https://gitter.im/.well-known/matrix/client advertises https://gitter.ems.host as m.homeserver.base_url. Added that provider-advertised host with /_matrix/client/v3 and Bearer Matrix tokens, following the [client-server specification](https://spec.matrix.org/latest/client-server-api/). Legacy Gitter tokens are not compatible. The bound contract covers GET /account/whoami.
+
+The disposable-store live whoami probe could not resolve gitter.ems.host locally. This is an availability blocker, not successful authentication. No messages were sent. This addition implements the advertised route, not a functioning live account or a complete Matrix client; token lifecycle, sync loops, binary media and encrypted-room key management remain unsupported. Focused suite: 478 passed; Ruff clean.

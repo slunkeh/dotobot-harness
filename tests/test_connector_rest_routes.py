@@ -15,6 +15,14 @@ from harness.paths import HarnessPaths
 # Literal expected requests intentionally independent of catalogue metadata.
 CASES = [
     (
+        "gitter",
+        {},
+        "/account/whoami",
+        "https://gitter.ems.host/_matrix/client/v3/account/whoami",
+        "Authorization",
+        "Bearer fixture-key",
+    ),
+    (
         "endorsal",
         {},
         "/tags",

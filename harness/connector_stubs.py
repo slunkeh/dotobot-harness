@@ -1133,6 +1133,8 @@ STUBS: list[dict] = [
     },
     {
         "type": "gitter",
+        "api_base": "https://gitter.ems.host/_matrix/client/v3",
+        "auth_style": "bearer",
         "name": "Gitter",
         "auth": "api_key",
         "fields": [],
