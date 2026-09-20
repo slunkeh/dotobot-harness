@@ -398,6 +398,8 @@ STUBS: list[dict] = [
     },
     {
         "type": "campaignhq",
+        "api_base": "https://api.campaignhq.co/api/v1",
+        "auth_style": "bearer",
         "name": "CampaignHQ",
         "auth": "api_key",
         "fields": [],

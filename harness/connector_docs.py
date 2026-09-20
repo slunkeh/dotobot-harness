@@ -266,7 +266,7 @@ _ROWS: list[tuple[str, str, str, str]] = [
         "campaignhq",
         "none",
         "https://campaignhq.docs.apiary.io/",
-        "Official Ruby API client, no MCP.",
+        "REST uses a stored Bearer API key from Settings > Integrations > API keys. Paths omit /api/v1. GET /lists; POST /lists with JSON name and optional partner_entity_id.",
     ),
     (
         "campayn",

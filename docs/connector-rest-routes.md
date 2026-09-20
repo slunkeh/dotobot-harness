@@ -3,11 +3,11 @@
 Scope: implement the 144 catalogue connectors identified with missing REST hosts.
 This is an implementation ledger, not a claim of live-account verification.
 
-One hundred and fifteen routes now have offline request-contract coverage through the real connector
+One hundred and sixteen routes now have offline request-contract coverage through the real connector
 registry and credential store. Tests assert the outbound origin, version prefix,
 credential header, query and JSON body. Credentials are never followed through
 HTTP redirects. Production authenticated reads and writes remain unverified for these
-one hundred and fifteen routes. The remaining 29 connectors still need provider research and code.
+one hundred and sixteen routes. The remaining 28 connectors still need provider research and code.
 
 ## Implemented routes
 
@@ -189,7 +189,7 @@ Live evidence for the third batch:
 | `callrail` | Route and offline request tests added; live verification pending |
 | `campaign_cleaner` | Implemented; request contracts pass; authenticated account verification pending |
 | `campaign_monitor` | Route and offline request tests added; live verification pending |
-| `campaignhq` | Pending provider research and implementation |
+| `campaignhq` | Implemented REST route; authenticated account acceptance pending |
 | `campayn` | Implemented; request contracts pass; authenticated account verification pending |
 | `cardly` | Route and offline request tests added; live verification pending |
 | `catch_all_verifier` | Implemented REST route; credits GET and verification JSON contracts pass; live invalid key rejected; authenticated acceptance open |
@@ -1049,3 +1049,10 @@ A disposable-store account-list read with invalid credentials returned HTTP 401 
 Retrieved the [provider-published API Blueprint](https://jsapi.apiary.io/apis/publicdemioapi.apib) behind the [official reference](https://publicdemioapi.docs.apiary.io/), resolving the earlier inaccessible-documentation blocker. It specifies my.demio.com/api/v1 and Api-Key/Api-Secret headers. Store credentials as a JSON array [key, secret]. Contracts cover GET /ping and JSON PUT /event/register. Registration can contact attendees and was tested offline only.
 
 Disposable-store GET /ping rejected invalid credentials with HTTP 401 Authorization failed. The provider's published sandbox example credentials returned HTTP 200 with pong true and sandbox true. This proves sandbox authentication, not production account permissions or registration delivery. No attendee was registered. Focused suite: 470 passed; Ruff clean.
+
+
+## CampaignHQ REST API
+
+The [published API Blueprint](https://jsapi.apiary.io/apis/campaignhq.apib) behind the [provider reference](https://campaignhq.docs.apiary.io/) specifies api.campaignhq.co/api/v1 and Bearer API keys. Added GET /lists and JSON POST /lists request contracts. Keys come from Settings > Integrations > API keys. List creation takes name and optional partner_entity_id; responses include pagination metadata. Contact or campaign actions may trigger communication and require account acceptance.
+
+A disposable-store GET /lists with an invalid key returned HTTP 401 unauthorized, Access denied. No lists or contacts were created. Real account access and writes remain unverified. Focused suite: 472 passed; Ruff clean.
