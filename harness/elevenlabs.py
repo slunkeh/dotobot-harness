@@ -42,7 +42,9 @@ def request(paths, route: str, *, method="GET", key=None) -> dict:
             body = json.loads(exc.read(65_536))
             error = body.get("detail") if isinstance(body, dict) else None
             if isinstance(error, dict):
-                code = error.get("code") or error.get("status")
+                code = error.get("code")
+                if code not in {"invalid_api_key", "missing_permissions", "quota_exceeded"}:
+                    code = error.get("status")
         except (OSError, ValueError):
             pass
         if not isinstance(code, str):
@@ -117,7 +119,16 @@ def voices(paths, search="", page="") -> dict:
     result = request(paths, "/v2/voices?" + urllib.parse.urlencode(query))
     return {
         "voices": [
-            {"voice_id": row["voice_id"], "name": str(row.get("name") or row["voice_id"])}
+            {
+                "voice_id": row["voice_id"],
+                "name": str(row.get("name") or row["voice_id"]),
+                "preview_url": row.get("preview_url") if isinstance(row.get("preview_url"), str) else None,
+                "labels": {
+                    key: value for key, value in (row.get("labels") or {}).items()
+                    if key in {"accent", "age", "gender", "description", "use_case", "language"}
+                    and isinstance(value, str)
+                } if isinstance(row.get("labels"), dict) else {},
+            }
             for row in result.get("voices", [])
             if isinstance(row, dict) and isinstance(row.get("voice_id"), str)
         ],
