@@ -1076,6 +1076,9 @@ STUBS: list[dict] = [
     },
     {
         "type": "getemails",
+        "api_base": "https://api.retention.com/api/v1",
+        "auth_style": "header_pair",
+        "auth_headers": ["api-id", "api-key"],
         "name": "GetEmails",
         "auth": "api_key",
         "fields": [],

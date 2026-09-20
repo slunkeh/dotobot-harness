@@ -3,11 +3,11 @@
 Scope: implement the 144 catalogue connectors identified with missing REST hosts.
 This is an implementation ledger, not a claim of live-account verification.
 
-One hundred and eighteen routes now have offline request-contract coverage through the real connector
+One hundred and nineteen routes now have offline request-contract coverage through the real connector
 registry and credential store. Tests assert the outbound origin, version prefix,
 credential header, query and JSON body. Credentials are never followed through
 HTTP redirects. Production authenticated reads and writes remain unverified for these
-one hundred and eighteen routes. The remaining 26 connectors still need provider research and code.
+one hundred and nineteen routes. The remaining 25 connectors still need provider research and code.
 
 ## Implemented routes
 
@@ -247,7 +247,7 @@ Live evidence for the third batch:
 | `fomo` | Route and offline request tests added; live verification pending |
 | `freshmarketer` | Implemented standalone account-subdomain route; request contracts pass; real host/key needed for live acceptance |
 | `funnelcockpit` | Implemented; request contracts pass; invalid-key request rejected live, account acceptance pending |
-| `getemails` | Pending provider research and implementation |
+| `getemails` | REST host and header authentication implemented; file upload workflows and real account acceptance pending |
 | `getresponse` | Route and offline request tests added; live verification pending |
 | `getswift` | Pending provider research and implementation |
 | `giantcampaign` | Implemented; request contracts pass; authenticated account verification pending |
@@ -1077,3 +1077,10 @@ A disposable-store GET /tags with an invalid key returned HTTP 401 Invalid Token
 The [current provider documentation](https://api.flexmail.eu/documentation/) links its [OpenAPI definition](https://api.flexmail.eu/documentation/openapi.php). It specifies api.flexmail.eu and Basic authentication with account ID as username and a personal access token as password. Store account_id:token. Added GET /contacts and JSON POST /contacts contracts using email and source ID. Obtain source IDs from the account API.
 
 The specification limits this REST service to contact management and refers campaign sending to SOAP. Transactional email is a separate product and host; neither is claimed by this route. A disposable-store GET /contacts with invalid credentials returned HTTP 401 Invalid authentication credentials. No contacts were created or messages sent. Real account acceptance remains open. Focused suite: 476 passed; Ruff clean.
+
+
+## GetEmails / Retention.com route
+
+The [provider history](https://retention.com/about-r) confirms GetEmails became Retention.com. The [authentication guide](https://docs.retention.com/docs/authentication) specifies api.retention.com/api/v1 and api-id/api-key headers. Added the current host and a stored JSON credential array [API ID, API key]. The guide inconsistently names authenticate in a heading but uses /validate in its examples; the live /validate endpoint was verified.
+
+A disposable-store GET /validate returned HTTP 401 Invalid API Key or ID for invalid credentials. Focused suite: 477 passed; Ruff clean. The [getting-started guide](https://docs.retention.com/docs/getting-started) emphasizes suppression-file uploads and webhooks. The generic JSON route does not implement multipart file uploads or webhook delivery, so this host addition does not complete those business workflows. No files or contact data were uploaded; authenticated account acceptance remains open.

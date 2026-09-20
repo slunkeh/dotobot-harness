@@ -672,7 +672,12 @@ _ROWS: list[tuple[str, str, str, str]] = [
         "https://api.funnelcockpit.com/",
         "Store the private API key, sent directly in Authorization without Bearer. GET /me verifies the user; GET /email/tags uses zero-based page and limit. JSON bodies are supported, including POST /email/tag with contactId and tagId. Plan access applies; subscriber and tag operations can trigger automations.",
     ),
-    ("getemails", "none", "https://getemails.com/", "No dedicated MCP found."),
+    (
+        "getemails",
+        "none",
+        "https://docs.retention.com/docs/authentication",
+        "GetEmails is now Retention.com. Store a JSON array [API ID, API key], sent in api-id and api-key headers. GET /validate checks credentials. File uploads and webhook delivery are not implemented by this JSON route.",
+    ),
     (
         "getresponse",
         "official",
