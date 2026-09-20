@@ -3,11 +3,11 @@
 Scope: implement the 144 catalogue connectors identified with missing REST hosts.
 This is an implementation ledger, not a claim of live-account verification.
 
-Fifty-seven routes now have offline request-contract coverage through the real connector
+Fifty-eight routes now have offline request-contract coverage through the real connector
 registry and credential store. Tests assert the outbound origin, version prefix,
 credential header, query and JSON body. Credentials are never followed through
 HTTP redirects. Production authenticated reads and writes remain unverified for these
-fifty-seven routes. The remaining 87 connectors still need provider research and code.
+fifty-eight routes. The remaining 86 connectors still need provider research and code.
 
 ## Implemented routes
 
@@ -19,6 +19,7 @@ CloudConvert currently uses its production automatic-region API, not its sandbox
 
 | Connector | Provider reference | Setup |
 |---|---|---|
+| `giantcampaign` | [Provider documentation](https://giantcampaign.com/developers/) | Store the GiantCampaign API token. Dotobot adds the required api_token query parameter from the secret store; do not include it in tool arguments. GET /lists or /campaigns reads resources. The documented POST endpoints also pass parameters in the URL query: supply those non-secret parameters in path, using URL encoding. JSON-body acceptance is not verified. Sending campaigns or subscriber actions may trigger email. |
 | `clickfunnels` | [Provider documentation](https://developers.myclickfunnels.com/docs/getting-started) | Store a ClickFunnels 2.0 platform application API access token, used as Bearer. Set subdomain to accounts for GET /teams and /teams/TEAM_ID/workspaces; use the actual workspace subdomain for /workspaces/WORKSPACE_ID/contacts and workspace writes. Enter only the subdomain, without scheme or .myclickfunnels.com. Use separate connector records if both scopes are needed. JSON bodies are supported and Dotobot supplies the required User-Agent. Tokens are team-wide. OAuth consent and refresh are not handled here. |
 | `adtraction` | [Provider documentation](https://apidocs.adtraction.net/nextgen/) | Store the API token from Adtraction Account > Settings > API. Uses X-Token authentication and JSON bodies. Include the API version in each path: GET /v2/partner/markets/ or POST /v3/partner/programs/ with market in the JSON body. Both v2 and v3 share the configured host; prefer v3 replacements for deprecated v2 endpoints. Keep documented trailing slashes. Pagination starts at page 0. |
 | `easypromos` | [Provider documentation](https://easypromos-apiref.redoc.ly/) | Store an access token from the Easypromos account Utilities menu. Uses Bearer authentication; White Label or Corporate plan required. GET /promotions lists promotions; use paging.next_cursor for further pages. POST requests use JSON. Some participation operations also require a participant login token in the body. Legacy v1 endpoints are retired. |
@@ -226,7 +227,7 @@ Live evidence for the third batch:
 | `getemails` | Pending provider research and implementation |
 | `getresponse` | Route and offline request tests added; live verification pending |
 | `getswift` | Pending provider research and implementation |
-| `giantcampaign` | Pending provider research and implementation |
+| `giantcampaign` | Implemented; request contracts pass; authenticated account verification pending |
 | `gist` | Implemented; request contracts pass; authenticated account verification pending |
 | `gitter` | Pending provider research and implementation |
 | `gobio_link` | Pending provider research and implementation |
@@ -247,7 +248,7 @@ Live evidence for the third batch:
 | `hippo_video` | Pending provider research and implementation |
 | `humanitix` | Implemented; request contracts pass; authenticated account verification pending |
 | `hypeauditor` | Pending provider research and implementation |
-| `hyperise` | Pending provider research and implementation |
+| `hyperise` | Pending: official API support pages currently fail TLS certificate validation; host and authentication still require verification |
 | `icontact` | Pending provider research and implementation |
 | `impression` | Pending provider research and implementation |
 | `indiefunnels` | Pending provider research and implementation |
@@ -521,3 +522,28 @@ The focused suite passes 269 tests; Ruff passes.
 A bound GET /teams on the documented accounts subdomain using a disposable store
 and invalid token returned HTTP 401 API key missing or invalid. No actual
 workspace subdomain or authenticated account was tested. No writes were made.
+
+## Hyperise research status
+
+The published API links point to support.hyperise.com/en/api/Creating-API-token
+and /en/api/Image-Views-API. Browser retrieval timed out; a direct HTTPS request
+failed certificate validation with a self-signed-certificate error. The route
+remains pending because its API host and authentication have not been verified
+from accessible primary documentation. This is not evidence that the service
+itself has stopped working.
+
+## GiantCampaign validation
+
+The [provider reference](https://giantcampaign.com/developers/) requires api_token
+in the query for both reads and POST requests. The new trusted catalogue query
+authentication style inserts the stored token with URL encoding, refuses
+caller-supplied token overrides, and omits authenticated URLs from connection
+errors. Bound GET/POST tests include reserved characters in the credential;
+additional tests cover overrides, foreign paths and error output. Redirects
+remain disabled. JSON request-body acceptance is not claimed; documented
+non-secret parameters can be supplied in the path query.
+
+The two positive cases failed before implementation. All nine new cases now
+pass; the focused suite passes 278 tests and Ruff passes. A live bound GET /lists
+with an invalid token returned HTTP 401 Unauthenticated. No campaign or
+subscriber was changed; authenticated account verification remains pending.

@@ -898,3 +898,57 @@ def test_humanitix_required_page_query(tmp_path):
         result = bound["humanitix_get"][1]({"path": "/events", "query": {"page": 1}})
     assert "HTTP 200" in result
     assert send.call_args.args[0].full_url == "https://api.humanitix.com/v1/events?page=1"
+
+
+@pytest.mark.parametrize("method", ["GET", "POST"])
+def test_giantcampaign_query_credential(tmp_path, method):
+    from urllib.parse import parse_qs, urlsplit
+
+    paths = HarnessPaths(home=tmp_path)
+    record = Connectors(paths).add("giantcampaign", "GiantCampaign", secret="key&= +?")
+    bound = tools_for_bot(paths, "atlas", record_ids={record["id"]})
+    with patch("connectors.generic._open", return_value=_response({})) as send:
+        name = "giantcampaign_get" if method == "GET" else "giantcampaign_request"
+        result = bound[name][1]({"method": method, "path": "/lists?name=Fixture"})
+    assert "HTTP 200" in result
+    req = send.call_args.args[0]
+    parts = urlsplit(req.full_url)
+    assert parts.netloc == "acc.giantcampaign.com"
+    assert parts.path == "/api/v1/lists"
+    assert parse_qs(parts.query) == {"name": ["Fixture"], "api_token": ["key&= +?"]}
+    assert req.get_header("Authorization") is None
+    assert req.data is None
+
+
+@pytest.mark.parametrize(
+    "path,query,body",
+    [
+        ("/lists?api_token=override", None, None),
+        ("/lists?%61pi_token=override", None, None),
+        ("/lists?api_token[]=override", None, None),
+        ("/lists", {"api_token": "override"}, None),
+        ("/lists", None, {"api_token": "override"}),
+        ("https://other.example/lists", None, None),
+    ],
+)
+def test_giantcampaign_refuses_credential_override(tmp_path, path, query, body):
+    paths = HarnessPaths(home=tmp_path)
+    record = Connectors(paths).add("giantcampaign", "GiantCampaign", secret="fixture-key")
+    ctx = ConnectorContext(paths=paths, bot="atlas", record=record)
+    with patch("connectors.generic._open") as send:
+        assert generic._http(ctx, "POST", path, query=query, body=body).startswith("error:")
+    send.assert_not_called()
+
+
+def test_query_credential_is_not_exposed_by_connection_error(tmp_path):
+    import urllib.error
+
+    paths = HarnessPaths(home=tmp_path)
+    record = Connectors(paths).add("giantcampaign", "GiantCampaign", secret="fixture-key")
+    bound = tools_for_bot(paths, "atlas", record_ids={record["id"]})
+    with patch(
+        "connectors.generic._open",
+        side_effect=urllib.error.URLError("URL includes api_token=fixture-key"),
+    ):
+        result = bound["giantcampaign_get"][1]({"path": "/lists"})
+    assert result == "error: could not reach API"

@@ -34,7 +34,7 @@ KNOWN_BASES: dict[str, tuple[str, str]] = {
     "telegram": ("https://api.telegram.org", "telegram"),
 }
 
-_STYLES = ("bearer", "basic", "telegram", "header", "basic_key", "4dem")
+_STYLES = ("bearer", "basic", "telegram", "header", "basic_key", "4dem", "query")
 
 
 def tool_names(type_: str) -> list[str]:
@@ -196,6 +196,8 @@ def _headers(ctx: ConnectorContext, secret: str) -> dict[str, str]:
         "Accept": "application/json",
         "User-Agent": "dotobot/0.2.9",
     }
+    if style == "query":
+        return hdrs
     if style == "header":
         from harness.connectors import _CATALOG_TYPES
 
@@ -286,6 +288,16 @@ def _http(
             {str(k): v for k, v in query.items() if v is not None}, doseq=True
         )
         url += ("&" if "?" in url else "?") + qs
+    if style == "query":
+        from harness.connectors import _CATALOG_TYPES
+
+        parameter = _CATALOG_TYPES[str(ctx.record["type"])]["auth_query"]
+        supplied = urllib.parse.parse_qs(urllib.parse.urlsplit(url).query, keep_blank_values=True)
+        if any(k == parameter or k.startswith(parameter + "[") for k in supplied) or (
+            body is not None and parameter in body
+        ):
+            return "error: authentication comes from the connector secret store"
+        url += ("&" if "?" in url else "?") + urllib.parse.urlencode({parameter: key})
     # Final boundary: a sentinel the model echoed into the path,
     # query, or body is substituted with its plaintext here; one that cannot
     # be unsealed raises before any I/O — the request is refused, never
@@ -347,7 +359,11 @@ def _http(
         detail = exc.read().decode("utf-8", "replace")[:400]
         return f"error: HTTP {exc.code}: {detail}"
     except (urllib.error.URLError, TimeoutError, OSError) as exc:
-        return f"error: could not reach API: {exc}"
+        return (
+            "error: could not reach API"
+            if style == "query"
+            else f"error: could not reach API: {exc}"
+        )
     if len(raw) > _MAX_RESULT:
         raw = raw[:_MAX_RESULT] + "\n… (truncated)"
     return f"HTTP {status}\n{raw}" if raw else f"HTTP {status}"

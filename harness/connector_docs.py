@@ -650,7 +650,12 @@ _ROWS: list[tuple[str, str, str, str]] = [
         "https://zapier.com/mcp/getswift",
         "No official vendor server.",
     ),
-    ("giantcampaign", "none", "https://www.giantcampaign.com/", "No known MCP server."),
+    (
+        "giantcampaign",
+        "official",
+        "https://giantcampaign.com/developers/",
+        "Store the GiantCampaign API token. Dotobot adds the required api_token query parameter from the secret store; do not include it in tool arguments. GET /lists or /campaigns reads resources. The documented POST endpoints also pass parameters in the URL query: supply those non-secret parameters in path, using URL encoding. JSON-body acceptance is not verified. Sending campaigns or subscriber actions may trigger email.",
+    ),
     (
         "gist",
         "official",
