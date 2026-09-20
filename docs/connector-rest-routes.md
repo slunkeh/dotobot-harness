@@ -3,11 +3,11 @@
 Scope: implement the 144 catalogue connectors identified with missing REST hosts.
 This is an implementation ledger, not a claim of live-account verification.
 
-One hundred and twenty-two routes now have offline request-contract coverage through the real connector
+One hundred and twenty-three routes now have offline request-contract coverage through the real connector
 registry and credential store. Tests assert the outbound origin, version prefix,
 credential header, query and JSON body. Credentials are never followed through
 HTTP redirects. Production authenticated reads and writes remain unverified for these
-one hundred and twenty-two routes. The remaining 22 connectors still need provider research and code.
+one hundred and twenty-three routes. The remaining 21 connectors still need provider research and code.
 
 ## Implemented routes
 
@@ -233,7 +233,7 @@ Live evidence for the third batch:
 | `emelia` | Current REST route implemented; authenticated operations pending |
 | `encharge` | Implemented own-account REST route; request contracts pass; live invalid key rejected; authenticated acceptance open |
 | `endorsal` | Implemented REST route; authenticated account acceptance pending |
-| `engage` | Pending provider research and implementation |
+| `engage` | Engage.so REST route implemented; live request returned origin timeout 522 |
 | `enginemailer` | Implemented; request contracts pass; live invalid key rejected in HTTP 200 response body; authenticated acceptance pending |
 | `enormail` | Implemented; request contracts pass; authenticated account verification pending |
 | `esputnik` | Implemented; request-contract tests pass; production account verification pending |
@@ -1114,3 +1114,10 @@ The [official v2 reference](https://api.echtpost.de/v2/docs) specifies api.echtp
 A disposable-store GET /me with an invalid key returned HTTP 401 authentication-required. No postcard, contact or mailing was created. Real sandbox acceptance, card rendering and physical delivery remain separate open checks. Focused suite: 481 passed; Ruff clean.
 
 Hyperise's published token documentation was rechecked during this pass and still fails HTTPS certificate validation with a self-signed certificate error. No bypass was used; its route remains pending.
+
+
+## Engage.so customer messaging
+
+The [provider API overview](https://docs.engage.so/en-us/a/62bbdd015bfea4dca4834041-api-overview) specifies api.engage.so/v1, JSON requests and Basic authentication with API key and secret. The messaging product matches the existing integration name and purpose; catalogue text now explicitly identifies Engage.so. Added bound [list read and creation](https://docs.engage.so/en-us/a/62bbdd2e5bfea4dca4834045-lists) contracts, including title and double_optin. Store key:secret.
+
+A disposable-store GET /lists with invalid credentials returned HTTP 522 with an origin connection timeout. This proves neither valid authentication nor credential rejection. No list or subscriber was created. Live availability and authenticated workflows remain open. Focused suite: 483 passed; Ruff clean. A fresh catalogue/ledger audit confirms all original 144 entries remain present, with 123 configured hosts and 21 still without hosts.

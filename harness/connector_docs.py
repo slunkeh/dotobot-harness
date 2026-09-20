@@ -568,7 +568,12 @@ _ROWS: list[tuple[str, str, str, str]] = [
         "https://developers.endorsal.io/",
         "Official REST developer center. Generate a property-specific API key in Account > API. Requests use Authorization: Bearer; GET also accepts a key query parameter. Paths omit /v1. GET /tags lists tags; POST /tags accepts JSON name, type and description. Contact and AutoRequest operations may trigger outreach.",
     ),
-    ("engage", "none", "", "Too generic to identify a specific vendor."),
+    (
+        "engage",
+        "none",
+        "https://docs.engage.so/en-us/a/62bbdd015bfea4dca4834041-api-overview",
+        "Engage.so customer messaging. Store API_key:API_secret for Basic authentication. GET /lists; POST /lists accepts JSON title and optional description/double_optin. Customer changes can trigger messaging; use a test account.",
+    ),
     (
         "enginemailer",
         "official",

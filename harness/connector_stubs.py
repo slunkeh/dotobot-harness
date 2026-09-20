@@ -919,11 +919,13 @@ STUBS: list[dict] = [
     },
     {
         "type": "engage",
+        "api_base": "https://api.engage.so/v1",
+        "auth_style": "basic",
         "name": "Engage",
         "auth": "api_key",
         "fields": [],
         "category": "Email And Marketing",
-        "description": "Connect Engage.",
+        "description": "Connect Engage.so customer messaging.",
         "icon": "envelope",
     },
     {

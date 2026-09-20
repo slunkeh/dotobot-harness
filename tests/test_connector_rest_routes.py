@@ -2813,3 +2813,29 @@ def test_echtpost_preview_json(tmp_path):
     assert req.full_url == "https://api.echtpost.de/v2/cards/preview_fit"
     assert req.get_header("Authorization") == "Bearer fixture-key"
     assert json.loads(req.data) == body
+
+
+@pytest.mark.parametrize("method", ["GET", "POST"])
+def test_engage_list_contract(tmp_path, method):
+    import base64
+
+    paths = HarnessPaths(home=tmp_path)
+    record = Connectors(paths).add("engage", "Engage", secret="fixture-key:fixture-secret")
+    bound = tools_for_bot(paths, "atlas", record_ids={record["id"]})
+    body = {"title": "Fixture", "double_optin": True}
+    args = (
+        {"path": "/lists"}
+        if method == "GET"
+        else {"method": method, "path": "/lists", "body": body}
+    )
+    with patch("connectors.generic._open", return_value=_response({})) as send:
+        result = bound["engage_get" if method == "GET" else "engage_request"][1](args)
+    assert "HTTP 200" in result
+    req = send.call_args.args[0]
+    assert req.full_url == "https://api.engage.so/v1/lists"
+    assert (
+        req.get_header("Authorization")
+        == "Basic " + base64.b64encode(b"fixture-key:fixture-secret").decode()
+    )
+    if method == "POST":
+        assert json.loads(req.data) == body
