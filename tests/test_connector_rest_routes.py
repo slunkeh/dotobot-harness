@@ -15,6 +15,14 @@ from harness.paths import HarnessPaths
 # Literal expected requests intentionally independent of catalogue metadata.
 CASES = [
     (
+        "emaillistverify",
+        {},
+        "/credits",
+        "https://api.emaillistverify.com/api/credits",
+        "X-api-key",
+        "fixture-key",
+    ),
+    (
         "clickfunnels",
         {"subdomain": "accounts"},
         "/teams",
@@ -588,6 +596,12 @@ def test_4dem_malformed_auth_response_is_not_forwarded(tmp_path):
     "type_,path,url,body",
     [
         (
+            "emaillistverify",
+            "/emailJobs",
+            "https://api.emaillistverify.com/api/emailJobs",
+            {"email": "fixture@example.com", "quality": "standard"},
+        ),
+        (
             "adtraction",
             "/v3/partner/programs/",
             "https://api.adtraction.net/v3/partner/programs/",
@@ -952,3 +966,27 @@ def test_query_credential_is_not_exposed_by_connection_error(tmp_path):
     ):
         result = bound["giantcampaign_get"][1]({"path": "/lists"})
     assert result == "error: could not reach API"
+
+
+@pytest.mark.parametrize("method", ["GET", "POST"])
+def test_leaddyno_request_contract(tmp_path, method):
+    from urllib.parse import parse_qs
+
+    paths = HarnessPaths(home=tmp_path)
+    record = Connectors(paths).add("leaddyno", "LeadDyno", secret="fixture-key")
+    bound = tools_for_bot(paths, "atlas", record_ids={record["id"]})
+    args = {"path": "/visitors"}
+    if method == "POST":
+        args.update(method="POST", body={"url": "https://example.com/?afmc=fixture&x=1"})
+    name = "leaddyno_get" if method == "GET" else "leaddyno_request"
+    with patch("connectors.generic._open", return_value=_response({})) as send:
+        assert "HTTP 200" in bound[name][1](args)
+    req = send.call_args.args[0]
+    assert req.full_url == "https://api.leaddyno.com/v1/visitors"
+    assert req.get_header("Key") == "fixture-key"
+    assert req.get_method() == method
+    if method == "POST":
+        assert req.get_header("Content-type") == "application/x-www-form-urlencoded"
+        assert parse_qs(req.data.decode()) == {"url": ["https://example.com/?afmc=fixture&x=1"]}
+    else:
+        assert req.data is None

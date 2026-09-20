@@ -3,11 +3,11 @@
 Scope: implement the 144 catalogue connectors identified with missing REST hosts.
 This is an implementation ledger, not a claim of live-account verification.
 
-Fifty-eight routes now have offline request-contract coverage through the real connector
+Sixty routes now have offline request-contract coverage through the real connector
 registry and credential store. Tests assert the outbound origin, version prefix,
 credential header, query and JSON body. Credentials are never followed through
 HTTP redirects. Production authenticated reads and writes remain unverified for these
-fifty-eight routes. The remaining 86 connectors still need provider research and code.
+sixty routes. The remaining 84 connectors still need provider research and code.
 
 ## Implemented routes
 
@@ -19,6 +19,8 @@ CloudConvert currently uses its production automatic-region API, not its sandbox
 
 | Connector | Provider reference | Setup |
 |---|---|---|
+| `leaddyno` | [Provider documentation](https://support.leaddyno.com/hc/en-us/articles/21508238902173-Getting-Started-with-LeadDyno-API-Tracking) | Store the LeadDyno private API key from Account > Profile, not the public tracking key. It is sent in the documented key header. GET /visitors reads visitor records. POST /visitors takes a url field; body objects are form-encoded. Lead and purchase writes can change affiliate attribution; use only test data when checking writes. |
+| `emaillistverify` | [Provider documentation](https://api.emaillistverify.com/api-doc) | Store an EmailListVerify API key, sent in x-api-key. GET /credits reads balances without verifying an email. POST /emailJobs accepts JSON email and optional quality; poll /emailJobs/JOB_ID for completion. Verification operations consume credits. Multipart list uploads and binary downloads are not supported by the generic JSON tool. |
 | `giantcampaign` | [Provider documentation](https://giantcampaign.com/developers/) | Store the GiantCampaign API token. Dotobot adds the required api_token query parameter from the secret store; do not include it in tool arguments. GET /lists or /campaigns reads resources. The documented POST endpoints also pass parameters in the URL query: supply those non-secret parameters in path, using URL encoding. JSON-body acceptance is not verified. Sending campaigns or subscriber actions may trigger email. |
 | `clickfunnels` | [Provider documentation](https://developers.myclickfunnels.com/docs/getting-started) | Store a ClickFunnels 2.0 platform application API access token, used as Bearer. Set subdomain to accounts for GET /teams and /teams/TEAM_ID/workspaces; use the actual workspace subdomain for /workspaces/WORKSPACE_ID/contacts and workspace writes. Enter only the subdomain, without scheme or .myclickfunnels.com. Use separate connector records if both scopes are needed. JSON bodies are supported and Dotobot supplies the required User-Agent. Tokens are team-wide. OAuth consent and refresh are not handled here. |
 | `adtraction` | [Provider documentation](https://apidocs.adtraction.net/nextgen/) | Store the API token from Adtraction Account > Settings > API. Uses X-Token authentication and JSON bodies. Include the API version in each path: GET /v2/partner/markets/ or POST /v3/partner/programs/ with market in the JSON body. Both v2 and v3 share the configured host; prefer v3 replacements for deprecated v2 endpoints. Keep documented trailing slashes. Pagination starts at page 0. |
@@ -204,7 +206,7 @@ Live evidence for the third batch:
 | `email_on_acid` | Route and offline tests added; public sandbox authentication and read passed; production verification pending |
 | `emailable` | Route and offline request tests added; live verification pending |
 | `emailchef` | Pending provider research and implementation |
-| `emaillistverify` | Pending provider research and implementation |
+| `emaillistverify` | Implemented; request contracts pass; authenticated account verification pending |
 | `emailoctopus` | Implemented; request-contract tests pass; production account verification pending |
 | `emailverify_io` | Pending provider research and implementation |
 | `emelia` | Pending provider research and implementation |
@@ -270,7 +272,7 @@ Live evidence for the third batch:
 | `laposta` | Implemented; documented sandbox list read HTTP 200 (truncated); production verification pending |
 | `lawmatics` | Implemented; request-contract tests pass; production account verification pending |
 | `lead_identity_check` | Pending provider research and implementation |
-| `leaddyno` | Pending provider research and implementation |
+| `leaddyno` | Implemented; request contracts pass; authenticated account verification pending |
 | `leadoku` | Pending provider research and implementation |
 | `leadpops` | Pending provider research and implementation |
 | `linkedin` | Pending provider research and implementation |
@@ -547,3 +549,17 @@ The two positive cases failed before implementation. All nine new cases now
 pass; the focused suite passes 278 tests and Ruff passes. A live bound GET /lists
 with an invalid token returned HTTP 401 Unauthenticated. No campaign or
 subscriber was changed; authenticated account verification remains pending.
+
+## EmailListVerify and LeadDyno validation
+
+Four new request cases failed before their routes were added and pass afterward.
+The focused suite passes 282 tests; Ruff passes. EmailListVerify's
+[live OpenAPI](https://api.emaillistverify.com/api-doc-json) confirms the production
+host, x-api-key, credit read and JSON email-job body. LeadDyno's official tracking
+guide documents key-header authentication and form-encoded visitor creation.
+Tests verify both GET and POST encoding without creating remote records.
+
+Bound reads with disposable stores and deliberately invalid keys returned
+HTTP 401 INVALID_API_KEY for EmailListVerify /credits and HTTP 401 Unauthorized
+for LeadDyno /visitors. No verification credits were spent and no affiliate
+tracking data was created. Authenticated account acceptance remains pending.

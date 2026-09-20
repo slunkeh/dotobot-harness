@@ -505,8 +505,8 @@ _ROWS: list[tuple[str, str, str, str]] = [
     (
         "emaillistverify",
         "official",
-        "https://emaillistverify.com/mcp-server",
-        "Vendor MCP. Also on Pipedream/Composio.",
+        "https://api.emaillistverify.com/api-doc",
+        "Store an EmailListVerify API key, sent in x-api-key. GET /credits reads balances without verifying an email. POST /emailJobs accepts JSON email and optional quality; poll /emailJobs/JOB_ID for completion. Verification operations consume credits. Multipart list uploads and binary downloads are not supported by the generic JSON tool.",
     ),
     (
         "emailoctopus",
@@ -928,9 +928,9 @@ _ROWS: list[tuple[str, str, str, str]] = [
     ),
     (
         "leaddyno",
-        "none",
-        "https://leaddyno.com/api_docs",
-        "Only classic Zapier integration.",
+        "official",
+        "https://support.leaddyno.com/hc/en-us/articles/21508238902173-Getting-Started-with-LeadDyno-API-Tracking",
+        "Store the LeadDyno private API key from Account > Profile, not the public tracking key. It is sent in the documented key header. GET /visitors reads visitor records. POST /visitors takes a url field; body objects are form-encoded. Lead and purchase writes can change affiliate attribution; use only test data when checking writes.",
     ),
     (
         "leadoku",
