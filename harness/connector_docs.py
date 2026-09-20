@@ -990,8 +990,8 @@ _ROWS: list[tuple[str, str, str, str]] = [
     (
         "kyvio",
         "none",
-        "https://zapier.com/mcp/kyvio2",
-        "Only Zapier generic wrapper.",
+        "https://kyvio.com/support",
+        "The provider advertises API integrations, but its linked support portal currently shows a missing-page error. The Kyvio REST host/authentication contract still needs account or provider documentation. Mailvio is a separate product and is not substituted here.",
     ),
     (
         "lagrowthmachine",

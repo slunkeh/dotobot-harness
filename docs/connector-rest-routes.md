@@ -287,7 +287,7 @@ Live evidence for the third batch:
 | `kickofflabs` | Implemented; request contracts pass; invalid key rejected live, account acceptance pending |
 | `kingsumo` | Pending: provider places API documentation in Lifetime account settings; no verified public host/auth contract |
 | `klenty` | Implemented; request contracts pass; authenticated account verification pending |
-| `kyvio` | Pending provider research and implementation |
+| `kyvio` | Pending: official support portal returns missing-page error; legacy Smart Mailer examples and separate Mailvio SDK do not establish current Kyvio contract |
 | `lagrowthmachine` | Implemented; request contracts pass; invalid key rejected live, account acceptance pending |
 | `lahar` | Implemented Ramper Marketing conversion route; JSON contract passes; incomplete live request rejected; authenticated acceptance open |
 | `laposta` | Implemented; documented sandbox list read HTTP 200 (truncated); production verification pending |
@@ -1228,3 +1228,8 @@ The [official trial signup](https://indiefunnels.eu/trial/start-your-14-day-free
 ## GoZen Growth provider documentation access route
 
 A [GoZen founder-team answer dated June 27, 2024](https://appsumo.com/products/gozen-growth/questions/hi-gozen-team-congratulations-on-launc-1030019/) says developer API documentation is supplied through live chat for integrations. This identifies a provider-supported path to the missing documentation, but does not itself establish a base URL, header or payload contract. No support message was sent.
+
+
+## Kyvio official support portal blocker
+
+The [provider support page](https://kyvio.com/support) links https://support.kvsocial.com/. Browser navigation redirects to /portal/en/home and displays a Zoho Desk error saying the requested URL was not found. This confirms the help portal is currently unusable beyond the earlier command-line 403. The public KVSocial repositories inspected do not provide a Kyvio REST contract. Legacy Smart Mailer integration examples and the separate Mailvio SDK are insufficient to establish current Kyvio compatibility. Updated the catalogue pointer and limitation; host remains pending. No trial, key or subscriber was created.
