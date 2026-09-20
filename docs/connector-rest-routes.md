@@ -3,11 +3,11 @@
 Scope: implement the 144 catalogue connectors identified with missing REST hosts.
 This is an implementation ledger, not a claim of live-account verification.
 
-Eighty-eight routes now have offline request-contract coverage through the real connector
+Eighty-nine routes now have offline request-contract coverage through the real connector
 registry and credential store. Tests assert the outbound origin, version prefix,
 credential header, query and JSON body. Credentials are never followed through
 HTTP redirects. Production authenticated reads and writes remain unverified for these
-eighty-eight routes. The remaining 56 connectors still need provider research and code.
+eighty-nine routes. The remaining 55 connectors still need provider research and code.
 
 ## Implemented routes
 
@@ -231,7 +231,7 @@ Live evidence for the third batch:
 | `emailoctopus` | Implemented; request-contract tests pass; production account verification pending |
 | `emailverify_io` | Implemented; request contracts pass; invalid key rejected live, authenticated account acceptance pending |
 | `emelia` | Pending provider research and implementation |
-| `encharge` | Pending provider research and implementation |
+| `encharge` | Implemented own-account REST route; request contracts pass; live invalid key rejected; authenticated acceptance open |
 | `endorsal` | Pending: official property-key Bearer authentication verified; endpoint reference and REST host still unresolved |
 | `engage` | Pending provider research and implementation |
 | `enginemailer` | Implemented; request contracts pass; live invalid key rejected in HTTP 200 response body; authenticated acceptance pending |
@@ -839,3 +839,10 @@ A disposable-store GET /api/mng/apps?limit=1 with an invalid token returned HTTP
 The [official API reference](https://developer.freshmarketer.com/) documents https://SUBDOMAIN.freshmarketer.com/mas/api/v1 and the fm-token header. Added account subdomain configuration, contacts transport coverage and JSON subscription-type creation coverage. Five invalid host cases block transport. This route covers the documented standalone product, not separate Freshworks CRM Suite hosts.
 
 No real account subdomain/key is available for a live acceptance check; no contact or subscription data was changed. All 371 focused tests and Ruff pass. There are 88 routes and 56 pending; the midpoint full suite predates this addition.
+
+
+## Encharge REST route
+
+The [official developer documentation](https://docs.encharge.io/api-documentation) links the [current ReDoc specification](https://app-encharge-resources.s3.amazonaws.com/merged.yaml), which specifies https://api.encharge.io/v1 and X-Encharge-Token for own-account API keys. Added GET /people/all and JSON POST /tags request coverage. The older raw definition linked from the documentation uses a different S3 bucket; the current ReDoc specification explicitly documents header-key authentication.
+
+A disposable connector-store probe of GET /people/all?limit=1 returned HTTP 401, errorCode 10082, rejecting the invalid token. No customer records were read or written. Authenticated account acceptance remains open. Partner OAuth setup, automatic token refresh and top-level array bodies for bulk people creation are not implemented. The separate Ingest API is outside this REST host. Focused suite: 373 passed; Ruff clean.

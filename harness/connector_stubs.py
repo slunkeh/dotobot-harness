@@ -832,6 +832,9 @@ STUBS: list[dict] = [
     {
         "type": "encharge",
         "name": "Encharge",
+        "api_base": "https://api.encharge.io/v1",
+        "auth_style": "header",
+        "auth_header": "X-Encharge-Token",
         "auth": "api_key",
         "fields": [],
         "category": "Email And Marketing",

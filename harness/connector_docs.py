@@ -533,9 +533,9 @@ _ROWS: list[tuple[str, str, str, str]] = [
     ),
     (
         "encharge",
-        "aggregator",
-        "https://zapier.com/mcp/encharge",
-        "Zapier/viaSocket only.",
+        "official",
+        "https://docs.encharge.io/api-documentation",
+        "REST API with an own-account API key from Account info, sent in X-Encharge-Token. GET /people/all accepts limit/offset; POST /tags takes tag and person identifiers. API writes may trigger flows. Shared partner OAuth setup and top-level array bodies for bulk people creation are not supported by this route. Ingest API uses a separate host.",
     ),
     (
         "endorsal",

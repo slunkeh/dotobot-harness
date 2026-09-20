@@ -15,6 +15,14 @@ from harness.paths import HarnessPaths
 # Literal expected requests intentionally independent of catalogue metadata.
 CASES = [
     (
+        "encharge",
+        {},
+        "/people/all",
+        "https://api.encharge.io/v1/people/all",
+        "X-encharge-token",
+        "fixture-key",
+    ),
+    (
         "freshmarketer",
         {"subdomain": "fixture"},
         "/contacts",
@@ -1786,3 +1794,18 @@ def test_freshmarketer_invalid_host(tmp_path, subdomain):
     with patch("connectors.generic._open") as send:
         assert "error:" in bound["freshmarketer_get"][1]({"path": "/contacts"})
     send.assert_not_called()
+
+
+def test_encharge_tag_json(tmp_path):
+    paths = HarnessPaths(home=tmp_path)
+    record = Connectors(paths).add("encharge", "Encharge", secret="fixture-key")
+    bound = tools_for_bot(paths, "atlas", record_ids={record["id"]})
+    body = {"tag": "fixture", "email": "fixture@example.com"}
+    with patch("connectors.generic._open", return_value=_response({})) as send:
+        assert "HTTP 200" in bound["encharge_request"][1](
+            {"method": "POST", "path": "/tags", "body": body}
+        )
+    req = send.call_args.args[0]
+    assert req.full_url == "https://api.encharge.io/v1/tags"
+    assert req.get_header("X-encharge-token") == "fixture-key"
+    assert json.loads(req.data) == body
