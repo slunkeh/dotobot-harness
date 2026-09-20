@@ -2328,3 +2328,29 @@ def test_mailingboss_transport_error_omits_token(tmp_path):
     with patch("connectors.generic._open", side_effect=urllib.error.URLError("fixture-secret")):
         result = bound["builderall_mailingboss_get"][1]({"path": "/lists"})
     assert result == "error: could not reach API"
+
+
+@pytest.mark.parametrize(
+    "path", ["/lineitems", "/daily-stats", "/creatives", "/creatives-daily-stats"]
+)
+def test_buysellads_reporting_query(tmp_path, path):
+    from urllib.parse import parse_qs, urlsplit
+
+    paths = HarnessPaths(home=tmp_path)
+    record = Connectors(paths).add("buysellads", "BuySellAds", secret="key&= +?")
+    bound = tools_for_bot(paths, "atlas", record_ids={record["id"]})
+    query = {"startDate": "2020-09-01", "endDate": "2020-09-30"}
+    with patch("connectors.generic._open", return_value=_response([])) as send:
+        result = bound["buysellads_get"][1]({"path": path, "query": query})
+    assert "HTTP 200" in result
+    req = send.call_args.args[0]
+    url = urlsplit(req.full_url)
+    assert url.netloc == "papi.buysellads.com"
+    assert url.path == path
+    assert parse_qs(url.query) == {
+        "key": ["key&= +?"],
+        "startDate": ["2020-09-01"],
+        "endDate": ["2020-09-30"],
+    }
+    assert req.get_header("Authorization") is None
+    assert req.data is None

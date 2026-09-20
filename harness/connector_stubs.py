@@ -338,6 +338,9 @@ STUBS: list[dict] = [
     },
     {
         "type": "buysellads",
+        "api_base": "https://papi.buysellads.com",
+        "auth_style": "query",
+        "auth_query": "key",
         "name": "BuySellAds",
         "auth": "api_key",
         "fields": [],

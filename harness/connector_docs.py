@@ -226,7 +226,12 @@ _ROWS: list[tuple[str, str, str, str]] = [
         "https://knowledgebase.builderall.com/docs/mailingboss-5-0-api-integration/",
         "Store the MailingBoss 5.0 Integration Key. Dotobot appends it as an encoded final path segment; omit the token from tool paths. GET /lists retrieves lists; POST /lists/fields with list_uid retrieves fields. Subscriber operations accept JSON body fields. Inspect status and data; subscriber creation may trigger configured automation.",
     ),
-    ("buysellads", "none", "https://docs.buysellads.com/", "No MCP found."),
+    (
+        "buysellads",
+        "official",
+        "https://docs.buysellads.com/advertiser-api",
+        "Request a private API key from your account manager. Sent as the key query parameter. Advertiser reporting GET paths: /lineitems, /daily-stats, /creatives, /creatives-daily-stats. Use startDate/endDate in YYYY-MM-DD format (UTC) to bound results; there is no pagination. Optional type=csv returns text. This is the Advertiser API, not the separate ad-serving service. No write endpoints are documented.",
+    ),
     (
         "calendly",
         "official",
