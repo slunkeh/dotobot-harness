@@ -82,7 +82,7 @@ def test_missing_secret_names_request_secret(paths):
 
 
 def test_unknown_stub_without_a_host_does_not_guess(paths):
-    ctx = _ctx(paths, type_="360nrs", secret="k")
+    ctx = _ctx(paths, type_="adhook", secret="k")
     out = generic._get(ctx, {"path": "/x"})
     assert "no REST host" in out
 

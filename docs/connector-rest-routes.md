@@ -3,11 +3,11 @@
 Scope: implement the 144 catalogue connectors identified with missing REST hosts.
 This is an implementation ledger, not a claim of live-account verification.
 
-Seven routes now have offline request-contract coverage through the real connector
+Fourteen routes now have offline request-contract coverage through the real connector
 registry and credential store. Tests assert the outbound origin, version prefix,
 credential header, query and JSON body. Credentials are never followed through
 HTTP redirects. Live authenticated reads and writes remain unverified for these
-seven routes. The remaining 137 connectors still need provider research and code.
+fourteen routes. The remaining 130 connectors still need provider research and code.
 
 ## Implemented routes
 
@@ -26,6 +26,15 @@ CloudConvert currently uses its production automatic-region API, not its sandbox
 | `cloud_convert` | [Provider documentation](https://cloudconvert.com/docs/getting-started/introduction) | Store a scoped CloudConvert API key. Uses the production https://api.cloudconvert.com/v2 API; GET /users/me requires user.read. Paths omit /v2. Authentication uses Bearer. |
 | `doppler` | [Provider documentation](https://restapi.fromdoppler.com/docs/gettingstarted) | Store a Doppler Email Marketing API key from Control Panel > Advanced Preferences. Paths are relative to https://restapi.fromdoppler.com, for example /accounts/ACCOUNT_EMAIL/lists. Authentication uses token KEY. This is not the Doppler secrets product. |
 | `getresponse` | [Provider documentation](https://apidocs.getresponse.com/v3/authentication) | Store a GetResponse SMB API key. Uses https://api.getresponse.com/v3 and X-Auth-Token: api-key KEY. GET /accounts checks access. GetResponse MAX accounts require a different host and X-Domain and are not covered by this route. |
+
+| `360nrs` | [Provider documentation](https://apidocs.360nrs.com/) | Store username:apiPassword as the secret, using the API password, not the platform login password. Allow the server IP in 360NRS settings. Paths are relative to https://dashboard.360nrs.com/api/rest; HTTP Basic authentication is used. |
+| `4dem` | [Provider documentation](https://api.4dem.it/open-api) | Store the 4Dem API key. The connector exchanges it at /authenticate for a bearer token before every request. Paths are relative to https://api.4dem.it, for example /addressbook/. Dedicated and partner API-channel hosts are not covered. |
+| `active_trail` | [Provider documentation](https://webapi.mymarketing.co.il/api/docs/Guides) | Store the access token from Settings > API apps. The token is sent unchanged in Authorization. Paths are relative to https://webapi.mymarketing.co.il/api, for example /groups. Check token expiry and allowed IPs. |
+| `campaign_monitor` | [Provider documentation](https://www.campaignmonitor.com/api/v3-3/getting-started/) | Store only the Campaign Monitor API key. HTTP Basic uses it as username with an empty password. Paths are relative to https://api.createsend.com/api/v3.3; use .json endpoints such as /clients.json. |
+| `drip` | [Provider documentation](https://developer.drip.com/) | Store the personal API token. HTTP Basic uses it as username with an empty password. Paths are relative to https://api.getdrip.com and include their version, for example /v2/accounts or /v3/ACCOUNT_ID/shopper_activity/order/batch. |
+
+| `bigmailer` | [Provider documentation](https://docs.bigmailer.io/docs/getting-started-api) | Store a BigMailer API key. Paths are relative to https://api.bigmailer.io/v1, for example /me. Authentication uses X-API-Key and JSON bodies. |
+| `cardly` | [Provider documentation](https://api.card.ly/v2/docs) | Store a Cardly test_ or live_ API key; use test_ keys to avoid order mutations while testing. Paths are relative to https://api.card.ly/v2, for example /art. Authentication uses API-Key and bodies use text/json as required by Cardly. |
 
 ActiveCampaign host selection: [official base URL guidance](https://developers.activecampaign.com/reference/url).
 
@@ -46,16 +55,28 @@ failure. The remaining CDP listener and machine-supervisor display tests fail
 identically on unchanged baseline `c33bb96` in this macOS environment. The full
 suite is therefore not recorded as green. Ruff and the CLI help check pass.
 
+Second batch adds seven routes and tests 4Dem token exchange, invalid-token refusal,
+authentication failure without a resource write, and token rotation between
+calls. These checks use synthetic credentials and do not verify real account access.
+
+Current focused validation: 186 tests pass across REST routes, generic connectors,
+redaction, connector catalogue/tools, mentions and public export. Ruff passes.
+
+Second-batch invalid-credential probes: 360NRS, ActiveTrail, Campaign Monitor,
+Drip and Cardly returned HTTP 401; 4Dem rejected its authentication exchange with
+HTTP 401; BigMailer returned HTTP 400 with an invalid API-key error. No authenticated
+account access is claimed. Cardly JSON content-type handling is also covered.
+
 ## Full 144-connector ledger
 
 | Connector | Implementation status |
 |---|---|
-| `360nrs` | Pending provider research and implementation |
-| `4dem` | Pending provider research and implementation |
+| `360nrs` | Route and offline request tests added; live verification pending |
+| `4dem` | Route and offline request tests added; live verification pending |
 | `abyssale` | Route and offline request tests added; live verification pending |
 | `acelle_mail` | Pending provider research and implementation |
 | `activecampaign` | Route and offline request tests added; live verification pending |
-| `active_trail` | Pending provider research and implementation |
+| `active_trail` | Route and offline request tests added; live verification pending |
 | `acumbamail` | Pending provider research and implementation |
 | `acymailing` | Pending provider research and implementation |
 | `add_to_calendar_pro` | Pending provider research and implementation |
@@ -74,7 +95,7 @@ suite is therefore not recorded as green. Ruff and the CLI help check pass.
 | `automizy` | Pending provider research and implementation |
 | `beamer` | Pending provider research and implementation |
 | `benchmark_email` | Pending provider research and implementation |
-| `bigmailer` | Pending provider research and implementation |
+| `bigmailer` | Route and offline request tests added; live verification pending |
 | `botconversa` | Pending provider research and implementation |
 | `brandmentions` | Pending provider research and implementation |
 | `builderall_mailingboss` | Pending provider research and implementation |
@@ -82,10 +103,10 @@ suite is therefore not recorded as green. Ruff and the CLI help check pass.
 | `callpage` | Pending provider research and implementation |
 | `callrail` | Route and offline request tests added; live verification pending |
 | `campaign_cleaner` | Pending provider research and implementation |
-| `campaign_monitor` | Pending provider research and implementation |
+| `campaign_monitor` | Route and offline request tests added; live verification pending |
 | `campaignhq` | Pending provider research and implementation |
 | `campayn` | Pending provider research and implementation |
-| `cardly` | Pending provider research and implementation |
+| `cardly` | Route and offline request tests added; live verification pending |
 | `catch_all_verifier` | Pending provider research and implementation |
 | `chatrace` | Pending provider research and implementation |
 | `cleverreach` | Pending provider research and implementation |
@@ -107,7 +128,7 @@ suite is therefore not recorded as green. Ruff and the CLI help check pass.
 | `docupost` | Pending provider research and implementation |
 | `doppler` | Route and offline request tests added; live verification pending |
 | `dribbble` | Pending provider research and implementation |
-| `drip` | Pending provider research and implementation |
+| `drip` | Route and offline request tests added; live verification pending |
 | `dripcel` | Pending provider research and implementation |
 | `dropcontact` | Pending provider research and implementation |
 | `dux_soup` | Pending provider research and implementation |

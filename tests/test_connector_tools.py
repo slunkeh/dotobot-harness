@@ -54,7 +54,8 @@ def test_connector_docs_cover_the_catalog():
     assert "developers.activecampaign.com" in ac["docs"]
     assert "api_domain" in ac["notes"]
     assert "Api-Token" in ac["notes"]
-    assert by_type["360nrs"]["publisher"] == "none"
+    assert by_type["360nrs"]["publisher"] == "official"
+    assert "username:apiPassword" in by_type["360nrs"]["notes"]
     assert by_type["n8n"]["docs"].startswith("https://docs.n8n.io")
     assert by_type["linear"]["docs"] == "https://linear.app/docs/mcp"
 

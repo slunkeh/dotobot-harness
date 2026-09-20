@@ -11,15 +11,15 @@ from __future__ import annotations
 _ROWS: list[tuple[str, str, str, str]] = [
     (
         "360nrs",
-        "none",
+        "official",
         "https://apidocs.360nrs.com/",
-        "SMS/email/voice API docs. No MCP.",
+        "Store username:apiPassword as the secret, using the API password, not the platform login password. Allow the server IP in 360NRS settings. Paths are relative to https://dashboard.360nrs.com/api/rest; HTTP Basic authentication is used.",
     ),
     (
         "4dem",
-        "none",
-        "https://pipedream.com/apps/-4dem",
-        "Email marketing API via Pipedream. No MCP.",
+        "official",
+        "https://api.4dem.it/open-api",
+        "Store the 4Dem API key. The connector exchanges it at /authenticate for a bearer token before every request. Paths are relative to https://api.4dem.it, for example /addressbook/. Dedicated and partner API-channel hosts are not covered.",
     ),
     (
         "abyssale",
@@ -41,9 +41,9 @@ _ROWS: list[tuple[str, str, str, str]] = [
     ),
     (
         "active_trail",
-        "aggregator",
-        "https://composio.dev/toolkits/active_trail",
-        "Composio toolkit; also on Pipedream.",
+        "official",
+        "https://webapi.mymarketing.co.il/api/docs/Guides",
+        "Store the access token from Settings > API apps. The token is sent unchanged in Authorization. Paths are relative to https://webapi.mymarketing.co.il/api, for example /groups. Check token expiry and allowed IPs.",
     ),
     (
         "acumbamail",
@@ -176,9 +176,9 @@ _ROWS: list[tuple[str, str, str, str]] = [
     ),
     (
         "bigmailer",
-        "aggregator",
-        "https://composio.dev/toolkits/bigmailer",
-        "Composio; also Pipedream/viaSocket.",
+        "official",
+        "https://docs.bigmailer.io/docs/getting-started-api",
+        "Store a BigMailer API key. Paths are relative to https://api.bigmailer.io/v1, for example /me. Authentication uses X-API-Key and JSON bodies.",
     ),
     (
         "bitly",
@@ -238,9 +238,9 @@ _ROWS: list[tuple[str, str, str, str]] = [
     ),
     (
         "campaign_monitor",
-        "community",
-        "https://www.stackone.com/connectors/campaignmonitor/mcp/",
-        "Also glama.ai/mcp/servers/pauliowest/cmon-mcp.",
+        "official",
+        "https://www.campaignmonitor.com/api/v3-3/getting-started/",
+        "Store only the Campaign Monitor API key. HTTP Basic uses it as username with an empty password. Paths are relative to https://api.createsend.com/api/v3.3; use .json endpoints such as /clients.json.",
     ),
     (
         "campaignhq",
@@ -254,7 +254,12 @@ _ROWS: list[tuple[str, str, str, str]] = [
         "https://github.com/nebojsac/Campayn-API",
         "Composio toolkit appears auto-generated only.",
     ),
-    ("cardly", "none", "https://api.card.ly/v2/docs", "No genuine dedicated MCP."),
+    (
+        "cardly",
+        "official",
+        "https://api.card.ly/v2/docs",
+        "Store a Cardly test_ or live_ API key; use test_ keys to avoid order mutations while testing. Paths are relative to https://api.card.ly/v2, for example /art. Authentication uses API-Key and bodies use text/json as required by Cardly.",
+    ),
     ("catch_all_verifier", "none", "https://catchallverifier.com/", "No docs found."),
     (
         "chatrace",
@@ -397,9 +402,9 @@ _ROWS: list[tuple[str, str, str, str]] = [
     ),
     (
         "drip",
-        "community",
-        "https://github.com/GravityKit/drip-mcp-server",
-        "drip.com/mcp — verify before calling official.",
+        "official",
+        "https://developer.drip.com/",
+        "Store the personal API token. HTTP Basic uses it as username with an empty password. Paths are relative to https://api.getdrip.com and include their version, for example /v2/accounts or /v3/ACCOUNT_ID/shopper_activity/order/batch.",
     ),
     (
         "dripcel",

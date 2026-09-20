@@ -34,7 +34,7 @@ KNOWN_BASES: dict[str, tuple[str, str]] = {
     "telegram": ("https://api.telegram.org", "telegram"),
 }
 
-_STYLES = ("bearer", "basic", "telegram", "header")
+_STYLES = ("bearer", "basic", "telegram", "header", "basic_key", "4dem")
 
 
 def tool_names(type_: str) -> list[str]:
@@ -207,10 +207,11 @@ def _headers(ctx: ConnectorContext, secret: str) -> dict[str, str]:
         return hdrs
     if style == "telegram":
         return hdrs
-    if style == "basic":
+    if style in {"basic", "basic_key"}:
         import base64
 
-        token = base64.b64encode(secret.encode("utf-8")).decode("ascii")
+        credentials = secret + ":" if style == "basic_key" else secret
+        token = base64.b64encode(credentials.encode("utf-8")).decode("ascii")
         hdrs["Authorization"] = f"Basic {token}"
         return hdrs
     hdrs["Authorization"] = f"Bearer {secret}"
@@ -226,6 +227,34 @@ class _NoRedirect(urllib.request.HTTPRedirectHandler):
 
 def _open(req, *, timeout):
     return urllib.request.build_opener(_NoRedirect()).open(req, timeout=timeout)
+
+
+def _fourdem_token(base: str, key: str) -> str:
+    """Exchange the stored API key for a short-lived token for this request.
+
+    Do not persist tokens or cache them across connector records. Reauthenticating
+    avoids expired tokens and automatically respects API-key rotation.
+    """
+    request = urllib.request.Request(
+        base + "/authenticate",
+        data=json.dumps({"APIKey": key}).encode("utf-8"),
+        method="POST",
+        headers={"Content-Type": "application/json", "Accept": "application/json"},
+    )
+    try:
+        with _open(request, timeout=_TIMEOUT) as response:
+            payload = json.loads(response.read(65_537))
+    except urllib.error.HTTPError as exc:
+        exc.close()
+        raise ValueError(f"4Dem authentication failed (HTTP {exc.code})") from None
+    except (urllib.error.URLError, TimeoutError, OSError):
+        raise ValueError("could not reach 4Dem authentication") from None
+    except (ValueError, UnicodeError):
+        raise ValueError("4Dem authentication returned invalid JSON") from None
+    token = payload.get("token") if isinstance(payload, dict) else None
+    if not isinstance(token, str) or not token or any(ord(c) < 33 or ord(c) > 126 for c in token):
+        raise ValueError("4Dem authentication returned no usable token")
+    return token
 
 
 def _http(
@@ -281,9 +310,19 @@ def _http(
         if body is not None
         else None
     )
-    hdrs = _headers(ctx, key)
+    if style == "4dem":
+        try:
+            auth_key = _fourdem_token(base, key)
+        except ValueError as exc:
+            return f"error: {exc}"
+    else:
+        auth_key = key
+    hdrs = _headers(ctx, auth_key)
     if data is not None:
-        hdrs["Content-Type"] = "application/json"
+        from harness.connectors import _CATALOG_TYPES
+
+        cat = _CATALOG_TYPES.get(str(ctx.record.get("type") or "")) or {}
+        hdrs["Content-Type"] = str(cat.get("content_type") or "application/json")
     req = urllib.request.Request(url, data=data, method=method, headers=hdrs)
     try:
         with _open(req, timeout=_TIMEOUT) as resp:

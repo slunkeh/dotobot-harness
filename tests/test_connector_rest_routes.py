@@ -14,6 +14,40 @@ from harness.paths import HarnessPaths
 
 # Literal expected requests intentionally independent of catalogue metadata.
 CASES = [
+    ("bigmailer", {}, "/me", "https://api.bigmailer.io/v1/me", "X-api-key", "fixture-key"),
+    ("cardly", {}, "/art", "https://api.card.ly/v2/art", "Api-key", "fixture-key"),
+    (
+        "360nrs",
+        {},
+        "/account",
+        "https://dashboard.360nrs.com/api/rest/account",
+        "Authorization",
+        "Basic dGVzdC11c2VyOnRlc3QtYXBpLXBhc3N3b3Jk",
+    ),
+    (
+        "active_trail",
+        {},
+        "/groups",
+        "https://webapi.mymarketing.co.il/api/groups",
+        "Authorization",
+        "fixture-key",
+    ),
+    (
+        "campaign_monitor",
+        {},
+        "/clients.json",
+        "https://api.createsend.com/api/v3.3/clients.json",
+        "Authorization",
+        "Basic Zml4dHVyZS1rZXk6",
+    ),
+    (
+        "drip",
+        {},
+        "/v2/accounts",
+        "https://api.getdrip.com/v2/accounts",
+        "Authorization",
+        "Basic Zml4dHVyZS1rZXk6",
+    ),
     ("abyssale", {}, "/designs", "https://api.abyssale.com/designs", "X-api-key", "fixture-key"),
     (
         "activecampaign",
@@ -69,7 +103,8 @@ CASES = [
 @pytest.mark.parametrize("type_,config,path,url,header,value", CASES)
 def test_bound_connector_read_and_write_contract(tmp_path, type_, config, path, url, header, value):
     paths = HarnessPaths(home=tmp_path)
-    record = Connectors(paths).add(type_, type_, config=config, secret="fixture-key")
+    secret = "test-user:test-api-password" if type_ == "360nrs" else "fixture-key"
+    record = Connectors(paths).add(type_, type_, config=config, secret=secret)
     bound = tools_for_bot(paths, "atlas", record_ids={record["id"]})
     for method, args, name in [
         ("GET", {"path": path, "query": {"limit": 2}}, f"{type_}_get"),
@@ -89,7 +124,9 @@ def test_bound_connector_read_and_write_contract(tmp_path, type_, config, path, 
             assert request.get_header("Authorization") is None
         if method == "POST":
             assert json.loads(request.data) == {"fixture": True}
-            assert request.get_header("Content-type") == "application/json"
+            assert request.get_header("Content-type") == (
+                "text/json" if type_ == "cardly" else "application/json"
+            )
         assert "fixture-key" not in request.full_url
 
 
@@ -133,3 +170,104 @@ def test_http_redirect_cannot_replay_api_key(code):
         with pytest.raises(urllib.error.HTTPError):
             handler.parent.error("http", request, io.BytesIO(), code, "Redirect", headers)
     follow.assert_not_called()
+
+
+def _response(payload):
+    response = io.BytesIO(json.dumps(payload).encode())
+    response.status = 200
+    return response
+
+
+@pytest.mark.parametrize("method", ["GET", "POST"])
+def test_4dem_exchanges_key_before_each_resource_request(tmp_path, method):
+    paths = HarnessPaths(home=tmp_path)
+    record = Connectors(paths).add("4dem", "4Dem", secret="fixture-key")
+    bound = tools_for_bot(paths, "atlas", record_ids={record["id"]})
+    args = {"path": "/addressbook/"}
+    name = "4dem_get"
+    if method == "POST":
+        args.update(method="POST", body={"name": "fixture"})
+        name = "4dem_request"
+    responses = [
+        _response({"token": "first-token"}),
+        _response([]),
+        _response({"token": "second-token"}),
+        _response([]),
+    ]
+    with patch("connectors.generic._open", side_effect=responses) as send:
+        assert "HTTP 200" in bound[name][1](args)
+        assert "HTTP 200" in bound[name][1](args)
+    requests = [call.args[0] for call in send.call_args_list]
+    for index, token in [(0, "first-token"), (2, "second-token")]:
+        auth, request = requests[index : index + 2]
+        assert auth.full_url == "https://api.4dem.it/authenticate"
+        assert auth.method == "POST"
+        assert json.loads(auth.data) == {"APIKey": "fixture-key"}
+        assert auth.get_header("Authorization") is None
+        assert request.full_url == "https://api.4dem.it/addressbook/"
+        assert request.get_header("Authorization") == "Bearer " + token
+        assert request.method == method
+        if method == "POST":
+            assert json.loads(request.data) == {"name": "fixture"}
+        else:
+            assert request.data is None
+    assert ConnectorContext(paths=paths, bot="atlas", record=record).secret() == "fixture-key"
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {},
+        [],
+        {"token": None},
+        {"token": 123},
+        {"token": ""},
+        {"token": "bad\r\nheader"},
+        {"token": "bad\x00header"},
+        {"token": "\u00e9"},
+    ],
+)
+def test_4dem_refuses_resource_call_without_valid_token(tmp_path, payload):
+    paths = HarnessPaths(home=tmp_path)
+    record = Connectors(paths).add("4dem", "4Dem", secret="fixture-key")
+    ctx = ConnectorContext(paths=paths, bot="atlas", record=record)
+    with patch("connectors.generic._open", return_value=_response(payload)) as send:
+        result = generic._get(ctx, {"path": "/addressbook/"})
+    assert "no usable token" in result
+    assert send.call_count == 1
+
+
+def test_4dem_auth_error_never_echoes_credentials_or_sends_write(tmp_path):
+    import urllib.error
+
+    paths = HarnessPaths(home=tmp_path)
+    record = Connectors(paths).add("4dem", "4Dem", secret="fixture-key")
+    ctx = ConnectorContext(paths=paths, bot="atlas", record=record)
+    error = urllib.error.HTTPError(
+        "https://api.4dem.it/authenticate", 401, "denied", {}, io.BytesIO(b"fixture-key")
+    )
+    with patch("connectors.generic._open", side_effect=error) as send:
+        result = generic._request(ctx, {"path": "/addressbook/", "method": "POST", "body": {}})
+    assert result == "error: 4Dem authentication failed (HTTP 401)"
+    assert send.call_count == 1
+
+
+def test_4dem_refuses_foreign_path_before_authentication(tmp_path):
+    paths = HarnessPaths(home=tmp_path)
+    record = Connectors(paths).add("4dem", "4Dem", secret="fixture-key")
+    ctx = ConnectorContext(paths=paths, bot="atlas", record=record)
+    with patch("connectors.generic._open") as send:
+        assert "path must stay" in generic._get(ctx, {"path": "https://other.example/collect"})
+    send.assert_not_called()
+
+
+def test_4dem_malformed_auth_response_is_not_forwarded(tmp_path):
+    paths = HarnessPaths(home=tmp_path)
+    record = Connectors(paths).add("4dem", "4Dem", secret="fixture-key")
+    ctx = ConnectorContext(paths=paths, bot="atlas", record=record)
+    with patch(
+        "connectors.generic._open", return_value=io.BytesIO(b"not-json fixture-key")
+    ) as send:
+        result = generic._get(ctx, {"path": "/addressbook/"})
+    assert result == "error: 4Dem authentication returned invalid JSON"
+    assert send.call_count == 1
