@@ -363,7 +363,12 @@ _ROWS: list[tuple[str, str, str, str]] = [
         "https://docs.customer.io/ai/mcp/get-started/",
         "Dotobot uses mcp.customer.io/mcp.",
     ),
-    ("cyberimpact", "none", "https://cyberimpact.com/en/", "No MCP found."),
+    (
+        "cyberimpact",
+        "official",
+        "https://api.cyberimpact.com/docs",
+        "Store the JWT API token from Developers > API tokens. Authentication uses Bearer. Paths are relative to https://api.cyberimpact.com; GET /groups reads groups and POST /groups accepts JSON with title and isPublic. Use page and limit for pagination.",
+    ),
     (
         "demandbase",
         "official",
@@ -544,9 +549,9 @@ _ROWS: list[tuple[str, str, str, str]] = [
     ),
     (
         "eventbrite",
-        "community",
-        "https://github.com/joshuachestang/eventbrite-mcp-server",
-        "Several independent repos exist.",
+        "official",
+        "https://www.eventbrite.com/platform/new/api",
+        "Store your Eventbrite personal OAuth token, not the application client secret. Authentication uses Bearer. Paths are relative to /v3 and normally end with a slash, for example GET /users/me/. JSON writes use the endpoint schema. Access depends on the token owner and organization permissions; OAuth authorization for other users is not performed by this stored-token route.",
     ),
     (
         "everwebinar",

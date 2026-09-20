@@ -14,6 +14,22 @@ from harness.paths import HarnessPaths
 
 # Literal expected requests intentionally independent of catalogue metadata.
 CASES = [
+    (
+        "cyberimpact",
+        {},
+        "/groups",
+        "https://api.cyberimpact.com/groups",
+        "Authorization",
+        "Bearer fixture-key",
+    ),
+    (
+        "eventbrite",
+        {},
+        "/users/me/",
+        "https://www.eventbriteapi.com/v3/users/me/",
+        "Authorization",
+        "Bearer fixture-key",
+    ),
     ("beamer", {}, "/posts", "https://api.getbeamer.com/v0/posts", "Beamer-api-key", "fixture-key"),
     (
         "convertkit",

@@ -3,11 +3,11 @@
 Scope: implement the 144 catalogue connectors identified with missing REST hosts.
 This is an implementation ledger, not a claim of live-account verification.
 
-Twenty-nine routes now have offline request-contract coverage through the real connector
+Thirty-one routes now have offline request-contract coverage through the real connector
 registry and credential store. Tests assert the outbound origin, version prefix,
 credential header, query and JSON body. Credentials are never followed through
 HTTP redirects. Production authenticated reads and writes remain unverified for these
-twenty-nine routes. The remaining 115 connectors still need provider research and code.
+thirty-one routes. The remaining 113 connectors still need provider research and code.
 
 ## Implemented routes
 
@@ -48,6 +48,8 @@ CloudConvert currently uses its production automatic-region API, not its sandbox
 | `beamer` | [Provider documentation](https://www.getbeamer.com/help/how-to-use-single-user-notifications) | Store a Beamer API key from Settings > API. Paths are relative to /v0, for example GET /posts or POST /posts with a JSON body. Authentication uses Beamer-Api-Key. Key permissions control read and write access. |
 | `convertkit` | [Provider documentation](https://developers.kit.com/api-reference/authentication) | ConvertKit is now Kit. Store a V4 API key from Developer settings for personal account automation. Authentication uses X-Kit-Api-Key; paths are relative to /v4, for example GET /account. Legacy V3 keys are incompatible. Some endpoints, including bulk and purchase creation, require OAuth and are not covered by this key route. |
 | `esputnik` | [Provider documentation](https://docs.esputnik.com/reference/getting-started-with-your-api) | Store a secret in username:API_KEY format, using any nonempty username and the API key as the password. HTTP Basic authentication is used. Paths include their version, for example GET /v1/account/info. Most writes are asynchronous: an HTTP success means acceptance, not completed processing. |
+| `cyberimpact` | [Provider documentation](https://api.cyberimpact.com/docs) | Store the JWT API token from Developers > API tokens. Authentication uses Bearer. Paths are relative to https://api.cyberimpact.com; GET /groups reads groups and POST /groups accepts JSON with title and isPublic. Use page and limit for pagination. |
+| `eventbrite` | [Provider documentation](https://www.eventbrite.com/platform/new/api) | Store your Eventbrite personal OAuth token, not the application client secret. Authentication uses Bearer. Paths are relative to /v3 and normally end with a slash, for example GET /users/me/. JSON writes use the endpoint schema. Access depends on the token owner and organization permissions; OAuth authorization for other users is not performed by this stored-token route. |
 
 ActiveCampaign host selection: [official base URL guidance](https://developers.activecampaign.com/reference/url).
 
@@ -154,7 +156,7 @@ Live evidence for the third batch:
 | `coupontools` | Pending provider research and implementation |
 | `crowdpower` | Pending provider research and implementation |
 | `curated` | Pending provider research and implementation |
-| `cyberimpact` | Pending provider research and implementation |
+| `cyberimpact` | Implemented; request-contract tests pass; production account verification pending |
 | `demandbase` | Pending provider research and implementation |
 | `demio` | Pending provider research and implementation |
 | `discourse` | Pending provider research and implementation |
@@ -185,7 +187,7 @@ Live evidence for the third batch:
 | `enginemailer` | Pending provider research and implementation |
 | `enormail` | Pending provider research and implementation |
 | `esputnik` | Implemented; request-contract tests pass; production account verification pending |
-| `eventbrite` | Pending provider research and implementation |
+| `eventbrite` | Implemented; request-contract tests pass; production account verification pending |
 | `everwebinar` | Pending provider research and implementation |
 | `exact_mails` | Pending provider research and implementation |
 | `facebook` | Pending provider research and implementation |
@@ -271,3 +273,19 @@ and Kit explicitly reported invalid API keys; eSputnik reported Unauthorized.
 No authenticated account operations or external writes were performed. Kit uses
 V4 keys for personal automation; OAuth-only endpoints remain outside that key
 route. eSputnik requires username:API_KEY in the secret store, not a bare key.
+
+### Sixth batch: Cyberimpact and Eventbrite
+
+2026-09-20: both route-contract cases failed before implementation and pass
+afterward. 211 focused tests pass; Ruff passes. Bound-tool invalid-token reads
+returned HTTP 401 from both providers. Cyberimpact rejected the JWT segment
+count; Eventbrite returned INVALID_AUTH. These results prove endpoint
+reachability only. No authenticated reads or writes are claimed. Cyberimpact
+uses the official OpenAPI server and Bearer scheme. Eventbrite JSON request
+format is documented in its [API basics](https://www.eventbrite.co.uk/platform/docs/api-basics),
+and personal-token authentication in its [OAuth guide](https://www.eventbrite.com/platform/docs/app-oauth-flow).
+
+Research still pending implementation: Laposta documents Basic API-key
+authentication and form-encoded regular writes, with JSON for bulk member
+operations. Its [reference](https://api.laposta.nl/doc/index.en.php) therefore
+requires request-body selection before its route can be marked implemented.
