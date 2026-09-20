@@ -267,7 +267,7 @@ Live evidence for the third batch:
 | `greenspark` | Implemented; request contracts pass; authenticated account verification pending |
 | `growsurf` | Route and offline request tests added; live verification pending |
 | `herobot` | Pending provider research and implementation |
-| `heysummit` | Pending provider research and implementation |
+| `heysummit` | Pending: official REST v2 help found, but linked api-v2 and api-docs documentation hosts return 403; full REST contract unverified |
 | `hippo_video` | Implemented stored authentication-token route; contracts pass; invalid token/email rejected live; account acceptance pending |
 | `humanitix` | Implemented; request contracts pass; authenticated account verification pending |
 | `hypeauditor` | Implemented; request contracts pass; invalid credentials rejected live, account acceptance pending |
@@ -874,3 +874,10 @@ A disposable connector-store GET /credits returned HTTP 401, Authorization infor
 The [official integration page](https://emailchef.com/integration/) loads its [OpenAPI specification](https://emailchef.com/integration/data/openapi.yaml), version 1.4. It specifies app.emailchef.com, /apps/api/v1 resources and the authkey header. Added list GET and JSON POST coverage, including the required instance_in wrapper. A current token must be stored as the connector secret; automatic login/renewal and alternative consumerKey/consumerSecret authentication are not implemented.
 
 A disposable connector-store GET /lists?limit=1 returned HTTP 401 with unauthorized_request. No list or subscriber was created. Authenticated acceptance remains open. Focused suite: 381 passed; Ruff clean.
+
+
+## HeySummit reference availability
+
+The [official webhook guide](https://help.heysummit.com/en/articles/11403933-how-to-set-up-webhooks-for-event-actions) documents POST /api/v2/webhooks/ and directs developers to API v2 documentation. Both https://api-v2.heysummit.com and https://api-docs.heysummit.com returned HTTP 403 during this pass. The API root returns an Event not found page. No REST route was guessed from older third-party examples.
+
+The [official MCP guide](https://help.heysummit.com/en/articles/15921700-connect-an-ai-assistant-to-heysummit-with-mcp) confirms a separate MCP endpoint, OAuth or Token-header authentication, and paid-plan access. That does not establish the full REST contract. HeySummit remains in the 51 pending connectors. KingSumo research likewise did not locate an authoritative REST contract in this pass.
