@@ -352,3 +352,8 @@ harness/update_rollback.py
 
 docs/connector-rest-routes.md
 tests/test_connector_rest_routes.py
+
+harness/google_oauth.py
+tests/test_google_oauth.py
+
+docs/google-workspace-oauth.md

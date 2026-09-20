@@ -1873,6 +1873,24 @@ class _Handler(BaseHTTPRequestHandler):
         )
         if record is None:
             return self._send_json({"error": f"no connector {connector_id!r}"}, 404)
+        from . import google_oauth
+
+        if google_oauth.supported(str(record.get("type") or "")):
+            redirect = str(data.get("redirect_uri") or f"{self.server.public_url}/oauth/callback")
+            try:
+                return self._send_json(
+                    google_oauth.start_authorize(
+                        self.orch.paths,
+                        record,
+                        redirect,
+                        client_id=str(data.get("client_id") or ""),
+                        client_secret=str(data.get("client_secret") or ""),
+                    )
+                )
+            except MCPOAuthError as exc:
+                return self._send_json(
+                    {"connector": connector_id, "status": "error", "message": str(exc)}, 502
+                )
         url = connector_mcp_url(str(record.get("type", "")), record.get("config"))
         if not url:
             return self._send_json(

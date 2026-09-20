@@ -23,6 +23,7 @@ from typing import Any
 
 from .connector_docs import DOCS
 from .connector_stubs import STUBS
+from .google_oauth import SCOPES as _GOOGLE_SCOPES
 from .paths import HarnessPaths
 from .secrets import delete_secret, secret_source, set_secret
 
@@ -337,11 +338,7 @@ CATALOG: list[dict] = [
         "icon": "chart.bar.xaxis",
     },
     {
-        # Official Google-hosted Gmail MCP is Developer Preview (tools/call
-        # App password over IMAP/SMTP (connectors/gmail.py), not Google
-        # OAuth: no Cloud project, consent screen or client id. The address
-        # is the non-secret field, the app password is the record's secret,
-        # and every inbox is its own record — multi_account: extra inboxes.
+        # Gmail uses Google OAuth with IMAP/SMTP XOAUTH2.
         "type": "gmail",
         "name": "Gmail",
         "auth": "api_key",
@@ -738,6 +735,12 @@ CATALOG: list[dict] = [
     },
     *STUBS,
 ]
+
+# Google API consent is independent of remote MCP discovery.
+
+for _entry in CATALOG:
+    if _entry["type"] in _GOOGLE_SCOPES:
+        _entry.update(auth="oauth", oauth_supported=True, multi_account=True, prefer_static=True)
 
 _CATALOG_TYPES = {c["type"]: c for c in CATALOG}
 
@@ -1219,6 +1222,8 @@ class Connectors:
         oauth = mcp_oauth.connected(self.paths, str(item.get("id", "")))
         out["oauth_configured"] = oauth
         type_ = str(item.get("type", ""))
+        if type_ in _GOOGLE_SCOPES:
+            out["secret_configured"] = False
         cached = item.get("mcp_tools")
         prefer_static = bool(_CATALOG_TYPES.get(type_, {}).get("prefer_static"))
         if oauth and isinstance(cached, list) and cached and not prefer_static:
