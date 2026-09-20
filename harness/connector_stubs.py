@@ -1365,6 +1365,13 @@ STUBS: list[dict] = [
         "name": "La Growth Machine",
         "auth": "api_key",
         "fields": [],
+        "api_base": "https://apiv2.lagrowthmachine.com/flow",
+        "auth_style": "bearer",
+        "form_body_paths": [
+            "/flow/campaigns/[^/]+/(settings|status)",
+            "/flow/audiences",
+            "/flow/leads/status",
+        ],
         "category": "Sales And CRM",
         "description": "Connect La Growth Machine.",
         "icon": "person.2",

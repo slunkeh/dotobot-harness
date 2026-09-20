@@ -15,6 +15,14 @@ from harness.paths import HarnessPaths
 # Literal expected requests intentionally independent of catalogue metadata.
 CASES = [
     (
+        "lagrowthmachine",
+        {},
+        "/members",
+        "https://apiv2.lagrowthmachine.com/flow/members",
+        "Authorization",
+        "Bearer fixture-key",
+    ),
+    (
         "curated",
         {},
         "/publications",
@@ -1163,3 +1171,35 @@ def test_docupost_post_query_authentication(tmp_path, endpoint):
     assert req.method == "POST"
     assert req.data is None
     assert req.get_header("Authorization") is None
+
+
+@pytest.mark.parametrize(
+    "path,body,is_form",
+    [
+        ("/audiences/create", {"name": "Fixture"}, False),
+        ("/leads", {"firstname": "Fixture", "proEmail": "fixture@example.com"}, False),
+        ("/campaigns/123/status", {"status": "PAUSED"}, True),
+        ("/campaigns/123/settings", {"name": "Fixture"}, True),
+        ("/audiences", {"audience": "Fixture", "linkedinUrl": "https://example.com"}, True),
+        ("/leads/status", {"status": "PAUSED"}, True),
+    ],
+)
+def test_lagrowthmachine_body_formats(tmp_path, path, body, is_form):
+    from urllib.parse import parse_qs
+
+    paths = HarnessPaths(home=tmp_path)
+    record = Connectors(paths).add("lagrowthmachine", "LGM", secret="fixture-key")
+    bound = tools_for_bot(paths, "atlas", record_ids={record["id"]})
+    with patch("connectors.generic._open", return_value=_response({})) as send:
+        assert "HTTP 200" in bound["lagrowthmachine_request"][1](
+            {"method": "POST", "path": path, "body": body}
+        )
+    req = send.call_args.args[0]
+    assert req.full_url == "https://apiv2.lagrowthmachine.com/flow" + path
+    assert req.get_header("Authorization") == "Bearer fixture-key"
+    if is_form:
+        assert parse_qs(req.data.decode()) == {k: [v] for k, v in body.items()}
+        assert req.get_header("Content-type") == "application/x-www-form-urlencoded"
+    else:
+        assert json.loads(req.data) == body
+        assert req.get_header("Content-type") == "application/json"

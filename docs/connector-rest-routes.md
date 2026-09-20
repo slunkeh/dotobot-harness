@@ -3,11 +3,11 @@
 Scope: implement the 144 catalogue connectors identified with missing REST hosts.
 This is an implementation ledger, not a claim of live-account verification.
 
-Sixty-six routes now have offline request-contract coverage through the real connector
+Sixty-seven routes now have offline request-contract coverage through the real connector
 registry and credential store. Tests assert the outbound origin, version prefix,
 credential header, query and JSON body. Credentials are never followed through
 HTTP redirects. Production authenticated reads and writes remain unverified for these
-sixty-six routes. The remaining 78 connectors still need provider research and code.
+sixty-seven routes. The remaining 77 connectors still need provider research and code.
 
 ## Implemented routes
 
@@ -19,6 +19,7 @@ CloudConvert currently uses its production automatic-region API, not its sandbox
 
 | Connector | Provider reference | Setup |
 |---|---|---|
+| `lagrowthmachine` | [Provider documentation](https://documenter.getpostman.com/view/32966764/2sBXqFM2Vv) | Store the Settings > API key; uses Bearer. GET /members tests access. Paths are relative to /flow. Bodies are JSON except /audiences, /leads/status and /campaigns/ID/settings or status, which use form encoding. POST /audiences/create takes name. Campaign and inbox actions can trigger outreach. |
 | `docupost` | [Provider documentation](https://help.docupost.com/developer-documentation/send-letter-api) | Store the Developer API token. POST /sendletter or /sendpostcard uses URL-encoded non-secret query parameters in path; Dotobot adds api_token securely. Supply sender/recipient and PDF or image URLs as documented. Enable account Sandbox Mode for testing. These operations send physical mail and can incur charges; no read endpoint is documented here. |
 | `curated` | [Provider documentation](https://support.curated.co/help/getting-started-with-the-api) | Store the Account API Key. Dotobot quotes it in Authorization: Token token. GET /publications retrieves IDs. POST /publications/ID/issues/ creates a draft. Bodies use JSON. Publishing requires the website. |
 | `dribbble` | [Provider documentation](https://developer.dribbble.com/v2/) | Store an OAuth access token, used as Bearer. GET /user or /user/shots reads account data. PUT /shots/ID updates metadata with upload scope. The documented JSON body uses application/x-www-form-urlencoded Content-Type. OAuth lifecycle, multipart uploads and binary responses are unsupported here. |
@@ -271,7 +272,7 @@ Live evidence for the third batch:
 | `kingsumo` | Pending provider research and implementation |
 | `klenty` | Implemented; request contracts pass; authenticated account verification pending |
 | `kyvio` | Pending provider research and implementation |
-| `lagrowthmachine` | Pending provider research and implementation |
+| `lagrowthmachine` | Implemented; request contracts pass; invalid key rejected live, account acceptance pending |
 | `lahar` | Pending provider research and implementation |
 | `laposta` | Implemented; documented sandbox list read HTTP 200 (truncated); production verification pending |
 | `lawmatics` | Implemented; request-contract tests pass; production account verification pending |
@@ -627,3 +628,12 @@ was added. The focused suite passes 295 tests; Ruff passes. A live bound POST
 for to_name. This proves endpoint reachability and input validation, not token
 acceptance or mailing success. No mailing job was submitted. Sandbox Mode is a
 provider account setting, not a request parameter invented by Dotobot.
+
+## La Growth Machine validation
+
+The vendor integrations page links the Postman reference. Its collection confirms
+Bearer authentication at apiv2.lagrowthmachine.com/flow and mixed JSON/form bodies.
+Seven new tests failed before implementation and pass afterward. The focused suite
+passes 302 tests; Ruff passes. A disposable bound GET /members returned HTTP 401
+Invalid apikey. No campaign, lead or inbox writes were attempted; authenticated
+account acceptance remains open.

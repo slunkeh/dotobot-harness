@@ -903,9 +903,9 @@ _ROWS: list[tuple[str, str, str, str]] = [
     ),
     (
         "lagrowthmachine",
-        "community",
-        "https://lobehub.com/mcp/gigradar-lgm-mcp-server",
-        "Also via Composio; no official vendor server confirmed.",
+        "official",
+        "https://documenter.getpostman.com/view/32966764/2sBXqFM2Vv",
+        "Store the API key from Settings > API; uses Bearer authentication. GET /members tests access. Paths are relative to /flow. Bodies use JSON except /audiences, /leads/status and /campaigns/ID/settings or status, which use form encoding. Pass body as an object. POST /audiences/create takes name. Campaign and inbox operations can trigger outreach.",
     ),
     ("lahar", "none", "", "No vendor API docs surfaced."),
     (

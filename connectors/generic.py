@@ -344,7 +344,13 @@ def _http(
         hdrs["Content-Type"] = str(cat.get("content_type") or "application/json")
         if (
             data is not None
-            and cat.get("body_encoding") == "form"
+            and (
+                cat.get("body_encoding") == "form"
+                or any(
+                    re.fullmatch(pattern, urllib.parse.urlparse(url).path)
+                    for pattern in cat.get("form_body_paths", [])
+                )
+            )
             and not any(
                 re.fullmatch(pattern, urllib.parse.urlparse(url).path)
                 for pattern in cat.get("json_body_paths", [])
