@@ -274,7 +274,7 @@ Live evidence for the third batch:
 | `hyperise` | Implemented: official regular API, query token and form writes; invalid-token read returns 401. Valid account acceptance open. |
 | `icontact` | Implemented standard API; three-header and JSON-array contracts pass; live invalid username rejected; authenticated acceptance open |
 | `impression` | Pending product identity: catalogue names Impression Digital agency; no verified public REST contract |
-| `indiefunnels` | Pending: Website API reference recovered; confirm IndieFunnels account exposes this API and customer domain |
+| `indiefunnels` | Pending: Website API reference recovered; prepared free-trial signup requires user password/CAPTCHA/terms handoff to inspect account API settings |
 | `infusionsoft` | Implemented; request-contract tests pass; production account verification pending |
 | `inksprout` | Pending: former API documentation URL fails in browser; current video editor API contract unverified |
 | `instabot` | Implemented master-key REST route; read/query contracts pass; live API key rejected; authenticated acceptance open |
@@ -1219,3 +1219,12 @@ A bound GET /users/current from a disposable local secret store with an invalid 
 The provider-owned [JavaScript SDK](https://github.com/Automizy/Automizy-Js-Api) supplies primary evidence despite the unavailable developer site: src/core.js defaults to https://api.automizy.com; src/apis/v2/smartLists.js uses Bearer tokens and JSON writes. Added GET /v2/smart-lists/ID/contacts and POST the same path with contacts array request contracts. Contact writes were only tested against mocked transport; no contact was added.
 
 A direct invalid-token GET /v2/smart-lists returned generic HTTP 403 Forbidden. This establishes reachability, not token acceptance or current account compatibility. The separate gateway.automizy.com host referenced by integration documentation timed out after 15 seconds; it was not substituted for the SDK host. Current account acceptance and token refresh remain open. Focused suite: 496 passed; Ruff clean. Host count: 130 of 144; 14 pending.
+
+
+## IndieFunnels account documentation handoff
+
+The [official trial signup](https://indiefunnels.eu/trial/start-your-14-day-free-trial) is reachable in the browser. It advertises a 14-day trial that ends automatically without a card. The actual form requires a password, reCAPTCHA and explicit terms/privacy acceptance. Prepared the non-secret identity fields and requested user handoff before completing those steps. No account or website was created. The provider-specific mapping to the recovered Website API remains unverified until account settings can be inspected.
+
+## GoZen Growth provider documentation access route
+
+A [GoZen founder-team answer dated June 27, 2024](https://appsumo.com/products/gozen-growth/questions/hi-gozen-team-congratulations-on-launc-1030019/) says developer API documentation is supplied through live chat for integrations. This identifies a provider-supported path to the missing documentation, but does not itself establish a base URL, header or payload contract. No support message was sent.
