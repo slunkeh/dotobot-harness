@@ -3,11 +3,11 @@
 Scope: implement the 144 catalogue connectors identified with missing REST hosts.
 This is an implementation ledger, not a claim of live-account verification.
 
-Fifty-five routes now have offline request-contract coverage through the real connector
+Fifty-six routes now have offline request-contract coverage through the real connector
 registry and credential store. Tests assert the outbound origin, version prefix,
 credential header, query and JSON body. Credentials are never followed through
 HTTP redirects. Production authenticated reads and writes remain unverified for these
-fifty-five routes. The remaining 89 connectors still need provider research and code.
+fifty-six routes. The remaining 88 connectors still need provider research and code.
 
 ## Implemented routes
 
@@ -19,6 +19,7 @@ CloudConvert currently uses its production automatic-region API, not its sandbox
 
 | Connector | Provider reference | Setup |
 |---|---|---|
+| `adtraction` | [Provider documentation](https://apidocs.adtraction.net/nextgen/) | Store the API token from Adtraction Account > Settings > API. Uses X-Token authentication and JSON bodies. Include the API version in each path: GET /v2/partner/markets/ or POST /v3/partner/programs/ with market in the JSON body. Both v2 and v3 share the configured host; prefer v3 replacements for deprecated v2 endpoints. Keep documented trailing slashes. Pagination starts at page 0. |
 | `easypromos` | [Provider documentation](https://easypromos-apiref.redoc.ly/) | Store an access token from the Easypromos account Utilities menu. Uses Bearer authentication; White Label or Corporate plan required. GET /promotions lists promotions; use paging.next_cursor for further pages. POST requests use JSON. Some participation operations also require a participant login token in the body. Legacy v1 endpoints are retired. |
 | `botconversa` | [Provider documentation](https://backend.botconversa.com.br/swagger/) | Store a BotConversa API key. Authentication uses API-KEY. Keep endpoint trailing slashes, for example GET /tags/ or /flows/. JSON writes are supported. POST /subscriber/ requires has_opt_in_whatsapp=true and actual contact consent. Messaging and flow endpoints can contact subscribers; adding the route does not authorize outreach. |
 | `benchmark_email` | [Provider documentation](https://benchmarkemail.github.io/RESTful-API-v3/) | Store a Benchmark Email API token. Uses AuthToken and application/json headers, including GET. Read lists with GET /Contact/ and query SearchFilter. Create a list with POST /Contact and body Data containing Name and Description. Response.Status must be 1; HTTP 200 alone can contain an application error. This is REST v3, not the legacy XML API. |
@@ -142,7 +143,7 @@ Live evidence for the third batch:
 | `adhook` | Pending provider research and implementation |
 | `adrapid` | Pending provider research and implementation |
 | `adroll` | Pending provider research and implementation |
-| `adtraction` | Pending provider research and implementation |
+| `adtraction` | Implemented; request contracts pass; authenticated account verification pending |
 | `aimtell` | Pending provider research and implementation |
 | `airship` | Pending provider research and implementation |
 | `apexverify` | Pending provider research and implementation |
@@ -493,3 +494,16 @@ site timed out during research. BotConversa's
 confirms JSON, API-KEY and the /api/v1/webhook prefix. Easypromos'
 [current reference](https://easypromos-apiref.redoc.ly/) confirms v2 JSON and
 Bearer authentication. Its White Label/Corporate requirement is recorded above.
+
+## Adtraction validation
+
+The [current unified reference](https://apidocs.adtraction.net/nextgen/) documents
+v2 and v3 on api.adtraction.net with X-Token authentication. The configured base
+omits the version so callers can use both, including v3 replacements for
+deprecated v2 endpoints. Two new cases failed before implementation and pass
+afterward. The focused suite passes 262 tests; Ruff passes.
+
+Bound calls using an invalid token returned HTTP 401 Unauthorized access for
+both GET /v2/partner/markets/ and POST /v3/partner/programs/ with market=SE.
+The latter is a documented retrieval operation despite using POST. No account
+data was changed. Authenticated provider access remains unverified.

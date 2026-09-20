@@ -78,9 +78,9 @@ _ROWS: list[tuple[str, str, str, str]] = [
     ),
     (
         "adtraction",
-        "aggregator",
-        "https://zapier.com/mcp/adtraction",
-        "Affiliate network via Zapier MCP.",
+        "official",
+        "https://apidocs.adtraction.net/nextgen/",
+        "Store the API token from Adtraction Account > Settings > API. Uses X-Token authentication and JSON bodies. Include the API version in each path: GET /v2/partner/markets/ or POST /v3/partner/programs/ with market in the JSON body. Both v2 and v3 share the configured host; prefer v3 replacements for deprecated v2 endpoints. Keep documented trailing slashes. Pagination starts at page 0.",
     ),
     (
         "aimtell",
