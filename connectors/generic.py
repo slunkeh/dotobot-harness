@@ -298,7 +298,7 @@ def _http(
             body is not None and parameter in body
         ):
             return "error: authentication comes from the connector secret store"
-        if auth_config.get("auth_in_form") and method != "GET":
+        if (auth_config.get("auth_in_form") or auth_config.get("auth_in_json")) and method != "GET":
             body = {**(body or {}), parameter: key}
         else:
             url += ("&" if "?" in url else "?") + urllib.parse.urlencode({parameter: key})

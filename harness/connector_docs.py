@@ -517,8 +517,8 @@ _ROWS: list[tuple[str, str, str, str]] = [
     (
         "emailverify_io",
         "official",
-        "https://www.emailverify.io/mcp/",
-        "Vendor-published MCP.",
+        "https://www.emailverify.io/api/docs",
+        "Store the account API key. Dotobot supplies key in GET queries and POST JSON bodies. GET /v2/check-account-balance reads credits; POST /v1/validate-batch accepts title and email_batch objects with address fields (maximum 5000). Poll /v1/get-result-bulk-verification-task/ with task_id. Verification consumes credits. Do not supply key in tool arguments.",
     ),
     (
         "emelia",

@@ -1037,3 +1037,41 @@ def test_acumbamail_form_preserves_caller_body_and_refuses_override(tmp_path):
             ctx, {"method": "POST", "path": "/getLists/", "body": {"auth_token": "override"}}
         )
     send.assert_not_called()
+
+
+@pytest.mark.parametrize("method", ["GET", "POST"])
+def test_emailverify_parameter_authentication(tmp_path, method):
+    from urllib.parse import parse_qs, urlsplit
+
+    paths = HarnessPaths(home=tmp_path)
+    record = Connectors(paths).add("emailverify_io", "EmailVerify", secret="key&= +?")
+    bound = tools_for_bot(paths, "atlas", record_ids={record["id"]})
+    body = {"title": "Fixture", "email_batch": [{"address": "fixture@example.com"}]}
+    args = (
+        {"path": "/v2/check-account-balance"}
+        if method == "GET"
+        else {
+            "method": "POST",
+            "path": "/v1/validate-batch",
+            "body": body,
+        }
+    )
+    name = "emailverify_io_get" if method == "GET" else "emailverify_io_request"
+    with patch("connectors.generic._open", return_value=_response({})) as send:
+        assert "HTTP 200" in bound[name][1](args)
+    req = send.call_args.args[0]
+    parts = urlsplit(req.full_url)
+    assert parts.netloc == "app.emailverify.io"
+    assert parts.path == "/api" + args["path"]
+    assert req.get_header("Authorization") is None
+    if method == "GET":
+        assert parse_qs(parts.query) == {"key": ["key&= +?"]}
+        assert req.data is None
+    else:
+        assert parts.query == ""
+        assert json.loads(req.data) == {**body, "key": "key&= +?"}
+        assert "key" not in body
+        assert req.get_header("Content-type") == "application/json"
+        with patch("connectors.generic._open") as send:
+            assert "secret store" in bound[name][1]({**args, "body": {"key": "override"}})
+        send.assert_not_called()

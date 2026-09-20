@@ -3,11 +3,11 @@
 Scope: implement the 144 catalogue connectors identified with missing REST hosts.
 This is an implementation ledger, not a claim of live-account verification.
 
-Sixty-one routes now have offline request-contract coverage through the real connector
+Sixty-two routes now have offline request-contract coverage through the real connector
 registry and credential store. Tests assert the outbound origin, version prefix,
 credential header, query and JSON body. Credentials are never followed through
 HTTP redirects. Production authenticated reads and writes remain unverified for these
-sixty-one routes. The remaining 83 connectors still need provider research and code.
+sixty-two routes. The remaining 82 connectors still need provider research and code.
 
 ## Implemented routes
 
@@ -19,6 +19,7 @@ CloudConvert currently uses its production automatic-region API, not its sandbox
 
 | Connector | Provider reference | Setup |
 |---|---|---|
+| `emailverify_io` | [Provider documentation](https://www.emailverify.io/api/docs) | Store the account API key. GET /v2/check-account-balance reads credits. POST /v1/validate-batch takes title and email_batch containing address objects, up to 5000. The stored key is inserted in GET queries or POST JSON; never pass it in tool arguments. Poll /v1/get-result-bulk-verification-task/ with task_id. Verification consumes credits. |
 | `acumbamail` | [Provider documentation](https://acumbamail.com/apidoc/) | Store the auth token from My account > Preferences. Dotobot inserts auth_token into GET queries or POST form data from the secret store. Use function paths with trailing slashes, such as /getLists/. JSON is the default response format. Pass POST parameters as a body object; nested fields are form-encoded with bracket notation. Some GET functions can modify data too: select functions carefully. Do not include auth_token in tool arguments. |
 | `leaddyno` | [Provider documentation](https://support.leaddyno.com/hc/en-us/articles/21508238902173-Getting-Started-with-LeadDyno-API-Tracking) | Store the LeadDyno private API key from Account > Profile, not the public tracking key. It is sent in the documented key header. GET /visitors reads visitor records. POST /visitors takes a url field; body objects are form-encoded. Lead and purchase writes can change affiliate attribution; use only test data when checking writes. |
 | `emaillistverify` | [Provider documentation](https://api.emaillistverify.com/api-doc) | Store an EmailListVerify API key, sent in x-api-key. GET /credits reads balances without verifying an email. POST /emailJobs accepts JSON email and optional quality; poll /emailJobs/JOB_ID for completion. Verification operations consume credits. Multipart list uploads and binary downloads are not supported by the generic JSON tool. |
@@ -209,7 +210,6 @@ Live evidence for the third batch:
 | `emailchef` | Pending provider research and implementation |
 | `emaillistverify` | Implemented; request contracts pass; authenticated account verification pending |
 | `emailoctopus` | Implemented; request-contract tests pass; production account verification pending |
-| `emailverify_io` | Pending provider research and implementation |
 | `emelia` | Pending provider research and implementation |
 | `encharge` | Pending provider research and implementation |
 | `endorsal` | Pending provider research and implementation |
@@ -578,3 +578,12 @@ Ruff passes.
 Bound GET and POST calls to /getLists/ with a disposable credential store and
 an invalid token both returned HTTP 401 Unauthorized. These are rejection checks,
 not authenticated list access. No live subscriber or campaign mutations ran.
+
+## EmailVerify.io validation
+
+Added the documented mixed GET-query and POST-JSON key authentication, preserving
+caller bodies and rejecting credential overrides. Both new tests failed before
+implementation and pass afterward. The focused suite passes 287 tests; Ruff passes.
+A bound GET /v2/check-account-balance using disposable invalid credentials returned
+HTTP 401 with Key not found. This establishes reachability, not authenticated
+account acceptance. No verification jobs were submitted.
