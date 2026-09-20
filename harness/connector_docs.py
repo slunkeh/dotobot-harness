@@ -895,9 +895,9 @@ _ROWS: list[tuple[str, str, str, str]] = [
     ("lahar", "none", "", "No vendor API docs surfaced."),
     (
         "laposta",
-        "none",
-        "https://developer.laposta.nl/",
-        "No MCP found.",
+        "official",
+        "https://api.laposta.nl/doc/index.en.php",
+        "Store the Laposta API key alone; HTTP Basic uses it as the username with an empty password. Paths are relative to https://api.laposta.org/v2, for example GET /list. Regular writes use form fields with bracket notation for nested objects; POST /list/LIST_ID/members uses JSON for bulk synchronization. Pass the body as an object; Dotobot selects the encoding. Bulk synchronization requires a paid account.",
     ),
     (
         "lawmatics",

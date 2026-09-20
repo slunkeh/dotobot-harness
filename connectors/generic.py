@@ -88,7 +88,7 @@ def tools(type_: str) -> list[ConnectorTool]:
                         "path": {"type": "string"},
                         "body": {
                             "type": "object",
-                            "description": "JSON object body",
+                            "description": "Body object, encoded as required by the provider",
                         },
                     },
                     "required": ["method", "path"],
@@ -323,6 +323,15 @@ def _http(
 
         cat = _CATALOG_TYPES.get(str(ctx.record.get("type") or "")) or {}
         hdrs["Content-Type"] = str(cat.get("content_type") or "application/json")
+        if cat.get("body_encoding") == "form" and not any(
+            re.fullmatch(pattern, urllib.parse.urlparse(url).path)
+            for pattern in cat.get("json_body_paths", [])
+        ):
+            # Resolve redaction sentinels before encoding so substituted secrets
+            # cannot introduce form fields through ampersands or equals signs.
+            data = urllib.parse.urlencode(_form_fields(json.loads(data))).encode("utf-8")
+            hdrs["Content-Type"] = "application/x-www-form-urlencoded"
+
     req = urllib.request.Request(url, data=data, method=method, headers=hdrs)
     try:
         with _open(req, timeout=_TIMEOUT) as resp:
@@ -336,6 +345,20 @@ def _http(
     if len(raw) > _MAX_RESULT:
         raw = raw[:_MAX_RESULT] + "\n… (truncated)"
     return f"HTTP {status}\n{raw}" if raw else f"HTTP {status}"
+
+
+def _form_fields(value: Any, prefix: str = "") -> list[tuple[str, str]]:
+    """Encode nested provider fields using PHP-style bracket notation."""
+    if isinstance(value, (dict, list)):
+        items = value.items() if isinstance(value, dict) else enumerate(value)
+        result = []
+        for key, child in items:
+            name = f"{prefix}[{key}]" if prefix else str(key)
+            result.extend(_form_fields(child, name))
+        return result
+    if isinstance(value, bool):
+        value = "true" if value else "false"
+    return [(prefix, "" if value is None else str(value))]
 
 
 def _get(ctx: ConnectorContext, args: dict[str, Any]) -> str:

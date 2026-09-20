@@ -3,11 +3,11 @@
 Scope: implement the 144 catalogue connectors identified with missing REST hosts.
 This is an implementation ledger, not a claim of live-account verification.
 
-Thirty-one routes now have offline request-contract coverage through the real connector
+Thirty-two routes now have offline request-contract coverage through the real connector
 registry and credential store. Tests assert the outbound origin, version prefix,
 credential header, query and JSON body. Credentials are never followed through
 HTTP redirects. Production authenticated reads and writes remain unverified for these
-thirty-one routes. The remaining 113 connectors still need provider research and code.
+thirty-two routes. The remaining 112 connectors still need provider research and code.
 
 ## Implemented routes
 
@@ -50,6 +50,7 @@ CloudConvert currently uses its production automatic-region API, not its sandbox
 | `esputnik` | [Provider documentation](https://docs.esputnik.com/reference/getting-started-with-your-api) | Store a secret in username:API_KEY format, using any nonempty username and the API key as the password. HTTP Basic authentication is used. Paths include their version, for example GET /v1/account/info. Most writes are asynchronous: an HTTP success means acceptance, not completed processing. |
 | `cyberimpact` | [Provider documentation](https://api.cyberimpact.com/docs) | Store the JWT API token from Developers > API tokens. Authentication uses Bearer. Paths are relative to https://api.cyberimpact.com; GET /groups reads groups and POST /groups accepts JSON with title and isPublic. Use page and limit for pagination. |
 | `eventbrite` | [Provider documentation](https://www.eventbrite.com/platform/new/api) | Store your Eventbrite personal OAuth token, not the application client secret. Authentication uses Bearer. Paths are relative to /v3 and normally end with a slash, for example GET /users/me/. JSON writes use the endpoint schema. Access depends on the token owner and organization permissions; OAuth authorization for other users is not performed by this stored-token route. |
+| `laposta` | [Provider documentation](https://api.laposta.nl/doc/index.en.php) | Store the Laposta API key alone; HTTP Basic uses it as the username with an empty password. Paths are relative to https://api.laposta.org/v2, for example GET /list. Regular writes use form fields with bracket notation for nested objects; POST /list/LIST_ID/members uses JSON for bulk synchronization. Pass the body as an object; Dotobot selects the encoding. Bulk synchronization requires a paid account. |
 
 ActiveCampaign host selection: [official base URL guidance](https://developers.activecampaign.com/reference/url).
 
@@ -240,7 +241,7 @@ Live evidence for the third batch:
 | `kyvio` | Pending provider research and implementation |
 | `lagrowthmachine` | Pending provider research and implementation |
 | `lahar` | Pending provider research and implementation |
-| `laposta` | Pending provider research and implementation |
+| `laposta` | Implemented; documented sandbox list read HTTP 200 (truncated); production verification pending |
 | `lawmatics` | Pending provider research and implementation |
 | `lead_identity_check` | Pending provider research and implementation |
 | `leaddyno` | Pending provider research and implementation |
@@ -289,3 +290,19 @@ Research still pending implementation: Laposta documents Basic API-key
 authentication and form-encoded regular writes, with JSON for bulk member
 operations. Its [reference](https://api.laposta.nl/doc/index.en.php) therefore
 requires request-body selection before its route can be marked implemented.
+
+### Seventh batch: Laposta body encoding
+
+2026-09-20: four request-body cases failed before the Laposta implementation.
+217 focused tests now pass; the new cases cover regular form fields, nested
+objects and arrays, booleans, special characters, bulk JSON (including query
+strings), GET without a body, and escaped credential substitution that cannot
+inject another form field. Other providers retain their existing JSON behavior.
+
+A bound GET /list using the provider's documented public testing key returned
+HTTP 200 with list data. The connector truncated the response at its existing
+12,000-character limit, so it cannot be treated as a complete JSON document or
+a complete list inventory. The documentation's sample list ID returned HTTP 400
+Unknown list; the sample ID appears stale. No live writes were performed and
+production account operations remain unverified. The previously pending Laposta
+body-format requirement is now implemented.

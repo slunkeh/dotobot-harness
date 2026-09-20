@@ -434,3 +434,80 @@ def test_documented_json_write_paths(tmp_path, type_, path, url, body):
     request = send.call_args.args[0]
     assert request.full_url == url
     assert json.loads(request.data) == body
+
+
+@pytest.mark.parametrize(
+    "path,body,expected,content_type",
+    [
+        (
+            "/list",
+            {"name": "A + B & C", "locked": False},
+            b"name=A+%2B+B+%26+C&locked=false",
+            "application/x-www-form-urlencoded",
+        ),
+        (
+            "/member",
+            {"list_id": "fixture", "custom_fields": {"city": "Edinburgh"}, "tags": ["one", "two"]},
+            b"list_id=fixture&custom_fields%5Bcity%5D=Edinburgh&tags%5B0%5D=one&tags%5B1%5D=two",
+            "application/x-www-form-urlencoded",
+        ),
+        (
+            "/list/fixture/members",
+            {"actions": ["add"], "members": [{"email": "fixture@example.com"}]},
+            None,
+            "application/json",
+        ),
+        (
+            "/list/fixture/members?mode=test",
+            {"actions": ["add"], "members": []},
+            None,
+            "application/json",
+        ),
+    ],
+)
+def test_laposta_body_formats(tmp_path, path, body, expected, content_type):
+    paths = HarnessPaths(home=tmp_path)
+    record = Connectors(paths).add("laposta", "Laposta", secret="fixture-key")
+    bound = tools_for_bot(paths, "atlas", record_ids={record["id"]})
+    with patch("connectors.generic._open", return_value=_response({"ok": True})) as send:
+        result = bound["laposta_request"][1]({"method": "POST", "path": path, "body": body})
+    assert "HTTP 200" in result
+    request = send.call_args.args[0]
+    assert request.full_url == "https://api.laposta.org/v2" + path
+    assert request.get_header("Authorization") == "Basic Zml4dHVyZS1rZXk6"
+    assert request.get_header("Content-type") == content_type
+    if expected is None:
+        assert json.loads(request.data) == body
+    else:
+        assert request.data == expected
+
+
+def test_laposta_form_secret_cannot_inject_fields(tmp_path):
+    from urllib.parse import parse_qs
+
+    from harness.redaction import register_secret
+
+    secret = "fixture-secret&extra=bad+value"
+    token = register_secret(secret, "LAPOSTA_FIXTURE")
+    paths = HarnessPaths(home=tmp_path)
+    record = Connectors(paths).add("laposta", "Laposta", secret=secret)
+    ctx = ConnectorContext(paths=paths, bot="atlas", record=record)
+    with patch("connectors.generic._open", return_value=_response({})) as send:
+        result = generic._request(
+            ctx, {"method": "POST", "path": "/list", "body": {"remarks": token}}
+        )
+    assert "HTTP 200" in result
+    assert parse_qs(send.call_args.args[0].data.decode()) == {"remarks": [secret]}
+
+
+def test_laposta_read_has_no_body(tmp_path):
+    paths = HarnessPaths(home=tmp_path)
+    record = Connectors(paths).add("laposta", "Laposta", secret="fixture-key")
+    bound = tools_for_bot(paths, "atlas", record_ids={record["id"]})
+    with patch("connectors.generic._open", return_value=_response({})) as send:
+        assert "HTTP 200" in bound["laposta_get"][1]({"path": "/list"})
+    request = send.call_args.args[0]
+    assert request.full_url == "https://api.laposta.org/v2/list"
+    assert request.data is None
+    assert request.get_header("Content-type") is None
+    assert request.get_header("Authorization") == "Basic Zml4dHVyZS1rZXk6"
