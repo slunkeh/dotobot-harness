@@ -177,7 +177,7 @@ Live evidence for the third batch:
 | `asters` | Implemented documented REST route; request contracts pass; live server names a different auth header; authenticated acceptance unresolved |
 | `attentive` | Route and offline request tests added; live verification pending |
 | `autoklose` | Implemented REST route; request contracts pass; live invalid key explicitly rejected; authenticated acceptance open |
-| `automizy` | Pending provider research and implementation |
+| `automizy` | Pending: provider advertises REST API but developer reference times out; former GetResponse acquisition claim unverified |
 | `beamer` | Implemented; request-contract tests pass; production account verification pending |
 | `benchmark_email` | Implemented; request contracts pass; authenticated account verification pending |
 | `bigmailer` | Route and offline request tests added; live verification pending |
@@ -1091,3 +1091,10 @@ A disposable-store GET /validate returned HTTP 401 Invalid API Key or ID for inv
 Gitter's [migration announcement](https://blog.gitter.im/2023/02/13/gitter-has-fully-migrated-to-matrix/) confirms its move to Matrix. A fresh read of https://gitter.im/.well-known/matrix/client advertises https://gitter.ems.host as m.homeserver.base_url. Added that provider-advertised host with /_matrix/client/v3 and Bearer Matrix tokens, following the [client-server specification](https://spec.matrix.org/latest/client-server-api/). Legacy Gitter tokens are not compatible. The bound contract covers GET /account/whoami.
 
 The disposable-store live whoami probe could not resolve gitter.ems.host locally. This is an availability blocker, not successful authentication. No messages were sent. This addition implements the advertised route, not a functioning live account or a complete Matrix client; token lifecycle, sync loops, binary media and encrypted-room key management remain unsupported. Focused suite: 478 passed; Ruff clean.
+
+
+## Automizy availability and identity investigation
+
+A fresh fetch of [Automizy's website](https://automizy.com/) succeeds and its published page still advertises REST API integration. The referenced developers.automizy.com HTTPS endpoint timed out after 20 seconds. Current evidence does not establish an operational API host or authentication contract.
+
+Removed the catalogue's unsupported assertion that Automizy was discontinued or absorbed into GetResponse, replacing it with the verified documentation limitation. Website availability alone does not prove API availability, and the old catalogue assertion is not evidence of an acquisition. Automizy remains pending; no credentials were transmitted and no host was guessed.

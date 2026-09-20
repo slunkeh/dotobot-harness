@@ -157,8 +157,8 @@ _ROWS: list[tuple[str, str, str, str]] = [
     (
         "automizy",
         "none",
-        "https://www.getresponse.com/",
-        "Discontinued / absorbed into GetResponse.",
+        "https://automizy.com/",
+        "The provider website advertises a REST API, but its developer reference is currently unavailable. Supported API host and authentication remain unverified.",
     ),
     (
         "aweber",
