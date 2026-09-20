@@ -15,6 +15,14 @@ from harness.paths import HarnessPaths
 # Literal expected requests intentionally independent of catalogue metadata.
 CASES = [
     (
+        "callpage",
+        {},
+        "/v3/external/calls/history",
+        "https://core.callpage.io/api/v3/external/calls/history",
+        "Authorization",
+        "fixture-key",
+    ),
+    (
         "funnelcockpit",
         {},
         "/me",
@@ -1380,3 +1388,18 @@ def test_brandmentions_command_query(tmp_path, command):
     assert parse_qs(parts.query) == {"command": [command], "api_key": ["key&= +?"]}
     assert req.get_header("Authorization") is None
     assert req.data is None
+
+
+def test_callpage_v1_field_update(tmp_path):
+    paths = HarnessPaths(home=tmp_path)
+    record = Connectors(paths).add("callpage", "CallPage", secret="fixture-key")
+    bound = tools_for_bot(paths, "atlas", record_ids={record["id"]})
+    with patch("connectors.generic._open", return_value=_response({})) as send:
+        assert "HTTP 200" in bound["callpage_request"][1](
+            {"method": "PATCH", "path": "/v1/external/calls/13/fields/1421", "body": {"value": 12}}
+        )
+    req = send.call_args.args[0]
+    assert req.full_url == "https://core.callpage.io/api/v1/external/calls/13/fields/1421"
+    assert req.method == "PATCH"
+    assert req.get_header("Authorization") == "fixture-key"
+    assert json.loads(req.data) == {"value": 12}

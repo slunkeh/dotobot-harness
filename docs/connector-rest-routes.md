@@ -3,11 +3,11 @@
 Scope: implement the 144 catalogue connectors identified with missing REST hosts.
 This is an implementation ledger, not a claim of live-account verification.
 
-Seventy-four routes now have offline request-contract coverage through the real connector
+Seventy-five routes now have offline request-contract coverage through the real connector
 registry and credential store. Tests assert the outbound origin, version prefix,
 credential header, query and JSON body. Credentials are never followed through
 HTTP redirects. Production authenticated reads and writes remain unverified for these
-seventy-four routes. The remaining 70 connectors still need provider research and code.
+seventy-five routes. The remaining 69 connectors still need provider research and code.
 
 ## Implemented routes
 
@@ -19,6 +19,7 @@ CloudConvert currently uses its production automatic-region API, not its sandbox
 
 | Connector | Provider reference | Setup |
 |---|---|---|
+| `callpage` | [Provider documentation](https://callpage.github.io/documentation-rest/) | Store the dashboard API key, sent directly in Authorization. GET /v3/external/calls/history reads history. PATCH /v1/external/calls/CALL_ID/fields/FIELD_ID takes JSON value. Include the documented version in paths; inspect hasError and data. Token/widget scopes apply. Calling and messaging may contact people. |
 | `brandmentions` | [Provider documentation](https://help.brandmentions.com/en/articles/12814618-how-do-i-authenticate-api-requests-safely) | Store the provider-issued API key. GET /command.php with query command=GetRemainingCredits reads credits; ListProjects lists projects. Dotobot supplies api_key. Commands can also mutate data or spend credits, even through GET. Provider-enabled API access is required. |
 | `discourse` | [Provider documentation](https://docs.discourse.org/) | Store an admin-generated API key. Configure api_domain as a hostname and api_username. Uses Api-Key and Api-Username. GET /categories.json reads categories; POST /posts.json takes JSON title and raw. Key scopes/user permissions apply. Root-host HTTPS and ASCII usernames are supported; subdirectory installations and User API key authorization are not implemented. |
 | `jvzoo` | [Provider documentation](https://api.jvzoo.com/docs/) | Store the API Application key alone; Basic auth uses it as username and x as password. Include /v3.0, /v2.1 or /v2.0 in paths. GET /v3.0/transactions takes start_date and end_date. JSON writes are supported; inspect meta.status and results. |
@@ -178,7 +179,7 @@ Live evidence for the third batch:
 | `brandmentions` | Implemented; request contracts pass; live Python request blocked by certificate-chain validation |
 | `builderall_mailingboss` | Pending provider research and implementation |
 | `buysellads` | Pending provider research and implementation |
-| `callpage` | Pending provider research and implementation |
+| `callpage` | Implemented; request contracts pass; invalid key rejected live, account acceptance pending |
 | `callrail` | Route and offline request tests added; live verification pending |
 | `campaign_cleaner` | Implemented; request contracts pass; authenticated account verification pending |
 | `campaign_monitor` | Route and offline request tests added; live verification pending |
@@ -723,3 +724,11 @@ verification failure: unable to get local issuer certificate. The system curl cl
 can reach the same HTTPS endpoint (400 for missing parameters), so this is a runtime
 trust-chain difference, not evidence the provider is down. TLS verification remains
 enabled. Authenticated acceptance and Python-runtime connectivity remain unresolved.
+
+## CallPage validation
+
+The provider reference mixes v3 call-history and v1 update endpoints. The route
+preserves those prefixes and uses the documented raw Authorization key. Two tests
+failed before implementation and pass afterward. The focused suite passes 326 tests;
+Ruff passes. A disposable bound v3 history GET returned HTTP 401 access-denied.
+No calls, messages or field updates were submitted; authenticated acceptance remains open.

@@ -225,9 +225,9 @@ _ROWS: list[tuple[str, str, str, str]] = [
     ),
     (
         "callpage",
-        "aggregator",
-        "https://composio.dev/toolkits/callpage",
-        "Composio-generated.",
+        "official",
+        "https://callpage.github.io/documentation-rest/",
+        "Store the dashboard API key; sent directly in Authorization. GET /v3/external/calls/history reads history. Include the documented version in each path; field updates use PATCH /v1/external/calls/CALL_ID/fields/FIELD_ID with JSON value. Inspect hasError and data. Token/widget scopes apply. Calling and messaging endpoints can contact people.",
     ),
     (
         "callrail",
