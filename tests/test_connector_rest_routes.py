@@ -3036,3 +3036,17 @@ def test_lead_identity_check_documented_headers_and_payload(tmp_path):
     assert req.get_header("Authorization") is None
     assert req.get_header("Content-type") == "application/json"
     assert json.loads(req.data) == body
+
+
+def test_adhook_documented_notification_read(tmp_path):
+    paths = HarnessPaths(home=tmp_path)
+    record = Connectors(paths).add("adhook", "Adhook", secret="fixture-jwt")
+    bound = tools_for_bot(paths, "atlas", record_ids={record["id"]})
+    with patch("connectors.generic._open", return_value=_response({"count": 0})) as send:
+        result = bound["adhook_get"][1]({"path": "/v1/notifications/count"})
+    assert "HTTP 200" in result
+    req = send.call_args.args[0]
+    assert req.full_url == "https://app.adhook.io/api/v1/notifications/count"
+    assert req.get_header("Authorization") == "Bearer fixture-jwt"
+    assert req.get_header("Adhooktoken") is None
+    assert req.data is None

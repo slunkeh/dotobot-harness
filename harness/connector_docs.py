@@ -63,7 +63,12 @@ _ROWS: list[tuple[str, str, str, str]] = [
         "https://docs.add-to-calendar-pro.com/api/introduction",
         "Organization API key in Authorization without a prefix. Read/write scopes and expiry apply. GET /event/all supports page; POST /event takes event_group (or new_event_group_name) and dates. Creation publishes immediately; updates may consume event credits. PATCH /event/PROKEY updates fields. Binary ICS downloads use a separate host.",
     ),
-    ("adhook", "none", "", "No public docs surfaced."),
+    (
+        "adhook",
+        "official",
+        "https://app.adhook.io/api-doc/",
+        "Store a current Adhook JWT access token, sent as Bearer. The provider web client supplies the /api base prefix omitted by its OpenAPI schema. Include /v1 or /v2 in paths, e.g. GET /v1/notifications/count. JSON bodies are supported. Shared-view adhookToken credentials are a separate mechanism and are not supported by this route. Token creation/refresh and authenticated account acceptance remain open.",
+    ),
     (
         "adrapid",
         "official",

@@ -118,6 +118,7 @@ STUBS: list[dict] = [
     },
     {
         "type": "adhook",
+        "api_base": "https://app.adhook.io/api",
         "name": "AdHook",
         "auth": "api_key",
         "fields": [],

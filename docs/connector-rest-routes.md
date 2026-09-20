@@ -3,11 +3,11 @@
 Scope: implement the 144 catalogue connectors identified with missing REST hosts.
 This is an implementation ledger, not a claim of live-account verification.
 
-One hundred and thirty-one routes now have offline request-contract coverage through the real connector
+One hundred and thirty-two routes now have offline request-contract coverage through the real connector
 registry and credential store. Tests assert the outbound origin, version prefix,
 credential header, query and JSON body. Credentials are never followed through
 HTTP redirects. Production authenticated reads and writes remain unverified for these
-one hundred and thirty-one routes. The remaining 13 connectors still need provider research and code.
+one hundred and thirty-two routes. The remaining 12 connectors still need provider research and code.
 
 ## Implemented routes
 
@@ -165,7 +165,7 @@ Live evidence for the third batch:
 | `acumbamail` | Implemented; request contracts pass; authenticated account verification pending |
 | `acymailing` | Implemented customer-host REST route; request contracts pass; real installation and license key needed for live acceptance |
 | `add_to_calendar_pro` | Implemented REST route; event read/create contracts pass; live invalid key rejected; authenticated acceptance open |
-| `adhook` | Pending: official OpenAPI found; server prefix and credential format are omitted; live invalid-credential responses are inconclusive |
+| `adhook` | Implemented: provider web client confirms /api prefix and JWT Bearer; invalid-token notifications read returns 401. Account acceptance open. |
 | `adrapid` | Implemented; request contracts pass; invalid token rejected live, account acceptance pending |
 | `adroll` | Implemented PAT route with scalar multipart writes; tests pass; invalid application key rejected live; account acceptance and binary uploads pending |
 | `adtraction` | Implemented; request contracts pass; authenticated account verification pending |
@@ -1240,3 +1240,10 @@ The [provider support page](https://kyvio.com/support) links https://support.kvs
 The provider homepage loaded in the browser despite command-line HTTP 403 and linked [official documentation](https://leadidentitycheck.com/documentation/). It explicitly specifies POST https://leadidentitycheck-node.vercel.app/main/lic/v1, X-LIC-KEY and Filterkey headers, and required Firstname, Lastname and Phone JSON fields. Added a two-secret-header route and a bound request contract. HTTP 200 can contain Master Response Fail and must not be interpreted as a matching identity. No public read endpoint is documented.
 
 A bound request from a disposable local secret store using invalid credentials and synthetic fixture details returned HTTP 400 Invalid filter key. No real personal data was submitted. Valid account acceptance and successful verification remain open. Focused suite: 497 passed; Ruff clean. Configured hosts: 131 of 144; 13 pending. The full suite started before this change and is tracked separately as the 130-host checkpoint.
+
+
+## Adhook host prefix and authentication resolved
+
+The [official OpenAPI reference](https://app.adhook.io/api-doc/) documents /v1/notifications/count but omits the server prefix and Authorization format. The provider public web client at https://app.adhook.io/next/ supplies both: its published main-KRQK6F7G.js initializes notifications at /api/v1/notifications and adds Authorization: Bearer using the JWT access token. The optional adhookToken header belongs to a separate shared-view mechanism; this route does not support it. No user session or private browser storage was accessed.
+
+Added https://app.adhook.io/api with Bearer authentication and a bound notification-read contract. Direct invalid-token GET /api/v1/notifications/count returned HTTP 401 Unauthorized. Valid account acceptance and token creation/refresh remain open. Updated the missing-host regression to explicitly remove host metadata in its fixture, so it continues testing refusal rather than depending on Adhook remaining unfinished. Focused suite: 498 passed; Ruff clean. Configured hosts: 132 of 144; 12 pending.

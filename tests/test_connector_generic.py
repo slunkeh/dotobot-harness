@@ -81,8 +81,14 @@ def test_missing_secret_names_request_secret(paths):
     assert "connector_" in out
 
 
-def test_unknown_stub_without_a_host_does_not_guess(paths):
+def test_unknown_stub_without_a_host_does_not_guess(paths, monkeypatch):
+    from harness.connectors import _CATALOG_TYPES
+
     ctx = _ctx(paths, type_="adhook", secret="k")
+    metadata = dict(_CATALOG_TYPES["adhook"])
+    metadata.pop("api_base", None)
+    metadata.pop("api_base_template", None)
+    monkeypatch.setitem(_CATALOG_TYPES, "adhook", metadata)
     out = generic._get(ctx, {"path": "/x"})
     assert "no REST host" in out
 
