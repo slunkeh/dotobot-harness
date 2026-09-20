@@ -294,7 +294,7 @@ Live evidence for the third batch:
 | `lawmatics` | Implemented; request-contract tests pass; production account verification pending |
 | `lead_identity_check` | Pending provider research and implementation |
 | `leaddyno` | Implemented; request contracts pass; authenticated account verification pending |
-| `leadoku` | Pending provider research and implementation |
+| `leadoku` | Pending: Growth-X identity suggested by integrations; help.growth-x.com fails browser DNS; provider contract unverified |
 | `leadpops` | Pending provider research and implementation |
 | `linkedin` | Implemented official API; profile and versioned post contracts pass; live invalid token rejected; authenticated acceptance open |
 | `microsoft_excel` | Implemented stored-token route; request contracts pass; OAuth lifecycle and live account verification pending |
@@ -1188,3 +1188,8 @@ A [provider-team answer](https://appsumo.com/products/kingsumo/questions/do-you-
 ## Inksprout documentation link verification
 
 The catalogue's https://inksprout.co/docs/index.html displays Cannot GET /docs/index.html in the browser. The [current provider homepage](https://inksprout.co/) presents a video editor with bulk CSV and Blueprint workflows, but the inspected page supplies no REST host or authentication contract. Replaced the broken documentation pointer with the current product homepage and a precise limitation. This does not establish that no API exists; account documentation is still needed. No video, account or publishing action was created.
+
+
+## Leadoku provider documentation access
+
+Integration listings associate Leadoku with Growth-X, but this does not establish the current provider REST contract. Opening https://help.growth-x.com/ in the browser fails with ERR_NAME_NOT_RESOLVED. No credentials were transmitted. A live provider reference or account documentation remains necessary; no host was substituted from similarly named lead products.
