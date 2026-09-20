@@ -463,6 +463,15 @@ def _http(
             return "error: LinkedIn api_version must be YYYYMM"
         hdrs["LinkedIn-Version"] = version
         hdrs["X-Restli-Protocol-Version"] = "2.0.0"
+    if ctx.record.get("type") == "google_ads":
+        config = ctx.record.get("config") or {}
+        for field in ("login_customer_id", "linked_customer_id"):
+            value = config.get(field)
+            if value is not None:
+                value = str(value)
+                if not re.fullmatch(r"[0-9]+", value):
+                    return f"error: Google Ads {field} must contain digits only"
+                hdrs[field.replace("_", "-")] = value
     if ctx.record.get("type") == "google_ad_manager":
         project = (ctx.record.get("config") or {}).get("quota_project")
         if project is not None:

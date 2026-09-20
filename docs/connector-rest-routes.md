@@ -3,11 +3,11 @@
 Scope: implement the 144 catalogue connectors identified with missing REST hosts.
 This is an implementation ledger, not a claim of live-account verification.
 
-One hundred and thirteen routes now have offline request-contract coverage through the real connector
+One hundred and fourteen routes now have offline request-contract coverage through the real connector
 registry and credential store. Tests assert the outbound origin, version prefix,
 credential header, query and JSON body. Credentials are never followed through
 HTTP redirects. Production authenticated reads and writes remain unverified for these
-one hundred and thirteen routes. The remaining 31 connectors still need provider research and code.
+one hundred and fourteen routes. The remaining 30 connectors still need provider research and code.
 
 ## Implemented routes
 
@@ -256,7 +256,7 @@ Live evidence for the third batch:
 | `gobio_link` | Pending provider research and implementation |
 | `goodbits` | Pending: website, API and support hosts fail DNS resolution; official API contract unavailable |
 | `google_ad_manager` | Implemented REST route; authenticated account acceptance pending |
-| `google_ads` | Pending provider research and implementation |
+| `google_ads` | Implemented REST route; authenticated account acceptance pending |
 | `google_analytics` | Implemented; Data API request contracts pass; invalid token rejected live; authenticated account acceptance pending |
 | `google_calendar` | Implemented stored-token route; request contracts pass; OAuth lifecycle and live account verification pending |
 | `google_drive` | Implemented stored-token route; request contracts pass; OAuth lifecycle and live account verification pending |
@@ -1033,3 +1033,12 @@ The [official getting-started guide](https://developers.google.com/ad-manager/ap
 Bound request contracts cover GET /networks and [POST /networks/NETWORK/reports/REPORT:run](https://developers.google.com/ad-manager/api/beta/reference/rest/v1/networks.reports/run) with an empty JSON object, including absent, valid and invalid project headers. Report execution is asynchronous; follow the returned operation and fetch result rows after completion. No live report was run.
 
 A disposable-store GET /networks with an invalid token returned HTTP 401 UNAUTHENTICATED. Real account authorization and report acceptance remain open. Focused suite: 460 passed; Ruff clean.
+
+
+## Google Ads REST API
+
+The [official authorization reference](https://developers.google.com/google-ads/api/rest/auth) requires OAuth Bearer and developer-token headers. Added googleads.googleapis.com using a stored JSON array [access token, developer token]. OAuth scope is https://www.googleapis.com/auth/adwords. Configure login_customer_id when acting through a manager and linked_customer_id for partner access; both accept digits only. API version remains in caller paths, with v25 used by the current vendor examples. Token issuance, refresh and developer-token approval remain external setup requirements.
+
+Contracts cover GET /v25/customers:listAccessibleCustomers and [POST /v25/customers/ID/googleAds:search](https://developers.google.com/google-ads/api/rest/common/search) with a limited GAQL query, including both customer headers and invalid-header rejection. Keep queries small because the generic response limit can truncate large reports; pagination is caller-managed and streaming is not incremental.
+
+A disposable-store account-list read with invalid credentials returned HTTP 401 UNAUTHENTICATED. This does not prove developer-token approval or account permissions. No ads, budgets or campaign mutations were submitted. Real account acceptance remains open. Focused suite: 468 passed; Ruff clean.

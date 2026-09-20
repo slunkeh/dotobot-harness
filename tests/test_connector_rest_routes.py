@@ -2622,3 +2622,46 @@ def test_ad_manager_report_and_quota_project(tmp_path, project):
     assert req.get_header("X-goog-user-project") == project
     assert req.get_header("Authorization") == "Bearer fixture-key"
     assert json.loads(req.data) == {}
+
+
+@pytest.mark.parametrize(
+    "config",
+    [
+        {},
+        {"login_customer_id": "1234567890", "linked_customer_id": "9876543210"},
+        {"login_customer_id": "123-456-7890"},
+        {"linked_customer_id": "bad\nheader"},
+    ],
+)
+@pytest.mark.parametrize("method", ["GET", "POST"])
+def test_google_ads_credentials_and_customer_headers(tmp_path, config, method):
+    paths = HarnessPaths(home=tmp_path)
+    record = Connectors(paths).add(
+        "google_ads",
+        "Ads",
+        secret=json.dumps(["fixture-token", "fixture-developer"]),
+        config=config,
+    )
+    bound = tools_for_bot(paths, "atlas", record_ids={record["id"]})
+    path = (
+        "/v25/customers:listAccessibleCustomers"
+        if method == "GET"
+        else "/v25/customers/1234567890/googleAds:search"
+    )
+    body = {"query": "SELECT campaign.id FROM campaign LIMIT 1"}
+    args = {"path": path} if method == "GET" else {"path": path, "method": method, "body": body}
+    with patch("connectors.generic._open", return_value=_response({})) as send:
+        result = bound["google_ads_get" if method == "GET" else "google_ads_request"][1](args)
+    if any(not v.isdigit() for v in config.values()):
+        assert "digits only" in result
+        send.assert_not_called()
+        return
+    assert "HTTP 200" in result
+    req = send.call_args.args[0]
+    assert req.full_url == "https://googleads.googleapis.com" + path
+    assert req.get_header("Authorization") == "Bearer fixture-token"
+    assert req.get_header("Developer-token") == "fixture-developer"
+    assert req.get_header("Login-customer-id") == config.get("login_customer_id")
+    assert req.get_header("Linked-customer-id") == config.get("linked_customer_id")
+    if method == "POST":
+        assert json.loads(req.data) == body

@@ -1158,6 +1158,10 @@ STUBS: list[dict] = [
     },
     {
         "type": "google_ads",
+        "api_base": "https://googleads.googleapis.com",
+        "auth_style": "header_pair",
+        "auth_headers": ["Authorization", "developer-token"],
+        "auth_header_prefixes": ["Bearer ", ""],
         "name": "Google Ads",
         "auth": "api_key",
         "fields": [],

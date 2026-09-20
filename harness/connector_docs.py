@@ -730,7 +730,7 @@ _ROWS: list[tuple[str, str, str, str]] = [
         "google_ads",
         "official",
         "https://developers.google.com/google-ads/api/docs/developer-toolkit/mcp-server",
-        "Official. Announced Oct 2025.",
+        "Official MCP. REST credentials are a stored JSON array [OAuth access token, developer token]. Include the API version in paths. Optional config login_customer_id and linked_customer_id are digit-only IDs. Token creation and refresh are manual.",
     ),
     (
         "google_analytics",
