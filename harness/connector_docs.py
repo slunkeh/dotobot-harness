@@ -114,9 +114,9 @@ _ROWS: list[tuple[str, str, str, str]] = [
     ),
     (
         "apexverify",
-        "aggregator",
-        "https://composio.dev/toolkits/apexverify",
-        "Composio-hosted.",
+        "official",
+        "https://documentation.apexverify.com/api-reference/api-authentication",
+        "Store an ApexVerify API key, sent in X-Api-Key. GET /account/credits reads the balance. POST /unit accepts JSON type (email or phone), target_country and unit. Verification consumes credits; review use_global_cache before submitting data. Multipart batch uploads and binary exports are not supported by the generic JSON tool.",
     ),
     (
         "appsflyer",

@@ -15,6 +15,14 @@ from harness.paths import HarnessPaths
 # Literal expected requests intentionally independent of catalogue metadata.
 CASES = [
     (
+        "apexverify",
+        {},
+        "/account/credits",
+        "https://api.apexverify.com/v1/account/credits",
+        "X-api-key",
+        "fixture-key",
+    ),
+    (
         "emaillistverify",
         {},
         "/credits",
@@ -595,6 +603,17 @@ def test_4dem_malformed_auth_response_is_not_forwarded(tmp_path):
 @pytest.mark.parametrize(
     "type_,path,url,body",
     [
+        (
+            "apexverify",
+            "/unit",
+            "https://api.apexverify.com/v1/unit",
+            {
+                "type": "email",
+                "target_country": "GB",
+                "unit": "fixture@example.com",
+                "use_global_cache": False,
+            },
+        ),
         (
             "emaillistverify",
             "/emailJobs",
