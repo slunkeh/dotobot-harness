@@ -162,6 +162,7 @@ Live evidence for the third batch:
 | `adtraction` | Implemented; request contracts pass; authenticated account verification pending |
 | `aimtell` | Pending provider research and implementation |
 | `airship` | Pending provider research and implementation |
+| `apexverify` | Implemented; request contracts pass; invalid key rejected live, authenticated account acceptance pending |
 | `appsflyer` | Pending provider research and implementation |
 | `arpoone` | Pending provider research and implementation |
 | `asters` | Pending provider research and implementation |
@@ -219,6 +220,7 @@ Live evidence for the third batch:
 | `emailchef` | Pending provider research and implementation |
 | `emaillistverify` | Implemented; request contracts pass; authenticated account verification pending |
 | `emailoctopus` | Implemented; request-contract tests pass; production account verification pending |
+| `emailverify_io` | Implemented; request contracts pass; invalid key rejected live, authenticated account acceptance pending |
 | `emelia` | Pending provider research and implementation |
 | `encharge` | Pending provider research and implementation |
 | `endorsal` | Pending provider research and implementation |
@@ -684,3 +686,18 @@ and Basic authentication with a literal x password. The new test failed before
 implementation and passes afterward. The focused suite passes 314 tests; Ruff passes.
 A disposable bound v3 transaction GET returned HTTP 401 Invalid API Key present.
 No account mutations were attempted; authenticated acceptance remains open.
+
+## Midpoint completeness and full-suite check
+
+At commit 4e999d9, the catalogue contains 72 implemented routes and 72 pending
+routes from the original 144. The full status table was missing ApexVerify and
+EmailVerify.io rows even though their implementation sections existed; both rows
+are restored. An exact set comparison confirms all 144 unique entries match the
+catalogue and their implemented/pending classifications agree with route metadata.
+
+Full pytest run with a short temporary directory: 3450 passed, 2 skipped, 2 failed
+(3454 collected). The failures are test_listener_user_data_dirs_reads_listening_cmdline
+and test_run_session_raises_when_display_stays_bound. Their assertion failures and
+missing /workspace diagnostic match the earlier unchanged c33bb96 baseline run.
+No additional failures appeared. This is code-level validation, not authenticated
+provider acceptance. No runtime source changed during this checkpoint.
