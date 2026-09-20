@@ -257,6 +257,7 @@ STUBS: list[dict] = [
     },
     {
         "type": "automizy",
+        "api_base": "https://api.automizy.com",
         "name": "Automizy",
         "auth": "api_key",
         "fields": [],

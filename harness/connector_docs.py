@@ -156,9 +156,9 @@ _ROWS: list[tuple[str, str, str, str]] = [
     ),
     (
         "automizy",
-        "none",
-        "https://automizy.com/",
-        "The provider website advertises a REST API, but its developer reference is currently unavailable. Supported API host and authentication remain unverified.",
+        "official",
+        "https://github.com/Automizy/Automizy-Js-Api",
+        "Uses the published vendor SDK host api.automizy.com and Bearer token authentication. Include /v2 in paths. GET /v2/smart-lists/ID/contacts reads list contacts; POST that path takes JSON contacts containing IDs or emails. Contact changes may trigger automations. This is the legacy SDK contract: current account acceptance is unverified, and the separate gateway.automizy.com host times out. Token refresh is not implemented.",
     ),
     (
         "aweber",

@@ -3,11 +3,11 @@
 Scope: implement the 144 catalogue connectors identified with missing REST hosts.
 This is an implementation ledger, not a claim of live-account verification.
 
-One hundred and twenty-nine routes now have offline request-contract coverage through the real connector
+One hundred and thirty routes now have offline request-contract coverage through the real connector
 registry and credential store. Tests assert the outbound origin, version prefix,
 credential header, query and JSON body. Credentials are never followed through
 HTTP redirects. Production authenticated reads and writes remain unverified for these
-one hundred and twenty-nine routes. The remaining 15 connectors still need provider research and code.
+one hundred and thirty routes. The remaining 14 connectors still need provider research and code.
 
 ## Implemented routes
 
@@ -177,7 +177,7 @@ Live evidence for the third batch:
 | `asters` | Implemented documented REST route; request contracts pass; live server names a different auth header; authenticated acceptance unresolved |
 | `attentive` | Route and offline request tests added; live verification pending |
 | `autoklose` | Implemented REST route; request contracts pass; live invalid key explicitly rejected; authenticated acceptance open |
-| `automizy` | Pending: provider advertises REST API but developer reference times out; former GetResponse acquisition claim unverified |
+| `automizy` | Implemented vendor SDK host and Bearer/JSON contracts; legacy host returns generic 403, current account acceptance unverified. |
 | `beamer` | Implemented; request-contract tests pass; production account verification pending |
 | `benchmark_email` | Implemented; request contracts pass; authenticated account verification pending |
 | `bigmailer` | Route and offline request tests added; live verification pending |
@@ -1212,3 +1212,10 @@ This run covers the code through ed7e44f; subsequent changes during the run only
 The accessible [official help centre](https://hyperise.customerly.help/en/collections/4317-api) resolves the earlier support-domain TLS blocker. Its user authentication and image template references specify https://app.hyperise.io/api/v1/regular with api_token in the query. The short-links reference documents POST form parameters, including nested query_params. Added secret-store read and form-write request contracts. Custom link domain setup is required for short links.
 
 A bound GET /users/current from a disposable local secret store with an invalid token returned HTTP 401 Unauthenticated. No image or short link was created. Focused suite: 494 passed; Ruff clean. Host count: 129 of 144, with 15 pending. Authenticated account and write acceptance remain open.
+
+
+## Automizy vendor SDK contract recovered
+
+The provider-owned [JavaScript SDK](https://github.com/Automizy/Automizy-Js-Api) supplies primary evidence despite the unavailable developer site: src/core.js defaults to https://api.automizy.com; src/apis/v2/smartLists.js uses Bearer tokens and JSON writes. Added GET /v2/smart-lists/ID/contacts and POST the same path with contacts array request contracts. Contact writes were only tested against mocked transport; no contact was added.
+
+A direct invalid-token GET /v2/smart-lists returned generic HTTP 403 Forbidden. This establishes reachability, not token acceptance or current account compatibility. The separate gateway.automizy.com host referenced by integration documentation timed out after 15 seconds; it was not substituted for the SDK host. Current account acceptance and token refresh remain open. Focused suite: 496 passed; Ruff clean. Host count: 130 of 144; 14 pending.

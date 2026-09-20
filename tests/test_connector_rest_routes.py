@@ -2991,3 +2991,25 @@ def test_hyperise_query_token_and_form(tmp_path, method):
         assert req.get_header("Content-type") == "application/x-www-form-urlencoded"
     else:
         assert req.data is None
+
+
+@pytest.mark.parametrize("method", ["GET", "POST"])
+def test_automizy_vendor_sdk_contract(tmp_path, method):
+    paths = HarnessPaths(home=tmp_path)
+    record = Connectors(paths).add("automizy", "Automizy", secret="fixture-key")
+    bound = tools_for_bot(paths, "atlas", record_ids={record["id"]})
+    args = {"path": "/v2/smart-lists/123/contacts"}
+    body = {"contacts": ["fixture@example.com"]}
+    if method == "POST":
+        args.update(method=method, body=body)
+    with patch("connectors.generic._open", return_value=_response({})) as send:
+        result = bound["automizy_get" if method == "GET" else "automizy_request"][1](args)
+    assert "HTTP 200" in result
+    req = send.call_args.args[0]
+    assert req.full_url == "https://api.automizy.com/v2/smart-lists/123/contacts"
+    assert req.get_header("Authorization") == "Bearer fixture-key"
+    if method == "POST":
+        assert json.loads(req.data) == body
+        assert req.get_header("Content-type") == "application/json"
+    else:
+        assert req.data is None
