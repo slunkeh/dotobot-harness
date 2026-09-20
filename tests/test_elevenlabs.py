@@ -504,3 +504,31 @@ def test_elevenlabs_key_alone_does_not_make_auto_available(paths, upstream, monk
     assert voice.resolve_backend(paths) is None
     voice.set_voice_settings(paths, {"provider": "elevenlabs"})
     assert voice.voice_status(paths)["available"] is True
+
+
+@pytest.mark.parametrize("field", ["code", "status"])
+@pytest.mark.parametrize("code,expected", [
+    ("missing_permissions", "Enable Voices: Read"),
+    ("invalid_api_key", "API key rejected"),
+    ("quota_exceeded", "Quota exhausted"),
+    ("unrecognized", "Authentication failed"),
+])
+def test_connect_reports_safe_upstream_reason(paths, monkeypatch, field, code, expected):
+    def fail(req, **kwargs):
+        body = {"detail": {field: code, "message": "private-key secret-token"}}
+        raise urllib.error.HTTPError(req.full_url, 401, "private-key", {},
+                                     io.BytesIO(json.dumps(body).encode()))
+    monkeypatch.setattr(elevenlabs.urllib.request, "urlopen", fail)
+    with pytest.raises(voice.VoiceError, match=expected) as caught:
+        elevenlabs.connect(paths, "private-key")
+    assert "private-key" not in str(caught.value)
+    assert "secret-token" not in str(caught.value)
+    assert not elevenlabs.status(paths)["configured"]
+
+
+def test_unknown_failure_retains_http_status(paths, monkeypatch):
+    def fail(req, **kwargs):
+        raise urllib.error.HTTPError(req.full_url, 502, "secret", {}, io.BytesIO(b"secret"))
+    monkeypatch.setattr(elevenlabs.urllib.request, "urlopen", fail)
+    with pytest.raises(voice.VoiceError, match="HTTP 502"):
+        elevenlabs.connect(paths, "private-key")
