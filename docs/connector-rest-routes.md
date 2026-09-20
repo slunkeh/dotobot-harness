@@ -167,7 +167,7 @@ Live evidence for the third batch:
 | `add_to_calendar_pro` | Pending provider research and implementation |
 | `adhook` | Pending provider research and implementation |
 | `adrapid` | Implemented; request contracts pass; invalid token rejected live, account acceptance pending |
-| `adroll` | Pending provider research and implementation |
+| `adroll` | Pending implementation: official host and PAT/client-ID authentication verified; multipart write support needs implementation |
 | `adtraction` | Implemented; request contracts pass; authenticated account verification pending |
 | `aimtell` | Pending provider research and implementation |
 | `airship` | Implemented regional HTTP/OAuth routes; version/auth contracts pass; invalid tokens rejected live; account acceptance pending |
@@ -793,3 +793,9 @@ The bound North American channels probe returned HTTP 401 with Unauthorized and 
 Configure region as us or eu and auth_mode as bearer, basic or oauth; omitted values preserve us/bearer. Dashboard and Basic credentials use the regional HTTP host; OAuth access tokens use the documented regional OAuth host. Basic secrets contain appKey:appSecret or appKey:masterSecret. Token issuance/refresh is not implemented. Only the four official hosts can be selected; unknown modes or regions block transport.
 
 Nine additional tests cover six region/auth combinations and invalid configuration. Bound probes against the EU HTTP host and both OAuth hosts returned HTTP 401 for invalid tokens. All 348 focused tests and Ruff pass. The overall route count remains 82 with 62 pending. No audience was contacted.
+
+## AdRoll implementation research
+
+The [official getting-started guide](https://apidocs.nextroll.com/guides/get-started.html) confirms https://services.adroll.com. Personal access tokens use Authorization: Token TOKEN, together with the application client ID in the apikey URL query parameter on every method. The application ID must not move into POST/PUT/PATCH bodies. The documented first read is GET /api/v1/organization/get_advertisables.
+
+The [CRUD examples](https://apidocs.nextroll.com/crud-api/examples.html) use multipart form fields for writes, including POST /api/v1/advertisable/create; image creation includes file upload. This differs from the current generic JSON/urlencoded modes. Before marking this route implemented, add the supported request encoding and tests for the independent client-ID query, token header and body format. OAuth is also documented separately. No AdRoll API call or account mutation was made in this research pass; the route remains pending.
