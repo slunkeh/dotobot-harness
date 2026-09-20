@@ -1043,8 +1043,8 @@ _ROWS: list[tuple[str, str, str, str]] = [
     (
         "leadpops",
         "none",
-        "https://zapier.com/apps/leadpops-leads/integrations",
-        "Only classic Zapier integrations.",
+        "https://leadpops.com/enterprise-mortgage-marketing",
+        "The provider advertises API integrations and export, but the inspected public material does not publish a REST base, credential format or endpoint schema. Provider or account documentation is required before routing can be implemented.",
     ),
     (
         "linear",

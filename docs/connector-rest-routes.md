@@ -295,7 +295,7 @@ Live evidence for the third batch:
 | `lead_identity_check` | Implemented: official host, two secret headers and JSON verification request; invalid filter returns 400. Account acceptance open. |
 | `leaddyno` | Implemented; request contracts pass; authenticated account verification pending |
 | `leadoku` | Pending: Growth-X identity suggested by integrations; help.growth-x.com fails browser DNS; provider contract unverified |
-| `leadpops` | Pending provider research and implementation |
+| `leadpops` | Pending: official enterprise page advertises API integration/export but omits host, authentication and endpoint schema; provider documentation required |
 | `linkedin` | Implemented official API; profile and versioned post contracts pass; live invalid token rejected; authenticated acceptance open |
 | `microsoft_excel` | Implemented stored-token route; request contracts pass; OAuth lifecycle and live account verification pending |
 | `microsoft_outlook` | Implemented stored-token route; request contracts pass; OAuth lifecycle and live account verification pending |
@@ -1252,3 +1252,25 @@ Added https://app.adhook.io/api with Bearer authentication and a bound notificat
 ## Full-suite checkpoint at 130 configured hosts
 
 The full suite started at 6f57136 completed with **3632 passed, 2 skipped, 2 failed, 1 warning in 307.14 seconds**. Failure names and assertions match the unchanged baseline: the CDP listener/profile assertion and machine-supervisor missing-/workspace shutdown assertion. This is not a fully green suite. The run collected the 130-host tests before the Lead Identity Check and Adhook additions; those later changes are covered by the 498-test focused run, not claimed as part of this full-suite checkpoint.
+
+
+## Remaining 12 implementation gates
+
+All 144 original entries remain in scope. The current code configures 132 hosts; the following 12 still lack sufficient provider evidence. They are not counted as working connections.
+
+| Provider | Evidence needed to implement the route |
+|---|---|
+| Exact Mails | Account API documentation; current public application backend differs from older integration examples. |
+| GetSwift | Reachable delivery API documentation or a current provider-supported host/authentication reference. |
+| Goodbits | Current provider API documentation; existing website/API/support domains do not resolve in this environment. |
+| GoZen Growth | Developer documentation supplied through provider support, specifying host and credential header. |
+| HeroBot | Account API documentation for the current herobot.ai product. |
+| Impression | Correct product identity and its API documentation; current catalogue points to a marketing agency. |
+| IndieFunnels | Complete trial signup handoff, then confirm account API settings and customer domain. |
+| Inksprout | Current account API contract after the old documentation URL stopped working. |
+| KingSumo | API documentation inside an entitled account; public provider answer places it in Lifetime settings. |
+| Kyvio | Current Kyvio API documentation; official support portal is broken and Mailvio is a separate product. |
+| Leadoku | Current product identity and provider API contract; Growth-X help host is unavailable. |
+| Leadpops | Provider API contract. The official enterprise page advertises API integration/export but specifies no host, authentication or endpoint schema. |
+
+No new account, paid plan, support message or production deployment was performed during this audit. The goal remains incomplete until all 144 routes have supported implementations and appropriate verification.
