@@ -15,6 +15,14 @@ from harness.paths import HarnessPaths
 # Literal expected requests intentionally independent of catalogue metadata.
 CASES = [
     (
+        "freshmarketer",
+        {"subdomain": "fixture"},
+        "/contacts",
+        "https://fixture.freshmarketer.com/mas/api/v1/contacts",
+        "Fm-token",
+        "fixture-key",
+    ),
+    (
         "appsflyer",
         {},
         "/api/mng/apps",
@@ -1748,4 +1756,33 @@ def test_feedblitz_rejects_wrong_body(tmp_path, body):
         assert "error: XML body" in bound["feedblitz_request"][1](
             {"path": "/user", "method": "POST", "body": body}
         )
+    send.assert_not_called()
+
+
+def test_freshmarketer_subscription_type_json(tmp_path):
+    paths = HarnessPaths(home=tmp_path)
+    record = Connectors(paths).add(
+        "freshmarketer", "Freshmarketer", config={"subdomain": "fixture"}, secret="fixture-key"
+    )
+    bound = tools_for_bot(paths, "atlas", record_ids={record["id"]})
+    body = {"name": "Fixture type", "description": "Fixture description"}
+    with patch("connectors.generic._open", return_value=_response({})) as send:
+        assert "HTTP 200" in bound["freshmarketer_request"][1](
+            {"method": "POST", "path": "/email-types", "body": body}
+        )
+    req = send.call_args.args[0]
+    assert req.full_url == "https://fixture.freshmarketer.com/mas/api/v1/email-types"
+    assert req.get_header("Fm-token") == "fixture-key"
+    assert json.loads(req.data) == body
+
+
+@pytest.mark.parametrize("subdomain", ["", "https://example.com", "x/evil", "x?evil", "x@evil"])
+def test_freshmarketer_invalid_host(tmp_path, subdomain):
+    paths = HarnessPaths(home=tmp_path)
+    record = Connectors(paths).add(
+        "freshmarketer", "Freshmarketer", config={"subdomain": subdomain}, secret="fixture-key"
+    )
+    bound = tools_for_bot(paths, "atlas", record_ids={record["id"]})
+    with patch("connectors.generic._open") as send:
+        assert "error:" in bound["freshmarketer_get"][1]({"path": "/contacts"})
     send.assert_not_called()

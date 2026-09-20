@@ -3,11 +3,11 @@
 Scope: implement the 144 catalogue connectors identified with missing REST hosts.
 This is an implementation ledger, not a claim of live-account verification.
 
-Eighty-seven routes now have offline request-contract coverage through the real connector
+Eighty-eight routes now have offline request-contract coverage through the real connector
 registry and credential store. Tests assert the outbound origin, version prefix,
 credential header, query and JSON body. Credentials are never followed through
 HTTP redirects. Production authenticated reads and writes remain unverified for these
-eighty-seven routes. The remaining 57 connectors still need provider research and code.
+eighty-eight routes. The remaining 56 connectors still need provider research and code.
 
 ## Implemented routes
 
@@ -245,7 +245,7 @@ Live evidence for the third batch:
 | `flexmail` | Pending provider research and implementation |
 | `flippingbook` | Implemented Online API; request contracts pass; invalid key rejected live, account acceptance pending |
 | `fomo` | Route and offline request tests added; live verification pending |
-| `freshmarketer` | Pending provider research and implementation |
+| `freshmarketer` | Implemented standalone account-subdomain route; request contracts pass; real host/key needed for live acceptance |
 | `funnelcockpit` | Implemented; request contracts pass; invalid-key request rejected live, account acceptance pending |
 | `getemails` | Pending provider research and implementation |
 | `getresponse` | Route and offline request tests added; live verification pending |
@@ -833,3 +833,9 @@ The [official developer center](https://developers.endorsal.io/) confirms proper
 The [app-list reference](https://dev.appsflyer.com/hc/reference/app-list-ad-nets-api-get) specifies hq1.appsflyer.com and API V2 Bearer authentication. Added bound contracts for the app list and [click-signing test](https://dev.appsflyer.com/hc/reference/click-signing-test-post) JSON request. Paths retain the service/version prefix. App lists require pagination; access depends on account permissions. Other service hosts and binary export workflows remain outside this route.
 
 A disposable-store GET /api/mng/apps?limit=1 with an invalid token returned HTTP 401 Authentication error. No signing test or account mutation was submitted. All 364 focused tests and Ruff pass. There are 87 routes and 57 pending; the midpoint full suite predates this addition.
+
+## Freshmarketer standalone API
+
+The [official API reference](https://developer.freshmarketer.com/) documents https://SUBDOMAIN.freshmarketer.com/mas/api/v1 and the fm-token header. Added account subdomain configuration, contacts transport coverage and JSON subscription-type creation coverage. Five invalid host cases block transport. This route covers the documented standalone product, not separate Freshworks CRM Suite hosts.
+
+No real account subdomain/key is available for a live acceptance check; no contact or subscription data was changed. All 371 focused tests and Ruff pass. There are 88 routes and 56 pending; the midpoint full suite predates this addition.

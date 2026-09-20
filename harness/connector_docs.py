@@ -619,9 +619,9 @@ _ROWS: list[tuple[str, str, str, str]] = [
     ),
     (
         "freshmarketer",
-        "partial",
-        "https://developers.freshworks.com/docs/agentic-dev-tools/mcp-server/",
-        "Freshworks MCP gateway covers Freshmarketer.",
+        "official",
+        "https://developer.freshmarketer.com/",
+        "Configure the subdomain from your Freshmarketer account hostname. Store Settings > API Settings key; sent in fm-token. This documented standalone Freshmarketer API uses /mas/api/v1; paths omit that prefix. GET /contacts lists contacts. POST /email-types takes JSON name and description; PATCH /email-types/ID updates it. Freshworks CRM Suite hosts and authentication are separate and are not routed here. User roles limit access; subscription and campaign operations can contact people.",
     ),
     (
         "front",
