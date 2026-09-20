@@ -867,9 +867,9 @@ _ROWS: list[tuple[str, str, str, str]] = [
     ),
     (
         "hyperise",
-        "aggregator",
-        "https://composio.dev/toolkits/hyperise",
-        "No dedicated vendor server.",
+        "official",
+        "https://hyperise.customerly.help/en/collections/4317-api",
+        "Store the Settings API token. Dotobot inserts api_token into the query; never pass it in tool arguments. GET /users/current verifies the account; GET /image-templates lists templates. POST /short-links uses form fields image_hash, url, title, desc and nested query_params. A custom link domain is required. Paths are relative to /api/v1/regular. Valid account and write acceptance remain unverified.",
     ),
     (
         "icontact",

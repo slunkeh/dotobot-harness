@@ -1356,6 +1356,10 @@ STUBS: list[dict] = [
     },
     {
         "type": "hyperise",
+        "api_base": "https://app.hyperise.io/api/v1/regular",
+        "auth_style": "query",
+        "auth_query": "api_token",
+        "body_encoding": "form",
         "name": "Hyperise",
         "auth": "api_key",
         "fields": [],

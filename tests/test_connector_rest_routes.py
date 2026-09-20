@@ -2949,3 +2949,45 @@ def test_content_snippet_mapping_read(tmp_path):
     assert req.full_url == "https://app.contentsnip.com/api/mappings"
     assert req.get_header("X-api-key") == "fixture-key"
     assert req.get_header("Authorization") is None
+
+
+@pytest.mark.parametrize("method", ["GET", "POST"])
+def test_hyperise_query_token_and_form(tmp_path, method):
+    from urllib.parse import parse_qs, urlsplit
+
+    paths = HarnessPaths(home=tmp_path)
+    record = Connectors(paths).add("hyperise", "Hyperise", secret="key&= +?")
+    bound = tools_for_bot(paths, "atlas", record_ids={record["id"]})
+    path = "/users/current" if method == "GET" else "/short-links"
+    args = {"path": path}
+    if method == "POST":
+        args.update(
+            method=method,
+            body={
+                "image_hash": "fixture",
+                "url": "https://example.com",
+                "title": "Fixture",
+                "desc": "Test",
+                "query_params": {"first_name": "Test"},
+            },
+        )
+    with patch("connectors.generic._open", return_value=_response({})) as send:
+        result = bound["hyperise_get" if method == "GET" else "hyperise_request"][1](args)
+    assert "HTTP 200" in result
+    req = send.call_args.args[0]
+    url = urlsplit(req.full_url)
+    assert url.netloc == "app.hyperise.io"
+    assert url.path == "/api/v1/regular" + path
+    assert parse_qs(url.query) == {"api_token": ["key&= +?"]}
+    assert req.get_header("Authorization") is None
+    if method == "POST":
+        assert parse_qs(req.data.decode()) == {
+            "image_hash": ["fixture"],
+            "url": ["https://example.com"],
+            "title": ["Fixture"],
+            "desc": ["Test"],
+            "query_params[first_name]": ["Test"],
+        }
+        assert req.get_header("Content-type") == "application/x-www-form-urlencoded"
+    else:
+        assert req.data is None

@@ -3,11 +3,11 @@
 Scope: implement the 144 catalogue connectors identified with missing REST hosts.
 This is an implementation ledger, not a claim of live-account verification.
 
-One hundred and twenty-eight routes now have offline request-contract coverage through the real connector
+One hundred and twenty-nine routes now have offline request-contract coverage through the real connector
 registry and credential store. Tests assert the outbound origin, version prefix,
 credential header, query and JSON body. Credentials are never followed through
 HTTP redirects. Production authenticated reads and writes remain unverified for these
-one hundred and twenty-eight routes. The remaining 16 connectors still need provider research and code.
+one hundred and twenty-nine routes. The remaining 15 connectors still need provider research and code.
 
 ## Implemented routes
 
@@ -271,7 +271,7 @@ Live evidence for the third batch:
 | `hippo_video` | Implemented stored authentication-token route; contracts pass; invalid token/email rejected live; account acceptance pending |
 | `humanitix` | Implemented; request contracts pass; authenticated account verification pending |
 | `hypeauditor` | Implemented; request contracts pass; invalid credentials rejected live, account acceptance pending |
-| `hyperise` | Pending: official API support pages currently fail TLS certificate validation; host and authentication still require verification |
+| `hyperise` | Implemented: official regular API, query token and form writes; invalid-token read returns 401. Valid account acceptance open. |
 | `icontact` | Implemented standard API; three-header and JSON-array contracts pass; live invalid username rejected; authenticated acceptance open |
 | `impression` | Pending product identity: catalogue names Impression Digital agency; no verified public REST contract |
 | `indiefunnels` | Pending: Website API reference recovered; confirm IndieFunnels account exposes this API and customer domain |
@@ -1205,3 +1205,10 @@ The [official GoZen Engage integration guide](https://docs.gozen.io/gozen-engage
 The complete local suite finished with **3628 passed, 2 skipped, 2 failed, 1 warning in 307.11 seconds**. Both failures match the previously recorded unchanged baseline by test name and assertion: test_listener_user_data_dirs_reads_listening_cmdline fails its listener/profile assertion; test_run_session_raises_when_display_stays_bound does not raise, with the missing /workspace environment diagnostic. These remain open local environment failures; this is not an entirely green suite or a claim of CI success.
 
 This run covers the code through ed7e44f; subsequent changes during the run only updated documentation metadata and the ledger. The 492 focused tests passed at the current 128-route implementation. Account-level acceptance and all 16 remaining hosts are still open.
+
+
+## Hyperise documentation recovered and route verified
+
+The accessible [official help centre](https://hyperise.customerly.help/en/collections/4317-api) resolves the earlier support-domain TLS blocker. Its user authentication and image template references specify https://app.hyperise.io/api/v1/regular with api_token in the query. The short-links reference documents POST form parameters, including nested query_params. Added secret-store read and form-write request contracts. Custom link domain setup is required for short links.
+
+A bound GET /users/current from a disposable local secret store with an invalid token returned HTTP 401 Unauthenticated. No image or short link was created. Focused suite: 494 passed; Ruff clean. Host count: 129 of 144, with 15 pending. Authenticated account and write acceptance remain open.
