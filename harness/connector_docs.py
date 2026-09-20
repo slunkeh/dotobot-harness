@@ -469,8 +469,10 @@ _ROWS: list[tuple[str, str, str, str]] = [
     (
         "dynamic_content_snippet",
         "none",
-        "",
-        "Likely a feature name, not a standalone vendor.",
+        "https://app.contentsnip.com",
+        "ContentSnip API: GET /mappings with x-api-key. The live endpoint distinguishes "
+        "missing and invalid keys. Public homepage returns 404; authenticated reads and "
+        "write payloads still need account documentation. Updating mappings changes website content.",
     ),
     (
         "dynapictures",

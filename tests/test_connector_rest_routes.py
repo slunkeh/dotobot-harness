@@ -2936,3 +2936,16 @@ def test_heysummit_events_contract(tmp_path, method):
     if method == "POST":
         assert req.get_header("Content-type") == "application/json"
         assert json.loads(req.data) == body
+
+
+def test_content_snippet_mapping_read(tmp_path):
+    paths = HarnessPaths(home=tmp_path)
+    record = Connectors(paths).add("dynamic_content_snippet", "ContentSnip", secret="fixture-key")
+    bound = tools_for_bot(paths, "atlas", record_ids={record["id"]})
+    with patch("connectors.generic._open", return_value=_response({})) as send:
+        result = bound["dynamic_content_snippet_get"][1]({"path": "/mappings"})
+    assert "HTTP 200" in result
+    req = send.call_args.args[0]
+    assert req.full_url == "https://app.contentsnip.com/api/mappings"
+    assert req.get_header("X-api-key") == "fixture-key"
+    assert req.get_header("Authorization") is None

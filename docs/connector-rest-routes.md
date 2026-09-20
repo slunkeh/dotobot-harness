@@ -3,11 +3,11 @@
 Scope: implement the 144 catalogue connectors identified with missing REST hosts.
 This is an implementation ledger, not a claim of live-account verification.
 
-One hundred and twenty-seven routes now have offline request-contract coverage through the real connector
+One hundred and twenty-eight routes now have offline request-contract coverage through the real connector
 registry and credential store. Tests assert the outbound origin, version prefix,
 credential header, query and JSON body. Credentials are never followed through
 HTTP redirects. Production authenticated reads and writes remain unverified for these
-one hundred and twenty-seven routes. The remaining 17 connectors still need provider research and code.
+one hundred and twenty-eight routes. The remaining 16 connectors still need provider research and code.
 
 ## Implemented routes
 
@@ -217,7 +217,7 @@ Live evidence for the third batch:
 | `dripcel` | Implemented MarTech REST route; request contracts pass; live invalid key rejected; authenticated acceptance open |
 | `dropcontact` | Route and offline request tests added; live verification pending |
 | `dux_soup` | Implemented HMAC REST route; URL/body signing and envelope tests pass; live invalid token rejected; authenticated acceptance open |
-| `dynamic_content_snippet` | Pending provider research and implementation |
+| `dynamic_content_snippet` | Host and x-api-key read route implemented; live missing/invalid-key distinction verified; write contract open |
 | `dynapictures` | Route and offline request tests added; live verification pending |
 | `egoi` | Route and offline request tests added; live verification pending |
 | `easypromos` | Implemented; request contracts pass; authenticated account verification pending |
@@ -1161,3 +1161,10 @@ The bound disposable-store GET /user with an invalid key returned HTTP 401: You 
 The provider homepage now links [the current API reference](https://app.heysummit.com/api/v2/docs/), which loaded in the browser. It specifies https://app.heysummit.com/api/v2 and Authorization: Token API_TOKEN. Tokens come from Event Setup > API, MCP & Webhooks. Added GET /events/ and JSON POST /events/ contracts with required title and optional planning_stage. Trailing slashes are preserved. This supersedes the earlier documentation-host blocker.
 
 A disposable-store GET /events/ with an invalid token returned HTTP 401 Invalid token. No event or attendee was created. Valid account access and write acceptance remain open. Focused suite: 491 passed; Ruff clean. Host count: 127 of 144, with 17 pending.
+
+
+## Dynamic Content Snippet / ContentSnip host
+
+The integration identity points to app.contentsnip.com. Direct read-only probes of https://app.contentsnip.com/api/mappings establish provider behavior: without a key, HTTP 401 API key is required; with an invalid x-api-key, HTTP 401 Invalid API key. Added this host/header and a bound read contract. The public application root redirects to a 404 page in the browser. Removed the unsupported catalogue assertion that this is merely a feature name.
+
+This is host/auth routing evidence, not successful account access. Public provider write documentation remains unavailable, so mapping update payloads and authenticated acceptance remain open. No mapping or website content was changed. Focused suite: 492 passed; Ruff clean. Host count: 128 of 144, with 16 pending.
