@@ -878,9 +878,9 @@ _ROWS: list[tuple[str, str, str, str]] = [
     ),
     (
         "kickofflabs",
-        "none",
-        "https://zapier.com/mcp/kickofflabs",
-        "Only Zapier generic wrapper.",
+        "official",
+        "https://support.kickofflabs.com/developer/common-api-behavior/",
+        "Store the campaign API Access key; uses Bearer with application/json. GET /campaigns lists campaigns. POST /CAMPAIGN_ID/ creates or updates a lead with email or phone_number. Bodies use JSON. Lead changes can trigger campaign automations. Rate limits and campaign permissions apply.",
     ),
     ("kingsumo", "none", "", "No public API docs site found."),
     (
