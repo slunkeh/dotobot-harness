@@ -165,7 +165,7 @@ Live evidence for the third batch:
 | `acumbamail` | Implemented; request contracts pass; authenticated account verification pending |
 | `acymailing` | Implemented customer-host REST route; request contracts pass; real installation and license key needed for live acceptance |
 | `add_to_calendar_pro` | Implemented REST route; event read/create contracts pass; live invalid key rejected; authenticated acceptance open |
-| `adhook` | Pending provider research and implementation |
+| `adhook` | Pending: official OpenAPI found; server prefix and credential format are omitted; live invalid-credential responses are inconclusive |
 | `adrapid` | Implemented; request contracts pass; invalid token rejected live, account acceptance pending |
 | `adroll` | Implemented PAT route with scalar multipart writes; tests pass; invalid application key rejected live; account acceptance and binary uploads pending |
 | `adtraction` | Implemented; request contracts pass; authenticated account verification pending |
@@ -946,3 +946,9 @@ Asters follow-up: documented x-api-key alone returned x-asters-key Key Not Found
 The [official API guide](https://support.dux-soup.com/article/227-the-dux-soup-api) specifies HMAC-SHA1 with Base64 output, signing GET URLs or request JSON bodies. Added signing after final outbound encoding, with automatic targeturl, millisecond timestamp and configured numeric userid for non-GET requests. Paths must contain that user ID. Caller-supplied envelope fields are rejected before transport. The fixed host permits documented remote-control/team paths; use each sub-API's actual path and method.
 
 Tests cover exact signed URL/body bytes for GET, POST, PUT and DELETE, plus six invalid envelope cases. These method cases test transport signing, not that every tested path supports every method. A disposable-store POST to the [documented empty conversation batch](https://support.dux-soup.com/article/603-messaging-activity-api), with user ID 0 and an invalid key, returned HTTP 403 invalid token. No LinkedIn action was requested. A Turbo/Cloud account and real key are needed for authenticated acceptance. Focused suite: 426 passed; Ruff clean.
+
+## Adhook API contract investigation
+
+The [official API reference](https://app.adhook.io/api-doc/) loads [OpenAPI](https://app.adhook.io/api/openapi.json). Its schema documents Authorization header parameters and JSON request bodies, including GET /v1/subtenants/read and POST /v1/subtenants. It supplies neither servers nor security schemes, and does not specify the Authorization value format. Some read operations also expose an adhookToken header.
+
+Read-only probes with an invalid credential returned: /v1/subtenants HTTP 404, /api/v1/subtenants HTTP 405, /api/v1/subtenants/read with a Bearer value HTTP 500, and /api/v1/posts with a Bearer value HTTP 400. These establish neither successful authentication nor a complete supported contract. Adhook remains pending rather than assigning a guessed authentication scheme. No account or social content was modified.
