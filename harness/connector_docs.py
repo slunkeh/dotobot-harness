@@ -728,7 +728,13 @@ _ROWS: list[tuple[str, str, str, str]] = [
         "https://myaccount.google.com/apppasswords",
         "Signs in with a Google app password over IMAP and SMTP — no Google Cloud project, OAuth client, or consent screen. 1. Turn on 2-Step Verification for the Google account (Google Account → Security). 2. Open the app passwords page (link below), enter a name such as Harness, and tap Create. 3. Paste the Gmail address and the 16-character password shown here. Bots search and read mail and attachments (PDF text extraction included), draft, and send. Each inbox is its own account: Add another account for a second address.",
     ),
-    ("gobio_link", "none", "https://gobio.link/", "No known MCP or public API docs."),
+    (
+        "gobio_link",
+        "official",
+        "https://gobio.link/api-documentation",
+        "Bearer API key from account API settings. GET /user; multipart POST /projects. "
+        "Scalar form fields supported; binary file uploads are not supported.",
+    ),
     ("goodbits", "none", "https://goodbits.io/", "No known MCP server."),
     (
         "google_ad_manager",

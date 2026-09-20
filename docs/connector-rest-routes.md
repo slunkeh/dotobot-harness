@@ -3,11 +3,11 @@
 Scope: implement the 144 catalogue connectors identified with missing REST hosts.
 This is an implementation ledger, not a claim of live-account verification.
 
-One hundred and twenty-five routes now have offline request-contract coverage through the real connector
+One hundred and twenty-six routes now have offline request-contract coverage through the real connector
 registry and credential store. Tests assert the outbound origin, version prefix,
 credential header, query and JSON body. Credentials are never followed through
 HTTP redirects. Production authenticated reads and writes remain unverified for these
-one hundred and twenty-five routes. The remaining 19 connectors still need provider research and code.
+one hundred and twenty-six routes. The remaining 18 connectors still need provider research and code.
 
 ## Implemented routes
 
@@ -253,7 +253,7 @@ Live evidence for the third batch:
 | `giantcampaign` | Implemented; request contracts pass; authenticated account verification pending |
 | `gist` | Implemented; request contracts pass; authenticated account verification pending |
 | `gitter` | Matrix route implemented from provider discovery; advertised host fails local DNS; live acceptance blocked |
-| `gobio_link` | Pending: public homepage reachable; API reference and login probes return 403; authentication unverified |
+| `gobio_link` | Implemented Bearer and multipart forms; browser docs verified; invalid-key GET returned 401 |
 | `goodbits` | Pending: website, API and support hosts fail DNS resolution; official API contract unavailable |
 | `google_ad_manager` | Implemented REST route; authenticated account acceptance pending |
 | `google_ads` | Implemented REST route; authenticated account acceptance pending |
@@ -1147,3 +1147,10 @@ The similarly named getswift.cloud storage uploader is a different product and m
 ## GoBio Link documentation access
 
 The public https://gobio.link/ homepage redirects to https://join.gobio.link/ and identifies the bio-link product. Its linked login at https://gobio.link/login returns HTTP 403 from this environment. Read-only checks of /api-documentation and /api also return 403; those guessed paths are not evidence of an API contract. No account was created and no credentials were sent. The marketing page and its published assets expose no verified API host/authentication instructions. GoBio remains pending; browser or account documentation is the next avenue.
+
+
+## GoBio API route: browser documentation resolved
+
+The earlier command-line documentation failures were resolved by viewing [the official reference](https://gobio.link/api-documentation) in the browser. It confirms https://gobio.link/api and Bearer API keys. The user reference documents GET /user; the projects reference specifies multipart POST /projects with required name and optional color. Added contracts for both through the registry and secret store. File uploads remain unsupported; scalar multipart fields work.
+
+The bound disposable-store GET /user with an invalid key returned HTTP 401: You do not have access to the API. No project or account was created. Valid account acceptance remains open. Focused suite: 489 passed; Ruff clean. Host count: 126 of 144, with 18 pending.

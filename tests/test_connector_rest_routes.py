@@ -2882,3 +2882,36 @@ def test_grade_us_profile_read_and_user_update(tmp_path, method):
     if method == "PATCH":
         assert req.get_header("Content-type") == "application/json"
         assert json.loads(req.data) == {"last_name": "Test"}
+
+
+@pytest.mark.parametrize("method", ["GET", "POST"])
+def test_gobio_user_and_project_contract(tmp_path, method):
+    from email import policy
+    from email.parser import BytesParser
+
+    paths = HarnessPaths(home=tmp_path)
+    record = Connectors(paths).add("gobio_link", "GoBio", secret="fixture-key")
+    bound = tools_for_bot(paths, "atlas", record_ids={record["id"]})
+    path = "/user" if method == "GET" else "/projects"
+    body = {"name": "Test Project", "color": "#ffffff"}
+    args = {"path": path}
+    if method == "POST":
+        args.update(method=method, body=body)
+    with patch("connectors.generic._open", return_value=_response({})) as send:
+        result = bound["gobio_link_get" if method == "GET" else "gobio_link_request"][1](args)
+    assert "HTTP 200" in result
+    req = send.call_args.args[0]
+    assert req.full_url == "https://gobio.link/api" + path
+    assert req.method == method
+    assert req.get_header("Authorization") == "Bearer fixture-key"
+    if method == "POST":
+        msg = BytesParser(policy=policy.default).parsebytes(
+            ("Content-Type: " + req.get_header("Content-type") + "\r\n\r\n").encode() + req.data
+        )
+        assert msg.get_content_type() == "multipart/form-data"
+        assert {
+            part.get_param("name", header="content-disposition"): part.get_payload(
+                decode=True
+            ).decode()
+            for part in msg.iter_parts()
+        } == body

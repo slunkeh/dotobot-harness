@@ -1154,6 +1154,8 @@ STUBS: list[dict] = [
         "name": "GoBio.link",
         "auth": "api_key",
         "fields": [],
+        "api_base": "https://gobio.link/api",
+        "body_encoding": "multipart",
         "category": "Email And Marketing",
         "description": "Connect GoBio.link.",
         "icon": "envelope",
