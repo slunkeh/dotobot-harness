@@ -389,9 +389,9 @@ _ROWS: list[tuple[str, str, str, str]] = [
     ),
     (
         "docupost",
-        "aggregator",
-        "https://composio.dev/toolkits/docupost",
-        "Composio toolkit.",
+        "official",
+        "https://help.docupost.com/developer-documentation/send-letter-api",
+        "Store the API token generated on the Developer page. Dotobot inserts api_token into the query. POST /sendletter or /sendpostcard uses URL-encoded non-secret parameters in path, including sender, recipient and document/image URLs. Enable Sandbox Mode in the account token settings for testing. These endpoints send physical mail and may incur charges; no read endpoint is documented here. Never put api_token in tool arguments.",
     ),
     (
         "doppler",

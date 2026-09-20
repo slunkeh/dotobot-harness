@@ -3,11 +3,11 @@
 Scope: implement the 144 catalogue connectors identified with missing REST hosts.
 This is an implementation ledger, not a claim of live-account verification.
 
-Sixty-five routes now have offline request-contract coverage through the real connector
+Sixty-six routes now have offline request-contract coverage through the real connector
 registry and credential store. Tests assert the outbound origin, version prefix,
 credential header, query and JSON body. Credentials are never followed through
 HTTP redirects. Production authenticated reads and writes remain unverified for these
-sixty-five routes. The remaining 79 connectors still need provider research and code.
+sixty-six routes. The remaining 78 connectors still need provider research and code.
 
 ## Implemented routes
 
@@ -19,6 +19,7 @@ CloudConvert currently uses its production automatic-region API, not its sandbox
 
 | Connector | Provider reference | Setup |
 |---|---|---|
+| `docupost` | [Provider documentation](https://help.docupost.com/developer-documentation/send-letter-api) | Store the Developer API token. POST /sendletter or /sendpostcard uses URL-encoded non-secret query parameters in path; Dotobot adds api_token securely. Supply sender/recipient and PDF or image URLs as documented. Enable account Sandbox Mode for testing. These operations send physical mail and can incur charges; no read endpoint is documented here. |
 | `curated` | [Provider documentation](https://support.curated.co/help/getting-started-with-the-api) | Store the Account API Key. Dotobot quotes it in Authorization: Token token. GET /publications retrieves IDs. POST /publications/ID/issues/ creates a draft. Bodies use JSON. Publishing requires the website. |
 | `dribbble` | [Provider documentation](https://developer.dribbble.com/v2/) | Store an OAuth access token, used as Bearer. GET /user or /user/shots reads account data. PUT /shots/ID updates metadata with upload scope. The documented JSON body uses application/x-www-form-urlencoded Content-Type. OAuth lifecycle, multipart uploads and binary responses are unsupported here. |
 | `apexverify` | [Provider documentation](https://documentation.apexverify.com/api-reference/api-authentication) | Store the API key, sent in X-Api-Key. GET /account/credits reads the balance. POST /unit accepts JSON type (email or phone), target_country and unit. Verification consumes credits; review use_global_cache before submitting data. Multipart uploads and binary exports are unsupported by the generic JSON tool. |
@@ -193,7 +194,7 @@ Live evidence for the third batch:
 | `demandbase` | Pending provider research and implementation |
 | `demio` | Pending provider research and implementation |
 | `discourse` | Pending provider research and implementation |
-| `docupost` | Pending provider research and implementation |
+| `docupost` | Implemented; request contracts pass; live missing-data rejection, authenticated acceptance pending |
 | `doppler` | Route and offline request tests added; live verification pending |
 | `dribbble` | Implemented stored-token route; request contracts pass; authenticated account testing pending |
 | `drip` | Route and offline request tests added; live verification pending |
@@ -616,3 +617,13 @@ The focused suite passes 293 tests; Ruff passes. A disposable bound GET /publica
 with an invalid key returned HTTP 404 Record not found. This proves an HTTP response
 from the documented endpoint but does not prove authentication handling or account
 access. No drafts were created on the live service.
+
+## DocuPost validation
+
+Two request tests cover letter and postcard endpoint paths, POST, query parameters
+and encoded stored credentials without a bearer header. Both failed before the route
+was added. The focused suite passes 295 tests; Ruff passes. A live bound POST
+/sendletter with an invalid token and no mailing data returned HTTP 400 MISSING_DATA
+for to_name. This proves endpoint reachability and input validation, not token
+acceptance or mailing success. No mailing job was submitted. Sandbox Mode is a
+provider account setting, not a request parameter invented by Dotobot.

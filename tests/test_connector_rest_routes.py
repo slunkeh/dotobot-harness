@@ -1142,3 +1142,24 @@ def test_curated_quotes_stored_token_and_creates_draft(tmp_path):
     assert req.get_header("Authorization") == "Token token=" + json.dumps(secret)
     assert req.method == "POST"
     assert req.data is None
+
+
+@pytest.mark.parametrize("endpoint", ["sendletter", "sendpostcard"])
+def test_docupost_post_query_authentication(tmp_path, endpoint):
+    from urllib.parse import parse_qs, urlsplit
+
+    paths = HarnessPaths(home=tmp_path)
+    record = Connectors(paths).add("docupost", "DocuPost", secret="key&= +?")
+    bound = tools_for_bot(paths, "atlas", record_ids={record["id"]})
+    with patch("connectors.generic._open", return_value=_response({})) as send:
+        assert "HTTP 200" in bound["docupost_request"][1](
+            {"method": "POST", "path": "/" + endpoint + "?to_name=Fixture%20Test"}
+        )
+    req = send.call_args.args[0]
+    parts = urlsplit(req.full_url)
+    assert parts.netloc == "app.docupost.com"
+    assert parts.path == "/api/1.1/wf/" + endpoint
+    assert parse_qs(parts.query) == {"to_name": ["Fixture Test"], "api_token": ["key&= +?"]}
+    assert req.method == "POST"
+    assert req.data is None
+    assert req.get_header("Authorization") is None
