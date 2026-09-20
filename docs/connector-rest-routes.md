@@ -3,11 +3,11 @@
 Scope: implement the 144 catalogue connectors identified with missing REST hosts.
 This is an implementation ledger, not a claim of live-account verification.
 
-One hundred and ten routes now have offline request-contract coverage through the real connector
+One hundred and eleven routes now have offline request-contract coverage through the real connector
 registry and credential store. Tests assert the outbound origin, version prefix,
 credential header, query and JSON body. Credentials are never followed through
 HTTP redirects. Production authenticated reads and writes remain unverified for these
-one hundred and ten routes. The remaining 34 connectors still need provider research and code.
+one hundred and eleven routes. The remaining 33 connectors still need provider research and code.
 
 ## Implemented routes
 
@@ -240,7 +240,7 @@ Live evidence for the third batch:
 | `eventbrite` | Implemented; request-contract tests pass; production account verification pending |
 | `everwebinar` | Implemented; form POST read contracts pass; invalid key rejected live; account acceptance pending |
 | `exact_mails` | Pending: current website gates API documentation behind account creation; backend differs from older integration examples |
-| `facebook` | Pending provider research and implementation |
+| `facebook` | Implemented Graph API host; Page discovery and Messenger request contracts pass; live invalid OAuth token rejected; account acceptance open |
 | `feedblitz` | Implemented XML REST route; transport contracts pass; invalid key rejected in HTTP 200 XML; account acceptance pending |
 | `flexmail` | Pending provider research and implementation |
 | `flippingbook` | Implemented Online API; request contracts pass; invalid key rejected live, account acceptance pending |
@@ -1012,3 +1012,9 @@ At commit e6a77c5, the full runtime suite completed with 3,582 passed, 2 skipped
 The [OpenID Connect guide](https://learn.microsoft.com/en-us/linkedin/consumer/integrations/self-serve/sign-in-with-linkedin-v2) documents GET api.linkedin.com/v2/userinfo using a Bearer access token. The [current Posts API](https://learn.microsoft.com/en-us/linkedin/marketing/community-management/shares/posts-api?view=li-lms-2026-09) requires version and Rest.li protocol headers. Added those headers on /rest/ paths, defaulting to 202609 with a YYYYMM config override. Tests cover profile request formatting and nested post bodies with default/explicit versions. No live post was made.
 
 A disposable-store GET /v2/userinfo with an invalid token returned HTTP 401 INVALID_ACCESS_TOKEN. Real OAuth consent, approved scopes, token refresh and authenticated operation acceptance remain open. Focused suite: 449 passed; Ruff clean.
+
+## Facebook Pages Graph API
+
+Meta's [Page discovery example](https://www.postman.com/meta/instagram/request/0vuw3vk/get-access-tokens-of-pages-you-manage) and [Messenger example](https://www.postman.com/meta/messenger-platform-api/request/ikvz4xw/mark-seen) establish graph.facebook.com, Bearer tokens and nested JSON writes. The route leaves the version in caller paths. Offline examples use the version in Meta's published collection; this is not a claim that version 20 remains suitable for a current app.
+
+A disposable-store unversioned GET /me?fields=id with an invalid token returned HTTP 401, OAuthException code 190. This proves credential parsing rejection, not Page permissions or version acceptance. No messages, read receipts or posts were sent. Valid tokens, scopes and authenticated acceptance remain open. Focused suite: 451 passed; Ruff clean.

@@ -985,6 +985,8 @@ STUBS: list[dict] = [
     },
     {
         "type": "facebook",
+        "api_base": "https://graph.facebook.com",
+        "auth_style": "bearer",
         "name": "Facebook Pages",
         "auth": "api_key",
         "fields": [],

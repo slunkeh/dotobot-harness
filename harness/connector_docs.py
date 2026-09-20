@@ -608,9 +608,9 @@ _ROWS: list[tuple[str, str, str, str]] = [
     ),
     (
         "facebook",
-        "aggregator",
-        "https://zapier.com/mcp/facebook-pages",
-        "Also community repos; no official Meta server.",
+        "official",
+        "https://www.postman.com/meta/messenger-platform-api",
+        "Store the Meta access token appropriate to the endpoint: user token for /VERSION/me/accounts discovery, Page token for Page actions. Include a supported Graph API version in each path; no version is pinned by this connector. JSON writes are supported, including Messenger /VERSION/PAGE_ID/messages. App permissions and review apply. Avoid duplicating the token in tool arguments. OAuth consent/refresh, binary uploads and appsecret_proof generation are not automated.",
     ),
     (
         "feedblitz",

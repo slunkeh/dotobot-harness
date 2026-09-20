@@ -15,6 +15,14 @@ from harness.paths import HarnessPaths
 # Literal expected requests intentionally independent of catalogue metadata.
 CASES = [
     (
+        "facebook",
+        {},
+        "/v20.0/me/accounts",
+        "https://graph.facebook.com/v20.0/me/accounts",
+        "Authorization",
+        "Bearer fixture-key",
+    ),
+    (
         "linkedin",
         {},
         "/v2/userinfo",
@@ -2522,4 +2530,20 @@ def test_linkedin_post_version_headers(tmp_path, version):
     assert req.full_url == "https://api.linkedin.com/rest/posts"
     assert req.get_header("Linkedin-version") == (version or "202609")
     assert req.get_header("X-restli-protocol-version") == "2.0.0"
+    assert json.loads(req.data) == body
+
+
+def test_facebook_messenger_json(tmp_path):
+    paths = HarnessPaths(home=tmp_path)
+    record = Connectors(paths).add("facebook", "Facebook", secret="fixture-key")
+    bound = tools_for_bot(paths, "atlas", record_ids={record["id"]})
+    body = {"recipient": {"id": "fixture-person"}, "sender_action": "mark_seen"}
+    with patch("connectors.generic._open", return_value=_response({})) as send:
+        result = bound["facebook_request"][1](
+            {"method": "POST", "path": "/v20.0/123/messages", "body": body}
+        )
+    assert "HTTP 200" in result
+    req = send.call_args.args[0]
+    assert req.full_url == "https://graph.facebook.com/v20.0/123/messages"
+    assert req.get_header("Authorization") == "Bearer fixture-key"
     assert json.loads(req.data) == body
