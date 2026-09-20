@@ -1198,3 +1198,10 @@ Integration listings associate Leadoku with Growth-X, but this does not establis
 ## GoZen Growth credential setup evidence
 
 The [official GoZen Engage integration guide](https://docs.gozen.io/gozen-engage-knowledge-base/integration/gozen-growth) confirms Growth keys are generated in account Settings > API key. The Forms integration guide also confirms workspace/list selection after supplying a key. Neither inspected guide specifies the REST base or credential header. Replaced the aggregator-only catalogue pointer with official setup guidance; host remains pending. GoZen Testimonials has its own documented API and is not a substitute for Growth. No account, key or contact was created.
+
+
+## Full-suite checkpoint at 128 configured hosts
+
+The complete local suite finished with **3628 passed, 2 skipped, 2 failed, 1 warning in 307.11 seconds**. Both failures match the previously recorded unchanged baseline by test name and assertion: test_listener_user_data_dirs_reads_listening_cmdline fails its listener/profile assertion; test_run_session_raises_when_display_stays_bound does not raise, with the missing /workspace environment diagnostic. These remain open local environment failures; this is not an entirely green suite or a claim of CI success.
+
+This run covers the code through ed7e44f; subsequent changes during the run only updated documentation metadata and the ledger. The 492 focused tests passed at the current 128-route implementation. Account-level acceptance and all 16 remaining hosts are still open.
