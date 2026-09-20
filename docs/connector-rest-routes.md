@@ -3,11 +3,11 @@
 Scope: implement the 144 catalogue connectors identified with missing REST hosts.
 This is an implementation ledger, not a claim of live-account verification.
 
-One hundred and five routes now have offline request-contract coverage through the real connector
+One hundred and six routes now have offline request-contract coverage through the real connector
 registry and credential store. Tests assert the outbound origin, version prefix,
 credential header, query and JSON body. Credentials are never followed through
 HTTP redirects. Production authenticated reads and writes remain unverified for these
-one hundred and five routes. The remaining 39 connectors still need provider research and code.
+one hundred and six routes. The remaining 38 connectors still need provider research and code.
 
 ## Implemented routes
 
@@ -283,7 +283,7 @@ Live evidence for the third batch:
 | `jellyreach` | Pending provider research and implementation |
 | `joggai` | Implemented; request-contract tests pass; production account verification pending |
 | `jvzoo` | Implemented; request contract passes; invalid key rejected live, account acceptance pending |
-| `kartra` | Pending provider research and implementation |
+| `kartra` | Implemented form POST API; nested read contract passes; invalid app ID explicitly rejected; authenticated acceptance open |
 | `kickofflabs` | Implemented; request contracts pass; invalid key rejected live, account acceptance pending |
 | `kingsumo` | Pending provider research and implementation |
 | `klenty` | Implemented; request contracts pass; authenticated account verification pending |
@@ -970,3 +970,9 @@ A disposable-store GET /lists with an invalid token returned HTTP 404 and an emp
 The [official authentication guide](https://docs.buysellads.com/advertiser-api) and [endpoint reference](https://docs.buysellads.com/advertiser-api/endpoints) specify papi.buysellads.com and the key query parameter. Added request contracts for all four documented reporting paths. The provider documents no pagination and no write operations for this API. Its ad-serving service is separate.
 
 Disposable-store GET /lineitems for September 2020 returned HTTP 400 with response.error indicating Unauthorized, both for an invalid key and for the api_test example credential printed in the documentation. The example is not a working sandbox credential. No ads were served or modified. A private account-manager-issued key is needed for account acceptance. Focused suite: 435 passed; Ruff clean.
+
+## Kartra inbound API
+
+The [connection guide](https://support.kartra.com/en/articles/15369013-connecting-to-the-api) requires POST to app.kartra.com/api with app_id, api_key and api_password. The [official read sample](https://support.kartra.com/en/articles/15369051-php-sample-retrieving-data-for-a-specific-lead) uses form encoding with nested get_lead fields. Added a credential JSON object stored as one secret and injected into the form body, with credential overrides, query parameters, other paths and GET rejected. Call the request tool with path / and POST.
+
+A disposable-store read request using synthetic invalid credentials returned HTTP 200 with status Error, type 239, and an invalid/inactive App Id message. HTTP success alone is not API success. No lead was created or changed. Real account credentials and a configured Kartra app are needed for acceptance. Focused suite: 441 passed; Ruff clean.

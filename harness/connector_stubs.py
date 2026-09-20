@@ -1437,6 +1437,9 @@ STUBS: list[dict] = [
     },
     {
         "type": "kartra",
+        "api_base": "https://app.kartra.com/api",
+        "auth_style": "kartra",
+        "body_encoding": "form",
         "name": "Kartra",
         "auth": "api_key",
         "fields": [],

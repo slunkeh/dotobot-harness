@@ -2354,3 +2354,47 @@ def test_buysellads_reporting_query(tmp_path, path):
     }
     assert req.get_header("Authorization") is None
     assert req.data is None
+
+
+def test_kartra_form_credentials_and_nested_read(tmp_path):
+    from urllib.parse import parse_qs
+
+    paths = HarnessPaths(home=tmp_path)
+    creds = {"app_id": "fixture-app", "api_key": "key&=", "api_password": "pass+ ?"}
+    record = Connectors(paths).add("kartra", "Kartra", secret=json.dumps(creds))
+    bound = tools_for_bot(paths, "atlas", record_ids={record["id"]})
+    with patch("connectors.generic._open", return_value=_response({"status": "Success"})) as send:
+        result = bound["kartra_request"][1](
+            {"method": "POST", "path": "/", "body": {"get_lead": {"email": "fixture@example.com"}}}
+        )
+    assert "HTTP 200" in result
+    req = send.call_args.args[0]
+    assert req.full_url == "https://app.kartra.com/api"
+    assert req.get_header("Authorization") is None
+    assert req.get_header("Content-type") == "application/x-www-form-urlencoded"
+    assert parse_qs(req.data.decode()) == {
+        **{k: [v] for k, v in creds.items()},
+        "get_lead[email]": ["fixture@example.com"],
+    }
+
+
+@pytest.mark.parametrize(
+    "method,path,body",
+    [
+        ("GET", "/", {}),
+        ("POST", "/other", {}),
+        ("POST", "/?api_key=x", {}),
+        ("POST", "/", {"api_key": "override"}),
+        ("POST", "/", {"api_password[]": "override"}),
+    ],
+)
+def test_kartra_rejects_wrong_request_shape(tmp_path, method, path, body):
+    paths = HarnessPaths(home=tmp_path)
+    record = Connectors(paths).add(
+        "kartra", "Kartra", secret=json.dumps({"app_id": "a", "api_key": "k", "api_password": "p"})
+    )
+    bound = tools_for_bot(paths, "atlas", record_ids={record["id"]})
+    with patch("connectors.generic._open") as send:
+        result = bound["kartra_request"][1]({"method": method, "path": path, "body": body})
+    assert "error:" in result
+    send.assert_not_called()

@@ -44,6 +44,7 @@ _STYLES = (
     "query",
     "header_pair",
     "path_suffix",
+    "kartra",
     "dux",
 )
 
@@ -248,7 +249,7 @@ def _headers(ctx: ConnectorContext, secret: str) -> dict[str, str]:
             for name, prefix, value in zip(cat["auth_headers"], prefixes, pair, strict=True)
         )
         return hdrs
-    if style in {"query", "dux", "path_suffix"}:
+    if style in {"query", "dux", "path_suffix", "kartra"}:
         return hdrs
     if style == "header":
         from harness.connectors import _CATALOG_TYPES
@@ -341,6 +342,29 @@ def _http(
         url = _join(base, path)
         if not url:
             return "error: path must stay on the connector's API host"
+    if style == "kartra":
+        url = url.rstrip("/")
+        if (
+            method != "POST"
+            or urllib.parse.urlsplit(url).path != "/api"
+            or query
+            or urllib.parse.urlsplit(url).query
+        ):
+            return "error: Kartra requires POST to /api without query parameters; use path /"
+        names = {"app_id", "api_key", "api_password"}
+        try:
+            credentials = json.loads(key)
+        except ValueError:
+            credentials = None
+        if (
+            not isinstance(credentials, dict)
+            or set(credentials) != names
+            or any(not isinstance(v, str) or not v for v in credentials.values())
+        ):
+            return "error: store Kartra credentials as a JSON object with app_id, api_key and api_password"
+        if any(k.split("[", 1)[0] in names for k in (body or {})):
+            return "error: authentication comes from the connector secret store"
+        body = {**(body or {}), **credentials}
     if style == "path_suffix":
         parts = urllib.parse.urlsplit(url)
         url = urllib.parse.urlunsplit(

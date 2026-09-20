@@ -912,9 +912,9 @@ _ROWS: list[tuple[str, str, str, str]] = [
     ),
     (
         "kartra",
-        "none",
-        "https://zapier.com/mcp/kartra",
-        "Only Zapier/Pipedream generic wrappers.",
+        "official",
+        "https://support.kartra.com/en/articles/15369013-connecting-to-the-api",
+        "Store a JSON object containing app_id, api_key and api_password. Use the request tool with POST, path /, and a body containing get_lead or documented actions. Credentials are injected into the form body. GET is unsupported even for reads. Check response status Error/Success. Create a custom app in My Apps; Test Mode suppresses lead email and replaces lead email domains. Live mode requires provider review.",
     ),
     (
         "kickofflabs",
