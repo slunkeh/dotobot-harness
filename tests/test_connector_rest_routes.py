@@ -1584,3 +1584,52 @@ def test_airship_invalid_config_blocks_transport(tmp_path, config):
     with patch("connectors.generic._open") as send:
         assert "error:" in bound["airship_get"][1]({"path": "/api/channels"})
     send.assert_not_called()
+
+
+def test_adroll_multipart_request(tmp_path):
+    from email import policy
+    from email.parser import BytesParser
+
+    paths = HarnessPaths(home=tmp_path)
+    record = Connectors(paths).add("adroll", "AdRoll", secret="fixture-key")
+    bound = tools_for_bot(paths, "atlas", record_ids={record["id"]})
+    body = {
+        "name": "Fixture café",
+        "organization": "fixture-org",
+        "country_code": "us",
+        "url": "https://example.com",
+    }
+    with patch("connectors.generic._open", return_value=_response({})) as send:
+        assert "HTTP 200" in bound["adroll_request"][1](
+            {
+                "method": "POST",
+                "path": "/api/v1/advertisable/create?apikey=fixture-client",
+                "body": body,
+            }
+        )
+    req = send.call_args.args[0]
+    assert (
+        req.full_url
+        == "https://services.adroll.com/api/v1/advertisable/create?apikey=fixture-client"
+    )
+    assert req.get_header("Authorization") == "Token fixture-key"
+    msg = BytesParser(policy=policy.default).parsebytes(
+        ("Content-Type: " + req.get_header("Content-type") + "\r\n\r\n").encode() + req.data
+    )
+    assert msg.get_content_type() == "multipart/form-data"
+    assert {
+        part.get_param("name", header="content-disposition"): part.get_payload(decode=True).decode()
+        for part in msg.iter_parts()
+    } == body
+
+
+@pytest.mark.parametrize("body", [{"bad\r\nname": "x"}, {"file": {"path": "/tmp/example"}}])
+def test_adroll_rejects_unsupported_multipart(tmp_path, body):
+    paths = HarnessPaths(home=tmp_path)
+    record = Connectors(paths).add("adroll", "AdRoll", secret="fixture-key")
+    bound = tools_for_bot(paths, "atlas", record_ids={record["id"]})
+    with patch("connectors.generic._open") as send:
+        assert "error: multipart" in bound["adroll_request"][1](
+            {"method": "POST", "path": "/api/v1/ad/create?apikey=fixture", "body": body}
+        )
+    send.assert_not_called()

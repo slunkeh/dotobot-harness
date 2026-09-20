@@ -3,11 +3,11 @@
 Scope: implement the 144 catalogue connectors identified with missing REST hosts.
 This is an implementation ledger, not a claim of live-account verification.
 
-Eighty-two routes now have offline request-contract coverage through the real connector
+Eighty-three routes now have offline request-contract coverage through the real connector
 registry and credential store. Tests assert the outbound origin, version prefix,
 credential header, query and JSON body. Credentials are never followed through
 HTTP redirects. Production authenticated reads and writes remain unverified for these
-eighty-two routes. The remaining 62 connectors still need provider research and code.
+eighty-three routes. The remaining 61 connectors still need provider research and code.
 
 ## Implemented routes
 
@@ -167,7 +167,7 @@ Live evidence for the third batch:
 | `add_to_calendar_pro` | Pending provider research and implementation |
 | `adhook` | Pending provider research and implementation |
 | `adrapid` | Implemented; request contracts pass; invalid token rejected live, account acceptance pending |
-| `adroll` | Pending implementation: official host and PAT/client-ID authentication verified; multipart write support needs implementation |
+| `adroll` | Implemented PAT route with scalar multipart writes; tests pass; invalid application key rejected live; account acceptance and binary uploads pending |
 | `adtraction` | Implemented; request contracts pass; authenticated account verification pending |
 | `aimtell` | Pending provider research and implementation |
 | `airship` | Implemented regional HTTP/OAuth routes; version/auth contracts pass; invalid tokens rejected live; account acceptance pending |
@@ -799,3 +799,9 @@ Nine additional tests cover six region/auth combinations and invalid configurati
 The [official getting-started guide](https://apidocs.nextroll.com/guides/get-started.html) confirms https://services.adroll.com. Personal access tokens use Authorization: Token TOKEN, together with the application client ID in the apikey URL query parameter on every method. The application ID must not move into POST/PUT/PATCH bodies. The documented first read is GET /api/v1/organization/get_advertisables.
 
 The [CRUD examples](https://apidocs.nextroll.com/crud-api/examples.html) use multipart form fields for writes, including POST /api/v1/advertisable/create; image creation includes file upload. This differs from the current generic JSON/urlencoded modes. Before marking this route implemented, add the supported request encoding and tests for the independent client-ID query, token header and body format. OAuth is also documented separately. No AdRoll API call or account mutation was made in this research pass; the route remains pending.
+
+## AdRoll route implementation
+
+Added the documented host, Token authentication and scalar multipart form bodies. Supply the application client ID in apikey URL query; it remains separate from the stored personal token. Tests parse MIME parts to verify field values and reject header-injection field names and nested file objects before transport. File uploads and OAuth consent are not supported.
+
+A bound GET /api/v1/organization/get_advertisables with invalid personal token and client ID returned HTTP 401 apiproxy:2 (invalid API key). This verifies reachability and application-key rejection, not personal-token or account acceptance. No advertising mutation was attempted. All 351 focused tests and Ruff pass. There are 83 routes and 61 pending. The midpoint full suite predates this addition.

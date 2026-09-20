@@ -73,8 +73,8 @@ _ROWS: list[tuple[str, str, str, str]] = [
     (
         "adroll",
         "official",
-        "https://help.adroll.com/hc/en-us/articles/44128588376077-AdRoll-MCP-Server-Beta",
-        "Official MCP beta (2026).",
+        "https://apidocs.nextroll.com/guides/get-started.html",
+        "Store a Personal Access Token; sent as Authorization: Token. Supply the developer application client ID as apikey in the URL query on every request (GET query or POST path query). GET /api/v1/organization/get_advertisables lists brands. CRUD writes use multipart scalar form fields; file uploads and nested bodies are unsupported. Paths include the service/version. OAuth flow is not implemented. Campaign changes may spend advertising budget.",
     ),
     (
         "adtraction",

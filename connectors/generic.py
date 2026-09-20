@@ -395,6 +395,31 @@ def _http(
             data = urllib.parse.urlencode(_form_fields(json.loads(data))).encode("utf-8")
             hdrs["Content-Type"] = "application/x-www-form-urlencoded"
 
+    if data is not None and cat.get("body_encoding") == "multipart":
+        import uuid
+
+        fields = json.loads(data)
+        if any(
+            not re.fullmatch(r"[A-Za-z0-9_]+", name) or isinstance(value, (dict, list))
+            for name, value in fields.items()
+        ):
+            return "error: multipart body needs simple field names and scalar values; file uploads are unsupported"
+        boundary = "dotobot-" + uuid.uuid4().hex
+        parts = []
+        for name, value in fields.items():
+            value = (
+                ""
+                if value is None
+                else str(value).lower()
+                if isinstance(value, bool)
+                else str(value)
+            )
+            parts.append(
+                f'--{boundary}\r\nContent-Disposition: form-data; name="{name}"\r\n\r\n{value}\r\n'
+            )
+        data = ("".join(parts) + f"--{boundary}--\r\n").encode("utf-8")
+        hdrs["Content-Type"] = "multipart/form-data; boundary=" + boundary
+
     req = urllib.request.Request(url, data=data, method=method, headers=hdrs)
     try:
         with _open(req, timeout=_TIMEOUT) as resp:
