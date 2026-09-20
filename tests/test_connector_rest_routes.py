@@ -15,6 +15,14 @@ from harness.paths import HarnessPaths
 # Literal expected requests intentionally independent of catalogue metadata.
 CASES = [
     (
+        "enginemailer",
+        {},
+        "/campaign/emcampaign/GetCategoryList",
+        "https://api.enginemailer.com/restapi/campaign/emcampaign/GetCategoryList",
+        "Apikey",
+        "fixture-key",
+    ),
+    (
         "adrapid",
         {},
         "/me",
@@ -667,6 +675,18 @@ def test_4dem_malformed_auth_response_is_not_forwarded(tmp_path):
 @pytest.mark.parametrize(
     "type_,path,url,body",
     [
+        (
+            "enginemailer",
+            "/Campaign/EMCampaign/CreateCampaign",
+            "https://api.enginemailer.com/restapi/Campaign/EMCampaign/CreateCampaign",
+            {
+                "CampaignName": "Fixture campaign",
+                "SenderName": "Fixture",
+                "SenderEmail": "sender@example.com",
+                "Subject": "Fixture",
+                "Content": "Fixture content",
+            },
+        ),
         (
             "adrapid",
             "/banners",

@@ -541,9 +541,9 @@ _ROWS: list[tuple[str, str, str, str]] = [
     ("engage", "none", "", "Too generic to identify a specific vendor."),
     (
         "enginemailer",
-        "community",
-        "https://www.npmjs.com/package/@lightyoruichi/enginemailer-mcp",
-        "Third-party npm package.",
+        "official",
+        "https://enginemailer.zendesk.com/hc/en-us/articles/360003129972-Campaign-REST-API-GETTING-STARTED",
+        "Store the profile API key; sent in APIKey. Campaign REST API requires a paid plan. Paths are relative to /restapi: GET /campaign/emcampaign/GetCategoryList; POST /Campaign/EMCampaign/CreateCampaign with a JSON object and verified SenderEmail domain. Inspect Result.Status and Result.StatusCode, not only HTTP status. Sending and scheduling campaigns are separate actions.",
     ),
     (
         "enormail",

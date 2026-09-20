@@ -3,11 +3,11 @@
 Scope: implement the 144 catalogue connectors identified with missing REST hosts.
 This is an implementation ledger, not a claim of live-account verification.
 
-Seventy-seven routes now have offline request-contract coverage through the real connector
+Seventy-eight routes now have offline request-contract coverage through the real connector
 registry and credential store. Tests assert the outbound origin, version prefix,
 credential header, query and JSON body. Credentials are never followed through
 HTTP redirects. Production authenticated reads and writes remain unverified for these
-seventy-seven routes. The remaining 67 connectors still need provider research and code.
+seventy-eight routes. The remaining 66 connectors still need provider research and code.
 
 ## Implemented routes
 
@@ -230,7 +230,7 @@ Live evidence for the third batch:
 | `encharge` | Pending provider research and implementation |
 | `endorsal` | Pending provider research and implementation |
 | `engage` | Pending provider research and implementation |
-| `enginemailer` | Pending provider research and implementation |
+| `enginemailer` | Implemented; request contracts pass; live invalid key rejected in HTTP 200 response body; authenticated acceptance pending |
 | `enormail` | Implemented; request contracts pass; authenticated account verification pending |
 | `esputnik` | Implemented; request-contract tests pass; production account verification pending |
 | `eventbrite` | Implemented; request-contract tests pass; production account verification pending |
@@ -753,3 +753,9 @@ that prefix. Two new tests failed before implementation and pass afterward. The
 focused suite passes 330 tests; Ruff passes. A disposable bound GET /me returned
 HTTP 401 JWT web token malformed. No banners were generated; authenticated account
 access and export completion remain unverified.
+
+## Enginemailer campaign API
+
+Added the documented /restapi host and APIKey header. [Category lookup](https://enginemailer.zendesk.com/hc/en-us/articles/360003226071-Get-Category-List) and [JSON campaign creation](https://enginemailer.zendesk.com/hc/en-us/articles/360003152791-Create-Campaign) are covered through the bound connector. The campaign API requires a paid plan and a verified sender domain for creation. Check Result.Status and Result.StatusCode rather than HTTP status alone.
+
+A disposable-store GET category lookup with an invalid key returned HTTP 200 with Result.StatusCode 500 and API Key Not Found. This proves reachability and application-level rejection, not authenticated account acceptance. No campaign was created or sent. All 332 focused tests pass; Ruff passes. There are now 78 implemented routes and 66 pending. The midpoint full-suite result predates this addition.
