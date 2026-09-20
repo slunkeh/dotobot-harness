@@ -15,6 +15,22 @@ from harness.paths import HarnessPaths
 # Literal expected requests intentionally independent of catalogue metadata.
 CASES = [
     (
+        "campaign_cleaner",
+        {},
+        "/get_credits",
+        "https://api.campaigncleaner.com/v1/get_credits",
+        "X-cc-api-key",
+        "fixture-key",
+    ),
+    (
+        "campayn",
+        {},
+        "/lists.json",
+        "https://campayn.com/api/v1/lists.json",
+        "Authorization",
+        "TRUEREST apikey=fixture-key",
+    ),
+    (
         "gist",
         {},
         "/contacts",
@@ -508,6 +524,23 @@ def test_4dem_malformed_auth_response_is_not_forwarded(tmp_path):
 @pytest.mark.parametrize(
     "type_,path,url,body",
     [
+        (
+            "campaign_cleaner",
+            "/send_campaign",
+            "https://api.campaigncleaner.com/v1/send_campaign",
+            {
+                "send_campaign": {
+                    "campaign_html": "<html><body>Fixture</body></html>",
+                    "campaign_name": "Fixture",
+                }
+            },
+        ),
+        (
+            "campayn",
+            "/lists/123/contacts.json",
+            "https://campayn.com/api/v1/lists/123/contacts.json",
+            {"email": "fixture@example.com", "first_name": "Fixture"},
+        ),
         (
             "crowdpower",
             "/customers",

@@ -232,9 +232,9 @@ _ROWS: list[tuple[str, str, str, str]] = [
     ),
     (
         "campaign_cleaner",
-        "aggregator",
-        "https://composio.dev/toolkits/campaign_cleaner",
-        "Composio-generated.",
+        "official",
+        "https://docs.campaigncleaner.com/api-reference/endpoint/get-credits",
+        "Store a Campaign Cleaner API key. Authentication uses X-CC-API-Key. GET /get_credits reads the credit balance. POST /send_campaign accepts a send_campaign object with campaign_html and campaign_name; this submits analysis and consumes credits. Poll the campaign status before retrieving results. JSON endpoints are supported; binary PDF responses are not.",
     ),
     (
         "campaign_monitor",
@@ -250,9 +250,9 @@ _ROWS: list[tuple[str, str, str, str]] = [
     ),
     (
         "campayn",
-        "none",
+        "official",
         "https://github.com/nebojsac/Campayn-API",
-        "Composio toolkit appears auto-generated only.",
+        "Store an API key from the Campayn Account section. Authentication uses Authorization: TRUEREST apikey=KEY. GET /lists.json reads lists. JSON writes such as POST /lists/LIST_ID/contacts.json add contacts; inspect success in the response. Keep the .json endpoint suffix.",
     ),
     (
         "cardly",

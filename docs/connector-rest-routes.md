@@ -3,11 +3,11 @@
 Scope: implement the 144 catalogue connectors identified with missing REST hosts.
 This is an implementation ledger, not a claim of live-account verification.
 
-Forty-eight routes now have offline request-contract coverage through the real connector
+Fifty routes now have offline request-contract coverage through the real connector
 registry and credential store. Tests assert the outbound origin, version prefix,
 credential header, query and JSON body. Credentials are never followed through
 HTTP redirects. Production authenticated reads and writes remain unverified for these
-forty-eight routes. The remaining 96 connectors still need provider research and code.
+fifty routes. The remaining 94 connectors still need provider research and code.
 
 ## Implemented routes
 
@@ -19,6 +19,8 @@ CloudConvert currently uses its production automatic-region API, not its sandbox
 
 | Connector | Provider reference | Setup |
 |---|---|---|
+| `campayn` | [Provider documentation](https://github.com/nebojsac/Campayn-API) | Store an API key from the Campayn Account section. Authentication uses Authorization: TRUEREST apikey=KEY. GET /lists.json reads lists. JSON writes such as POST /lists/LIST_ID/contacts.json add contacts; inspect success in the response. Keep the .json endpoint suffix. |
+| `campaign_cleaner` | [Provider documentation](https://docs.campaigncleaner.com/api-reference/endpoint/get-credits) | Store a Campaign Cleaner API key. Authentication uses X-CC-API-Key. GET /get_credits reads the credit balance. POST /send_campaign accepts a send_campaign object with campaign_html and campaign_name; this submits analysis and consumes credits. Poll the campaign status before retrieving results. JSON endpoints are supported; binary PDF responses are not. |
 | `abyssale` | [Provider documentation](https://developers.abyssale.com/rest-api/quickstart) | Store a workspace API key. REST paths are relative to https://api.abyssale.com; for example GET /designs. Authentication uses x-api-key. |
 | `activecampaign` | [Provider documentation](https://developers.activecampaign.com/reference/authentication) | Set api_domain to the host from Settings > Developer API URL, without https:// or /api/3. Do not guess the region. Store the API token. Paths are relative to /api/3, for example /users/me; authentication uses Api-Token. |
 | `attentive` | [Provider documentation](https://docs.attentive.com/docs/authentication) | Store the private application API key. Paths are relative to https://api.attentivemobile.com/v1; GET /subscriptions needs an email or phone query. Authentication uses Bearer. |
@@ -154,10 +156,10 @@ Live evidence for the third batch:
 | `buysellads` | Pending provider research and implementation |
 | `callpage` | Pending provider research and implementation |
 | `callrail` | Route and offline request tests added; live verification pending |
-| `campaign_cleaner` | Pending provider research and implementation |
+| `campaign_cleaner` | Implemented; request contracts pass; authenticated account verification pending |
 | `campaign_monitor` | Route and offline request tests added; live verification pending |
 | `campaignhq` | Pending provider research and implementation |
-| `campayn` | Pending provider research and implementation |
+| `campayn` | Implemented; request contracts pass; authenticated account verification pending |
 | `cardly` | Route and offline request tests added; live verification pending |
 | `catch_all_verifier` | Pending provider research and implementation |
 | `chatrace` | Pending provider research and implementation |
@@ -414,3 +416,23 @@ CrowdPower has a documented ingestion scope, not a documented GET list API;
 its request test follows [Identify Customer](https://docs.crowdpower.io/getting-started/beacon-api/identify-customer).
 Cometly event reads require dates, as shown in
 [List Events](https://docs.cometly.com/api-reference/endpoint/list-events).
+
+## Campaign Cleaner and Campayn validation
+
+Both routes failed their four new request-contract cases before implementation and
+pass afterward. The focused suite now passes 248 tests; Ruff passes. Bound reads
+using disposable stores and deliberately invalid keys returned HTTP 401 Invalid
+API Key from Campaign Cleaner /get_credits and HTTP 403 Bad Authorization from
+Campayn /lists.json. These prove endpoint reachability and rejection, not account
+access. No live writes were performed.
+
+Campaign Cleaner uses its [documented credit endpoint](https://docs.campaigncleaner.com/api-reference/endpoint/get-credits)
+and [JSON analysis submission](https://docs.campaigncleaner.com/api-reference/endpoint/send-campaign).
+Its linked openapi.json currently describes unrelated verification endpoints, so
+route contracts follow the individual endpoint pages. Campaign analysis consumes
+credits; binary PDF downloads are outside the generic JSON response support.
+
+Campayn's [own integration page](https://www.campayn.com/api) links the
+[official API repository](https://github.com/nebojsac/Campayn-API), whose subscribe
+sample confirms the HTTPS origin, JSON body, and TRUEREST authorization prefix.
+The contact-write test uses that documented request shape without creating a contact.
