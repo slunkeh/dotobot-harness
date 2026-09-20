@@ -384,8 +384,8 @@ _ROWS: list[tuple[str, str, str, str]] = [
     (
         "discourse",
         "official",
-        "https://github.com/discourse/discourse-mcp",
-        "Official. Announced Oct 2025.",
+        "https://docs.discourse.org/",
+        "Store an admin-generated API key and configure api_domain (hostname only) and api_username. Uses Api-Key and Api-Username headers. GET /categories.json reads categories; POST /posts.json accepts JSON title and raw to create a topic. User permissions and key scopes apply. Root-host HTTPS installations and ASCII usernames are supported; subdirectory installations, multipart uploads and User API key authorization are not implemented here.",
     ),
     (
         "docupost",

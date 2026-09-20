@@ -3,11 +3,11 @@
 Scope: implement the 144 catalogue connectors identified with missing REST hosts.
 This is an implementation ledger, not a claim of live-account verification.
 
-Seventy-two routes now have offline request-contract coverage through the real connector
+Seventy-three routes now have offline request-contract coverage through the real connector
 registry and credential store. Tests assert the outbound origin, version prefix,
 credential header, query and JSON body. Credentials are never followed through
 HTTP redirects. Production authenticated reads and writes remain unverified for these
-seventy-two routes. The remaining 72 connectors still need provider research and code.
+seventy-three routes. The remaining 71 connectors still need provider research and code.
 
 ## Implemented routes
 
@@ -19,6 +19,7 @@ CloudConvert currently uses its production automatic-region API, not its sandbox
 
 | Connector | Provider reference | Setup |
 |---|---|---|
+| `discourse` | [Provider documentation](https://docs.discourse.org/) | Store an admin-generated API key. Configure api_domain as a hostname and api_username. Uses Api-Key and Api-Username. GET /categories.json reads categories; POST /posts.json takes JSON title and raw. Key scopes/user permissions apply. Root-host HTTPS and ASCII usernames are supported; subdirectory installations and User API key authorization are not implemented. |
 | `jvzoo` | [Provider documentation](https://api.jvzoo.com/docs/) | Store the API Application key alone; Basic auth uses it as username and x as password. Include /v3.0, /v2.1 or /v2.0 in paths. GET /v3.0/transactions takes start_date and end_date. JSON writes are supported; inspect meta.status and results. |
 | `hypeauditor` | [Provider documentation](https://hypeauditor.com/swagger/public-api/v1/) | Store the API token and configure numeric client_id. Uses X-Auth-Hash and X-Auth-Id. GET /api/v1/media-plan/plans lists plans; POST with JSON title creates a plan. Include full API prefixes in paths. API entitlement and credits apply; report requests may consume credits. |
 | `funnelcockpit` | [Provider documentation](https://api.funnelcockpit.com/) | Store the private API key, sent directly in Authorization without Bearer. GET /me verifies the user; GET /email/tags uses zero-based page and limit. POST /email/tag takes JSON contactId and tagId. Subscriber/tag operations may trigger automations; plan access applies. |
@@ -200,7 +201,7 @@ Live evidence for the third batch:
 | `cyberimpact` | Implemented; request-contract tests pass; production account verification pending |
 | `demandbase` | Pending provider research and implementation |
 | `demio` | Pending provider research and implementation |
-| `discourse` | Pending provider research and implementation |
+| `discourse` | Implemented configurable-host route; request contracts pass; live forum acceptance pending |
 | `docupost` | Implemented; request contracts pass; live missing-data rejection, authenticated acceptance pending |
 | `doppler` | Route and offline request tests added; live verification pending |
 | `dribbble` | Implemented stored-token route; request contracts pass; authenticated account testing pending |
@@ -701,3 +702,13 @@ and test_run_session_raises_when_display_stays_bound. Their assertion failures a
 missing /workspace diagnostic match the earlier unchanged c33bb96 baseline run.
 No additional failures appeared. This is code-level validation, not authenticated
 provider acceptance. No runtime source changed during this checkpoint.
+
+## Discourse validation
+
+Eight cases cover configured hosts, username validation, authentication headers and
+JSON topic creation. The valid read/write tests failed before implementation.
+The initial implementation exposed shared template handling that wrongly validated
+api_username as a hostname; only fields used by the trusted URL template are now
+subject to hostname validation. Username validation remains separate and fail-closed.
+The focused suite passes 322 tests; Ruff passes. No real forum or token was used;
+no topics were posted. Live authenticated acceptance remains pending.

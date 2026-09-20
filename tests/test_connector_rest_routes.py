@@ -1305,3 +1305,58 @@ def test_jvzoo_versioned_read_authentication(tmp_path):
     )
     assert req.get_header("Authorization") == "Basic " + base64.b64encode(b"fixture-key:x").decode()
     assert req.data is None
+
+
+@pytest.mark.parametrize(
+    "domain,username",
+    [
+        ("forum.example.com", "fixture_user"),
+        ("", "fixture_user"),
+        ("https://forum.example.com", "fixture_user"),
+        ("forum.example.com/evil", "fixture_user"),
+        ("forum.example.com@evil.test", "fixture_user"),
+        ("forum.example.com", ""),
+        ("forum.example.com", "fixture\r\nInjected: yes"),
+    ],
+)
+def test_discourse_host_and_identity(tmp_path, domain, username):
+    paths = HarnessPaths(home=tmp_path)
+    record = Connectors(paths).add(
+        "discourse",
+        "Discourse",
+        config={"api_domain": domain, "api_username": username},
+        secret="fixture-key",
+    )
+    bound = tools_for_bot(paths, "atlas", record_ids={record["id"]})
+    with patch("connectors.generic._open", return_value=_response({})) as send:
+        result = bound["discourse_get"][1]({"path": "/categories.json"})
+    if (domain, username) != ("forum.example.com", "fixture_user"):
+        assert result.startswith("error:")
+        send.assert_not_called()
+        return
+    assert "HTTP 200" in result
+    req = send.call_args.args[0]
+    assert req.full_url == "https://forum.example.com/categories.json"
+    assert req.get_header("Api-key") == "fixture-key"
+    assert req.get_header("Api-username") == "fixture_user"
+    assert req.get_header("Authorization") is None
+
+
+def test_discourse_json_topic_request(tmp_path):
+    paths = HarnessPaths(home=tmp_path)
+    record = Connectors(paths).add(
+        "discourse",
+        "Discourse",
+        config={"api_domain": "forum.example.com", "api_username": "fixture_user"},
+        secret="fixture-key",
+    )
+    bound = tools_for_bot(paths, "atlas", record_ids={record["id"]})
+    body = {"title": "Fixture topic", "raw": "Fixture body"}
+    with patch("connectors.generic._open", return_value=_response({})) as send:
+        assert "HTTP 200" in bound["discourse_request"][1](
+            {"method": "POST", "path": "/posts.json", "body": body}
+        )
+    req = send.call_args.args[0]
+    assert req.full_url == "https://forum.example.com/posts.json"
+    assert req.get_header("Api-username") == "fixture_user"
+    assert json.loads(req.data) == body

@@ -141,6 +141,8 @@ def auth_style(ctx: ConnectorContext) -> str:
 def _fill(template: str, fields: list, config: dict) -> str:
     values: dict[str, str] = {}
     for field in fields:
+        if "{" + str(field) + "}" not in template:
+            continue
         value = str(config.get(field, "")).strip()
         if not _HOST.match(value):
             return ""
@@ -342,6 +344,11 @@ def _http(
     else:
         auth_key = key
     hdrs = _headers(ctx, auth_key)
+    if ctx.record.get("type") == "discourse":
+        username = str((ctx.record.get("config") or {}).get("api_username") or "")
+        if not re.fullmatch(r"[A-Za-z0-9_.-]+", username):
+            return "error: configure Discourse api_username using letters, numbers, dots, hyphens or underscores"
+        hdrs["Api-Username"] = username
     if ctx.record.get("type") == "hypeauditor":
         client_id = str((ctx.record.get("config") or {}).get("client_id") or "")
         if not re.fullmatch(r"[0-9]+", client_id):
