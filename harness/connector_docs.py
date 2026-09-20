@@ -965,7 +965,13 @@ _ROWS: list[tuple[str, str, str, str]] = [
         "https://support.kickofflabs.com/developer/common-api-behavior/",
         "Store the campaign API Access key; uses Bearer with application/json. GET /campaigns lists campaigns. POST /CAMPAIGN_ID/ creates or updates a lead with email or phone_number. Bodies use JSON. Lead changes can trigger campaign automations. Rate limits and campaign permissions apply.",
     ),
-    ("kingsumo", "none", "", "No public API docs site found."),
+    (
+        "kingsumo",
+        "none",
+        "https://help.kingsumo.com/",
+        "Provider team says API details are available in paid Lifetime account settings "
+        "rather than public documentation. REST host and authentication remain unverified.",
+    ),
     (
         "klaviyo",
         "official",

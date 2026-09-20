@@ -285,7 +285,7 @@ Live evidence for the third batch:
 | `jvzoo` | Implemented; request contract passes; invalid key rejected live, account acceptance pending |
 | `kartra` | Implemented form POST API; nested read contract passes; invalid app ID explicitly rejected; authenticated acceptance open |
 | `kickofflabs` | Implemented; request contracts pass; invalid key rejected live, account acceptance pending |
-| `kingsumo` | Pending provider research and implementation |
+| `kingsumo` | Pending: provider places API documentation in Lifetime account settings; no verified public host/auth contract |
 | `klenty` | Implemented; request contracts pass; authenticated account verification pending |
 | `kyvio` | Pending provider research and implementation |
 | `lagrowthmachine` | Implemented; request contracts pass; invalid key rejected live, account acceptance pending |
@@ -1178,3 +1178,8 @@ Browser navigation confirms herobot.app redirects to https://herobot.ai/, whose 
 ## Impression product identity unresolved
 
 The catalogue points to https://www.impressiondigital.com/, a marketing agency. Its [technology page](https://www.impressiondigital.com/about/our-technology/) describes third-party integrations and proprietary client tools, not a public Impression REST API. The generic catalogue description supplies no additional product identifier. Requested a product/documentation URL while continuing the other providers. No host is inferred from unrelated advertising impression APIs.
+
+
+## KingSumo account documentation requirement
+
+A [provider-team answer](https://appsumo.com/products/kingsumo/questions/do-you-have-any-details-for-api-integrat-673181/) dated May 15, 2024 says the API details are intentionally not public and are available in Lifetime account settings. This is stronger evidence than the previous unsuccessful documentation search, but remains an older statement rather than proof of current account access. The current public product listing still advertises custom API integrations in the Pro plan. Host/authentication remain pending account documentation. No plan was purchased and no giveaway was created.
