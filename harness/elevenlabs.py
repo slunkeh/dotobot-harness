@@ -36,14 +36,32 @@ def request(paths, route: str, *, method="GET", key=None) -> dict:
         with urllib.request.urlopen(req, timeout=20) as response:
             result = json.loads(response.read(2_000_000))
     except urllib.error.HTTPError as exc:
-        # Do not copy upstream bodies, headers or URLs: they can contain keys/tokens.
+        # Only translate known codes to local text; upstream messages can contain secrets.
+        code = None
+        try:
+            body = json.loads(exc.read(65_536))
+            error = body.get("detail") if isinstance(body, dict) else None
+            if isinstance(error, dict):
+                code = error.get("code") or error.get("status")
+        except (OSError, ValueError):
+            pass
+        if not isinstance(code, str):
+            code = None
         detail = {
             402: "Quota exhausted. Check your ElevenLabs account and retry.",
-            401: "API key rejected. Reconnect ElevenLabs in Voice providers.",
+            401: "Authentication failed. Check the API key and its permissions.",
             403: "API key lacks permission. Check its voices, transcription and speech permissions.",
             404: "Voice no longer exists. Choose another voice in Voice providers.",
             429: "Quota or rate limit reached. Check your ElevenLabs account and retry.",
-        }.get(exc.code, "Service unavailable. Retry the connection.")
+        }.get(exc.code, f"Request failed (HTTP {exc.code}). Retry the connection.")
+        detail = {
+            "invalid_api_key": "API key rejected. Reconnect ElevenLabs in Voice providers.",
+            "missing_permissions": (
+                "API key lacks permission. Enable Voices: Read to connect and choose a voice; "
+                "enable Speech to Text and Text to Speech for voice conversations."
+            ),
+            "quota_exceeded": "Quota exhausted. Check your ElevenLabs account and retry.",
+        }.get(code, detail)
         raise VoiceError("ElevenLabs: " + detail) from None
     except (OSError, ValueError, urllib.error.URLError):
         raise VoiceError("ElevenLabs connection failed. Check the network and retry.") from None
