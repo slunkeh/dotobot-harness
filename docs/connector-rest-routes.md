@@ -262,7 +262,7 @@ Live evidence for the third batch:
 | `google_drive` | Implemented stored-token route; request contracts pass; OAuth lifecycle and live account verification pending |
 | `google_sheets` | Implemented stored-token route; request contracts pass; OAuth lifecycle and live account verification pending |
 | `gosquared` | Implemented; request contracts pass; official public demo read passes; production account acceptance pending |
-| `gozen_growth` | Pending provider research and implementation |
+| `gozen_growth` | Pending: official key-generation instructions confirmed; Growth REST host/header still unverified |
 | `grade_us` | Implemented v4 raw Authorization; invalid-key read returned 401; valid account acceptance open |
 | `greenspark` | Implemented; request contracts pass; authenticated account verification pending |
 | `growsurf` | Route and offline request tests added; live verification pending |
@@ -1193,3 +1193,8 @@ The catalogue's https://inksprout.co/docs/index.html displays Cannot GET /docs/i
 ## Leadoku provider documentation access
 
 Integration listings associate Leadoku with Growth-X, but this does not establish the current provider REST contract. Opening https://help.growth-x.com/ in the browser fails with ERR_NAME_NOT_RESOLVED. No credentials were transmitted. A live provider reference or account documentation remains necessary; no host was substituted from similarly named lead products.
+
+
+## GoZen Growth credential setup evidence
+
+The [official GoZen Engage integration guide](https://docs.gozen.io/gozen-engage-knowledge-base/integration/gozen-growth) confirms Growth keys are generated in account Settings > API key. The Forms integration guide also confirms workspace/list selection after supplying a key. Neither inspected guide specifies the REST base or credential header. Replaced the aggregator-only catalogue pointer with official setup guidance; host remains pending. GoZen Testimonials has its own documented API and is not a substitute for Growth. No account, key or contact was created.

@@ -782,9 +782,11 @@ _ROWS: list[tuple[str, str, str, str]] = [
     ),
     (
         "gozen_growth",
-        "aggregator",
-        "https://zapier.com/mcp/gozen-growth",
-        "Also Composio toolkit.",
+        "official",
+        "https://docs.gozen.io/gozen-engage-knowledge-base/integration/gozen-growth",
+        "Generate the Growth API key in account Settings > API key. Official integration "
+        "guides confirm key-based access, but the REST host and header format remain unverified. "
+        "GoZen Testimonials is a separate product and its API host must not be substituted.",
     ),
     (
         "grade_us",
