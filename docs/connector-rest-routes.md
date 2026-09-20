@@ -3,11 +3,11 @@
 Scope: implement the 144 catalogue connectors identified with missing REST hosts.
 This is an implementation ledger, not a claim of live-account verification.
 
-One hundred and sixteen routes now have offline request-contract coverage through the real connector
+One hundred and seventeen routes now have offline request-contract coverage through the real connector
 registry and credential store. Tests assert the outbound origin, version prefix,
 credential header, query and JSON body. Credentials are never followed through
 HTTP redirects. Production authenticated reads and writes remain unverified for these
-one hundred and sixteen routes. The remaining 28 connectors still need provider research and code.
+one hundred and seventeen routes. The remaining 27 connectors still need provider research and code.
 
 ## Implemented routes
 
@@ -232,7 +232,7 @@ Live evidence for the third batch:
 | `emailverify_io` | Implemented; request contracts pass; invalid key rejected live, authenticated account acceptance pending |
 | `emelia` | Pending provider research and implementation |
 | `encharge` | Implemented own-account REST route; request contracts pass; live invalid key rejected; authenticated acceptance open |
-| `endorsal` | Pending: official property-key Bearer authentication verified; endpoint reference and REST host still unresolved |
+| `endorsal` | Implemented REST route; authenticated account acceptance pending |
 | `engage` | Pending provider research and implementation |
 | `enginemailer` | Implemented; request contracts pass; live invalid key rejected in HTTP 200 response body; authenticated acceptance pending |
 | `enormail` | Implemented; request contracts pass; authenticated account verification pending |
@@ -1063,3 +1063,10 @@ A disposable-store GET /lists with an invalid key returned HTTP 401 unauthorized
 The former websitebuilder Apiary reference now publishes a [move notice](https://jsapi.apiary.io/apis/websitebuilder.apib) pointing to [Website API](https://websitebuilder.app-sources.com/). The current reference specifies https://{domain}/api/site, Bearer keys from Website Settings > Applications, an identifying User-Agent, GET /contacts and JSON POST /contacts. This resolves the inaccessible-reference issue and identifies a concrete customer-host contract to verify.
 
 The IndieFunnels public website serves app-sources.com assets, consistent with the platform, but that alone does not prove account API availability or that its customer domains expose the documented API. Direct local fetching of the IndieFunnels homepage returned HTTP 403 while the browser search reader could retrieve it. No customer host or token was guessed. Account-level API settings confirmation remains the next step; IndieFunnels stays pending and the implemented count remains 116.
+
+
+## Endorsal REST route
+
+The [interactive provider reference](https://developers.endorsal.io/docs/endorsal/YXBpOjE2OTAxMDk-public-rest-api) loaded in the browser and its Original export produced Endorsal.v1.json. The schema confirms https://api.endorsal.io and /v1 paths, resolving the earlier host blocker. Added property-key Bearer routing and contracts for GET /tags and JSON POST /tags with name, type and description. No live tags or contacts were created.
+
+A disposable-store GET /tags with an invalid key returned HTTP 401 Invalid Token. Real property access and operation acceptance remain open. Focused suite: 474 passed; Ruff clean.

@@ -903,6 +903,8 @@ STUBS: list[dict] = [
     },
     {
         "type": "endorsal",
+        "api_base": "https://api.endorsal.io/v1",
+        "auth_style": "bearer",
         "name": "Endorsal",
         "auth": "api_key",
         "fields": [],

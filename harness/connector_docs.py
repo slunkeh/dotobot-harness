@@ -566,7 +566,7 @@ _ROWS: list[tuple[str, str, str, str]] = [
         "endorsal",
         "official",
         "https://developers.endorsal.io/",
-        "Official REST developer center. Generate a property-specific API key in Account > API. Requests use Authorization: Bearer; GET also accepts a key query parameter. The endpoint reference has not yet been retrieved, so no REST host is configured.",
+        "Official REST developer center. Generate a property-specific API key in Account > API. Requests use Authorization: Bearer; GET also accepts a key query parameter. Paths omit /v1. GET /tags lists tags; POST /tags accepts JSON name, type and description. Contact and AutoRequest operations may trigger outreach.",
     ),
     ("engage", "none", "", "Too generic to identify a specific vendor."),
     (

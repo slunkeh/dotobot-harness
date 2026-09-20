@@ -15,6 +15,14 @@ from harness.paths import HarnessPaths
 # Literal expected requests intentionally independent of catalogue metadata.
 CASES = [
     (
+        "endorsal",
+        {},
+        "/tags",
+        "https://api.endorsal.io/v1/tags",
+        "Authorization",
+        "Bearer fixture-key",
+    ),
+    (
         "campaignhq",
         {},
         "/lists",
@@ -2707,5 +2715,19 @@ def test_campaignhq_list_json(tmp_path):
     assert "HTTP 200" in result
     req = send.call_args.args[0]
     assert req.full_url == "https://api.campaignhq.co/api/v1/lists"
+    assert req.get_header("Authorization") == "Bearer fixture-key"
+    assert json.loads(req.data) == body
+
+
+def test_endorsal_tag_json(tmp_path):
+    paths = HarnessPaths(home=tmp_path)
+    record = Connectors(paths).add("endorsal", "Endorsal", secret="fixture-key")
+    bound = tools_for_bot(paths, "atlas", record_ids={record["id"]})
+    body = {"name": "Fixture", "type": "tag", "description": "Test tag"}
+    with patch("connectors.generic._open", return_value=_response({})) as send:
+        result = bound["endorsal_request"][1]({"method": "POST", "path": "/tags", "body": body})
+    assert "HTTP 200" in result
+    req = send.call_args.args[0]
+    assert req.full_url == "https://api.endorsal.io/v1/tags"
     assert req.get_header("Authorization") == "Bearer fixture-key"
     assert json.loads(req.data) == body
