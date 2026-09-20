@@ -3,11 +3,11 @@
 Scope: implement the 144 catalogue connectors identified with missing REST hosts.
 This is an implementation ledger, not a claim of live-account verification.
 
-One hundred and seventeen routes now have offline request-contract coverage through the real connector
+One hundred and eighteen routes now have offline request-contract coverage through the real connector
 registry and credential store. Tests assert the outbound origin, version prefix,
 credential header, query and JSON body. Credentials are never followed through
 HTTP redirects. Production authenticated reads and writes remain unverified for these
-one hundred and seventeen routes. The remaining 27 connectors still need provider research and code.
+one hundred and eighteen routes. The remaining 26 connectors still need provider research and code.
 
 ## Implemented routes
 
@@ -242,7 +242,7 @@ Live evidence for the third batch:
 | `exact_mails` | Pending: current website gates API documentation behind account creation; backend differs from older integration examples |
 | `facebook` | Implemented Graph API host; Page discovery and Messenger request contracts pass; live invalid OAuth token rejected; account acceptance open |
 | `feedblitz` | Implemented XML REST route; transport contracts pass; invalid key rejected in HTTP 200 XML; account acceptance pending |
-| `flexmail` | Pending provider research and implementation |
+| `flexmail` | Implemented contact-management REST route; account acceptance pending |
 | `flippingbook` | Implemented Online API; request contracts pass; invalid key rejected live, account acceptance pending |
 | `fomo` | Route and offline request tests added; live verification pending |
 | `freshmarketer` | Implemented standalone account-subdomain route; request contracts pass; real host/key needed for live acceptance |
@@ -1070,3 +1070,10 @@ The IndieFunnels public website serves app-sources.com assets, consistent with t
 The [interactive provider reference](https://developers.endorsal.io/docs/endorsal/YXBpOjE2OTAxMDk-public-rest-api) loaded in the browser and its Original export produced Endorsal.v1.json. The schema confirms https://api.endorsal.io and /v1 paths, resolving the earlier host blocker. Added property-key Bearer routing and contracts for GET /tags and JSON POST /tags with name, type and description. No live tags or contacts were created.
 
 A disposable-store GET /tags with an invalid key returned HTTP 401 Invalid Token. Real property access and operation acceptance remain open. Focused suite: 474 passed; Ruff clean.
+
+
+## Flexmail marketing REST API
+
+The [current provider documentation](https://api.flexmail.eu/documentation/) links its [OpenAPI definition](https://api.flexmail.eu/documentation/openapi.php). It specifies api.flexmail.eu and Basic authentication with account ID as username and a personal access token as password. Store account_id:token. Added GET /contacts and JSON POST /contacts contracts using email and source ID. Obtain source IDs from the account API.
+
+The specification limits this REST service to contact management and refers campaign sending to SOAP. Transactional email is a separate product and host; neither is claimed by this route. A disposable-store GET /contacts with invalid credentials returned HTTP 401 Invalid authentication credentials. No contacts were created or messages sent. Real account acceptance remains open. Focused suite: 476 passed; Ruff clean.

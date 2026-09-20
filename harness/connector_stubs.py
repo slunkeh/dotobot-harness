@@ -1017,6 +1017,8 @@ STUBS: list[dict] = [
     },
     {
         "type": "flexmail",
+        "api_base": "https://api.flexmail.eu",
+        "auth_style": "basic",
         "name": "Flexmail",
         "auth": "api_key",
         "fields": [],

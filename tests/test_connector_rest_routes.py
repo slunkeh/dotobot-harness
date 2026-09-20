@@ -2731,3 +2731,29 @@ def test_endorsal_tag_json(tmp_path):
     assert req.full_url == "https://api.endorsal.io/v1/tags"
     assert req.get_header("Authorization") == "Bearer fixture-key"
     assert json.loads(req.data) == body
+
+
+@pytest.mark.parametrize("method", ["GET", "POST"])
+def test_flexmail_contact_contract(tmp_path, method):
+    import base64
+
+    paths = HarnessPaths(home=tmp_path)
+    record = Connectors(paths).add("flexmail", "Flexmail", secret="123:fixture-token")
+    bound = tools_for_bot(paths, "atlas", record_ids={record["id"]})
+    body = {"email": "fixture@example.com", "source": 1}
+    args = (
+        {"path": "/contacts"}
+        if method == "GET"
+        else {"method": method, "path": "/contacts", "body": body}
+    )
+    with patch("connectors.generic._open", return_value=_response({})) as send:
+        result = bound["flexmail_get" if method == "GET" else "flexmail_request"][1](args)
+    assert "HTTP 200" in result
+    req = send.call_args.args[0]
+    assert req.full_url == "https://api.flexmail.eu/contacts"
+    assert (
+        req.get_header("Authorization")
+        == "Basic " + base64.b64encode(b"123:fixture-token").decode()
+    )
+    if method == "POST":
+        assert json.loads(req.data) == body

@@ -627,8 +627,8 @@ _ROWS: list[tuple[str, str, str, str]] = [
     (
         "flexmail",
         "partial",
-        "https://www.mcpbundles.com/skills/flexmail",
-        "Fallback API docs: developer.flexmail.eu.",
+        "https://api.flexmail.eu/documentation/",
+        "Store account_id:personal_access_token for Basic auth. This REST route covers contact management; campaign sending uses separate SOAP services and transactional email uses a separate host. GET /contacts; JSON writes use account resource IDs.",
     ),
     (
         "flippingbook",
