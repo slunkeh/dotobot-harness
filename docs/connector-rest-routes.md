@@ -273,7 +273,7 @@ Live evidence for the third batch:
 | `hypeauditor` | Implemented; request contracts pass; invalid credentials rejected live, account acceptance pending |
 | `hyperise` | Pending: official API support pages currently fail TLS certificate validation; host and authentication still require verification |
 | `icontact` | Implemented standard API; three-header and JSON-array contracts pass; live invalid username rejected; authenticated acceptance open |
-| `impression` | Pending provider research and implementation |
+| `impression` | Pending product identity: catalogue names Impression Digital agency; no verified public REST contract |
 | `indiefunnels` | Pending: Website API reference recovered; confirm IndieFunnels account exposes this API and customer domain |
 | `infusionsoft` | Implemented; request-contract tests pass; production account verification pending |
 | `inksprout` | Pending provider research and implementation |
@@ -1173,3 +1173,8 @@ This is host/auth routing evidence, not successful account access. Public provid
 ## HeroBot current identity and documentation
 
 Browser navigation confirms herobot.app redirects to https://herobot.ai/, whose login points to https://app.herobot.ai/en/login. The public help centre is https://help.herobot.ai/. Its integration guides discuss API operations, but the inspected public pages do not specify the HeroBot REST base, credential header or request schema. Public references to WhatsApp Cloud API and nerDigital endpoints are not sufficient evidence to substitute either as HeroBot's API. Updated the catalogue documentation pointer; host remains pending. No account, bot, channel or message was created.
+
+
+## Impression product identity unresolved
+
+The catalogue points to https://www.impressiondigital.com/, a marketing agency. Its [technology page](https://www.impressiondigital.com/about/our-technology/) describes third-party integrations and proprietary client tools, not a public Impression REST API. The generic catalogue description supplies no additional product identifier. Requested a product/documentation URL while continuing the other providers. No host is inferred from unrelated advertising impression APIs.
