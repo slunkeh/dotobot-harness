@@ -3,11 +3,11 @@
 Scope: implement the 144 catalogue connectors identified with missing REST hosts.
 This is an implementation ledger, not a claim of live-account verification.
 
-One hundred and nine routes now have offline request-contract coverage through the real connector
+One hundred and ten routes now have offline request-contract coverage through the real connector
 registry and credential store. Tests assert the outbound origin, version prefix,
 credential header, query and JSON body. Credentials are never followed through
 HTTP redirects. Production authenticated reads and writes remain unverified for these
-one hundred and nine routes. The remaining 35 connectors still need provider research and code.
+one hundred and ten routes. The remaining 34 connectors still need provider research and code.
 
 ## Implemented routes
 
@@ -296,7 +296,7 @@ Live evidence for the third batch:
 | `leaddyno` | Implemented; request contracts pass; authenticated account verification pending |
 | `leadoku` | Pending provider research and implementation |
 | `leadpops` | Pending provider research and implementation |
-| `linkedin` | Pending provider research and implementation |
+| `linkedin` | Implemented official API; profile and versioned post contracts pass; live invalid token rejected; authenticated acceptance open |
 | `microsoft_excel` | Implemented stored-token route; request contracts pass; OAuth lifecycle and live account verification pending |
 | `microsoft_outlook` | Implemented stored-token route; request contracts pass; OAuth lifecycle and live account verification pending |
 | `microsoft_teams` | Implemented stored-token route; request contracts pass; OAuth lifecycle and live account verification pending |
@@ -1006,3 +1006,9 @@ The current [provider website](https://exactmails.com) states that account creat
 ## Full-suite checkpoint at 109 routes
 
 At commit e6a77c5, the full runtime suite completed with 3,582 passed, 2 skipped and 2 failed in 309.70 seconds. The failures were test_listener_user_data_dirs_reads_listening_cmdline (assert False) and test_run_session_raises_when_display_stays_bound (did not raise RuntimeError). Both names and failing assertions match the previously reproduced baseline results at c33bb96. This run introduced no additional failing tests; it is not a fully green suite or authenticated provider acceptance. A short temporary test directory was used to avoid Unix socket path length failures. The focused connector suite remains 446 passed.
+
+## LinkedIn API
+
+The [OpenID Connect guide](https://learn.microsoft.com/en-us/linkedin/consumer/integrations/self-serve/sign-in-with-linkedin-v2) documents GET api.linkedin.com/v2/userinfo using a Bearer access token. The [current Posts API](https://learn.microsoft.com/en-us/linkedin/marketing/community-management/shares/posts-api?view=li-lms-2026-09) requires version and Rest.li protocol headers. Added those headers on /rest/ paths, defaulting to 202609 with a YYYYMM config override. Tests cover profile request formatting and nested post bodies with default/explicit versions. No live post was made.
+
+A disposable-store GET /v2/userinfo with an invalid token returned HTTP 401 INVALID_ACCESS_TOKEN. Real OAuth consent, approved scopes, token refresh and authenticated operation acceptance remain open. Focused suite: 449 passed; Ruff clean.

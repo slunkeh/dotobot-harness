@@ -15,6 +15,14 @@ from harness.paths import HarnessPaths
 # Literal expected requests intentionally independent of catalogue metadata.
 CASES = [
     (
+        "linkedin",
+        {},
+        "/v2/userinfo",
+        "https://api.linkedin.com/v2/userinfo",
+        "Authorization",
+        "Bearer fixture-key",
+    ),
+    (
         "dripcel",
         {},
         "/balance",
@@ -2481,3 +2489,37 @@ def test_icontact_headers_and_array_write(tmp_path, method):
     assert req.get_header("Authorization") is None
     if method == "POST":
         assert json.loads(req.data) == body
+
+
+@pytest.mark.parametrize("version", [None, "202608"])
+def test_linkedin_post_version_headers(tmp_path, version):
+    paths = HarnessPaths(home=tmp_path)
+    record = Connectors(paths).add(
+        "linkedin",
+        "LinkedIn",
+        secret="fixture-key",
+        config={"api_version": version} if version else {},
+    )
+    bound = tools_for_bot(paths, "atlas", record_ids={record["id"]})
+    body = {
+        "author": "urn:li:organization:1",
+        "commentary": "Fixture",
+        "visibility": "PUBLIC",
+        "distribution": {
+            "feedDistribution": "MAIN_FEED",
+            "targetEntities": [],
+            "thirdPartyDistributionChannels": [],
+        },
+        "lifecycleState": "PUBLISHED",
+        "isReshareDisabledByAuthor": False,
+    }
+    with patch("connectors.generic._open", return_value=_response({})) as send:
+        result = bound["linkedin_request"][1](
+            {"method": "POST", "path": "/rest/posts", "body": body}
+        )
+    assert "HTTP 200" in result
+    req = send.call_args.args[0]
+    assert req.full_url == "https://api.linkedin.com/rest/posts"
+    assert req.get_header("Linkedin-version") == (version or "202609")
+    assert req.get_header("X-restli-protocol-version") == "2.0.0"
+    assert json.loads(req.data) == body

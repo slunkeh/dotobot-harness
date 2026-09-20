@@ -1002,9 +1002,9 @@ _ROWS: list[tuple[str, str, str, str]] = [
     ),
     (
         "linkedin",
-        "community",
-        "https://github.com/stickerdaniel/linkedin-mcp-server",
-        "No official LinkedIn MCP.",
+        "official",
+        "https://learn.microsoft.com/en-us/linkedin/marketing/community-management/shares/posts-api",
+        "Store an OAuth access token, not an ID token. GET /v2/userinfo requires the OpenID Connect product and profile scope; email is optional. /rest/ requests include LinkedIn-Version 202609 and X-Restli-Protocol-Version 2.0.0. Config api_version may override with a supported YYYYMM release. POST /rest/posts requires approved social permissions and an author URN; publishing is a live external action. Token refresh and media uploads to other hosts are not automated.",
     ),
     (
         "mailchimp",

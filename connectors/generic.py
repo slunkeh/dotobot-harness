@@ -449,6 +449,14 @@ def _http(
         hdrs = _headers(ctx, auth_key)
     except ValueError as exc:
         return f"error: {exc}"
+    if ctx.record.get("type") == "linkedin" and urllib.parse.urlsplit(url).path.startswith(
+        "/rest/"
+    ):
+        version = str((ctx.record.get("config") or {}).get("api_version") or "202609")
+        if not re.fullmatch(r"[0-9]{4}(0[1-9]|1[0-2])", version):
+            return "error: LinkedIn api_version must be YYYYMM"
+        hdrs["LinkedIn-Version"] = version
+        hdrs["X-Restli-Protocol-Version"] = "2.0.0"
     if ctx.record.get("type") == "discourse":
         username = str((ctx.record.get("config") or {}).get("api_username") or "")
         if not re.fullmatch(r"[A-Za-z0-9_.-]+", username):

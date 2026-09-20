@@ -1592,6 +1592,8 @@ STUBS: list[dict] = [
     },
     {
         "type": "linkedin",
+        "api_base": "https://api.linkedin.com",
+        "auth_style": "bearer",
         "name": "LinkedIn",
         "auth": "api_key",
         "fields": [],
