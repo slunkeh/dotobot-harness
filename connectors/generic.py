@@ -63,7 +63,7 @@ def tools(type_: str) -> list[ConnectorTool]:
                         },
                         "query": {
                             "type": "object",
-                            "description": "optional query string as string values",
+                            "description": "optional query values; arrays repeat a parameter",
                         },
                     },
                     "required": ["path"],
@@ -282,7 +282,9 @@ def _http(
         if not url:
             return "error: path must stay on the connector's API host"
     if query:
-        qs = urllib.parse.urlencode({str(k): v for k, v in query.items() if v is not None})
+        qs = urllib.parse.urlencode(
+            {str(k): v for k, v in query.items() if v is not None}, doseq=True
+        )
         url += ("&" if "?" in url else "?") + qs
     # Final boundary: a sentinel the model echoed into the path,
     # query, or body is substituted with its plaintext here; one that cannot

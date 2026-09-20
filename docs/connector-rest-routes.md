@@ -3,11 +3,11 @@
 Scope: implement the 144 catalogue connectors identified with missing REST hosts.
 This is an implementation ledger, not a claim of live-account verification.
 
-Thirty-two routes now have offline request-contract coverage through the real connector
+Thirty-eight routes now have offline request-contract coverage through the real connector
 registry and credential store. Tests assert the outbound origin, version prefix,
 credential header, query and JSON body. Credentials are never followed through
 HTTP redirects. Production authenticated reads and writes remain unverified for these
-thirty-two routes. The remaining 112 connectors still need provider research and code.
+thirty-eight routes. The remaining 106 connectors still need provider research and code.
 
 ## Implemented routes
 
@@ -51,6 +51,12 @@ CloudConvert currently uses its production automatic-region API, not its sandbox
 | `cyberimpact` | [Provider documentation](https://api.cyberimpact.com/docs) | Store the JWT API token from Developers > API tokens. Authentication uses Bearer. Paths are relative to https://api.cyberimpact.com; GET /groups reads groups and POST /groups accepts JSON with title and isPublic. Use page and limit for pagination. |
 | `eventbrite` | [Provider documentation](https://www.eventbrite.com/platform/new/api) | Store your Eventbrite personal OAuth token, not the application client secret. Authentication uses Bearer. Paths are relative to /v3 and normally end with a slash, for example GET /users/me/. JSON writes use the endpoint schema. Access depends on the token owner and organization permissions; OAuth authorization for other users is not performed by this stored-token route. |
 | `laposta` | [Provider documentation](https://api.laposta.nl/doc/index.en.php) | Store the Laposta API key alone; HTTP Basic uses it as the username with an empty password. Paths are relative to https://api.laposta.org/v2, for example GET /list. Regular writes use form fields with bracket notation for nested objects; POST /list/LIST_ID/members uses JSON for bulk synchronization. Pass the body as an object; Dotobot selects the encoding. Bulk synchronization requires a paid account. |
+| `google_calendar` | [Provider documentation](https://developers.google.com/workspace/calendar/api/v3/reference) | Store a current OAuth access token as the connector secret, not an API key, refresh token or client secret. Authentication uses Bearer. This route does not run OAuth consent or refresh expired tokens; replace the stored access token when it expires. GET /users/me/calendarList lists calendars; use a token with calendar.calendarlist.readonly or another scope allowed by that endpoint. Writes need the corresponding calendar scope. Paths omit /calendar/v3. |
+| `google_drive` | [Provider documentation](https://developers.google.com/workspace/drive/api/reference/rest/v3) | Store a current OAuth access token as the connector secret, not an API key, refresh token or client secret. Authentication uses Bearer. This route does not run OAuth consent or refresh expired tokens; replace the stored access token when it expires. GET /files lists file metadata; drive.metadata.readonly is sufficient for that read. JSON metadata writes need an appropriate write scope. Paths omit /drive/v3. Binary and multipart uploads or downloads are not supported by these text tools. |
+| `google_sheets` | [Provider documentation](https://developers.google.com/workspace/sheets/api/reference/rest/v4/spreadsheets/get) | Store a current OAuth access token as the connector secret, not an API key, refresh token or client secret. Authentication uses Bearer. This route does not run OAuth consent or refresh expired tokens; replace the stored access token when it expires. GET /spreadsheets/SPREADSHEET_ID reads a spreadsheet; spreadsheets.readonly is sufficient for reads. Writes require spreadsheets or another supported write scope. Paths omit /v4. Use fields and ranges to limit large responses. |
+| `microsoft_excel` | [Provider documentation](https://learn.microsoft.com/en-us/graph/api/workbook-list-worksheets?view=graph-rest-1.0) | Store a current OAuth access token as the connector secret, not an API key, refresh token or client secret. Authentication uses Bearer. This route does not run OAuth consent or refresh expired tokens; replace the stored access token when it expires. GET /me/drive/items/ITEM_ID/workbook/worksheets lists worksheets. Use a delegated Graph token with Files.ReadWrite; application-only tokens are unsupported for this method. Calls are sessionless: workbook changes persist. Workbook-Session-Id and file uploads are not supported. Uses the global Graph cloud; paths omit /v1.0. |
+| `microsoft_outlook` | [Provider documentation](https://learn.microsoft.com/en-us/graph/api/user-list-messages?view=graph-rest-1.0) | Store a current OAuth access token as the connector secret, not an API key, refresh token or client secret. Authentication uses Bearer. This route does not run OAuth consent or refresh expired tokens; replace the stored access token when it expires. GET /me/messages lists messages with delegated Mail.ReadBasic for basic properties; bodies need Mail.Read. Application tokens use /users/USER_ID/messages with application permissions. Mail writes need corresponding permissions. Uses the global Graph cloud; paths omit /v1.0. |
+| `microsoft_teams` | [Provider documentation](https://learn.microsoft.com/en-us/graph/api/user-list-joinedteams?view=graph-rest-1.0) | Store a current OAuth access token as the connector secret, not an API key, refresh token or client secret. Authentication uses Bearer. This route does not run OAuth consent or refresh expired tokens; replace the stored access token when it expires. GET /me/joinedTeams requires delegated Team.ReadBasic.All with a work or school account. Personal accounts are unsupported. Application tokens use /users/USER_ID/joinedTeams. Other operations require their own permissions. Uses the global Graph cloud; paths omit /v1.0. |
 
 ActiveCampaign host selection: [official base URL guidance](https://developers.activecampaign.com/reference/url).
 
@@ -209,9 +215,9 @@ Live evidence for the third batch:
 | `google_ad_manager` | Pending provider research and implementation |
 | `google_ads` | Pending provider research and implementation |
 | `google_analytics` | Pending provider research and implementation |
-| `google_calendar` | Pending provider research and implementation |
-| `google_drive` | Pending provider research and implementation |
-| `google_sheets` | Pending provider research and implementation |
+| `google_calendar` | Implemented stored-token route; request contracts pass; OAuth lifecycle and live account verification pending |
+| `google_drive` | Implemented stored-token route; request contracts pass; OAuth lifecycle and live account verification pending |
+| `google_sheets` | Implemented stored-token route; request contracts pass; OAuth lifecycle and live account verification pending |
 | `gosquared` | Pending provider research and implementation |
 | `gozen_growth` | Pending provider research and implementation |
 | `grade_us` | Pending provider research and implementation |
@@ -248,9 +254,9 @@ Live evidence for the third batch:
 | `leadoku` | Pending provider research and implementation |
 | `leadpops` | Pending provider research and implementation |
 | `linkedin` | Pending provider research and implementation |
-| `microsoft_excel` | Pending provider research and implementation |
-| `microsoft_outlook` | Pending provider research and implementation |
-| `microsoft_teams` | Pending provider research and implementation |
+| `microsoft_excel` | Implemented stored-token route; request contracts pass; OAuth lifecycle and live account verification pending |
+| `microsoft_outlook` | Implemented stored-token route; request contracts pass; OAuth lifecycle and live account verification pending |
+| `microsoft_teams` | Implemented stored-token route; request contracts pass; OAuth lifecycle and live account verification pending |
 
 ### Fourth batch: JoggAI, Copicake and EmailOctopus
 
@@ -306,3 +312,27 @@ a complete list inventory. The documentation's sample list ID returned HTTP 400
 Unknown list; the sample ID appears stale. No live writes were performed and
 production account operations remain unverified. The previously pending Laposta
 body-format requirement is now implemented.
+
+### Eighth batch: Google Workspace and Microsoft Graph
+
+2026-09-20: six route cases failed before implementation and pass afterward.
+Added Google Calendar, Drive and Sheets plus Microsoft Excel, Outlook and Teams
+using stored OAuth access tokens. These are REST transports, not completed OAuth
+consent/refresh integrations. Tokens must be renewed outside these routes.
+230 focused tests pass; Ruff passes. Tests also cover documented JSON writes
+and Sheets repeated range parameters. The repeated-parameter test failed before
+the query encoder was changed to expand arrays; scalar queries remain covered.
+
+Sequential bound-tool probes using an invalid access token returned HTTP 401
+for all six routes. Google reported invalid authentication credentials; Microsoft
+reported InvalidAuthenticationToken. No user credentials, account reads or writes
+were used. Global Graph cloud, Excel sessionless behavior, Google text/JSON limits
+and required permissions are recorded above. Production acceptance remains open.
+
+Write contracts reference provider documentation for
+[Calendar creation](https://developers.google.com/workspace/calendar/api/v3/reference/calendars/insert),
+[Drive metadata creation](https://developers.google.com/workspace/drive/api/reference/rest/v3/files/create),
+[Sheets creation](https://developers.google.com/workspace/sheets/api/reference/rest/v4/spreadsheets/create),
+[Excel worksheet creation](https://learn.microsoft.com/en-us/graph/api/worksheetcollection-add?view=graph-rest-1.0),
+[Outlook folder creation](https://learn.microsoft.com/en-us/graph/api/user-post-mailfolders?view=graph-rest-1.0),
+and [Teams channel creation](https://learn.microsoft.com/en-us/graph/api/channel-post?view=graph-rest-1.0).

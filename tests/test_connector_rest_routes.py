@@ -15,6 +15,54 @@ from harness.paths import HarnessPaths
 # Literal expected requests intentionally independent of catalogue metadata.
 CASES = [
     (
+        "google_calendar",
+        {},
+        "/users/me/calendarList",
+        "https://www.googleapis.com/calendar/v3/users/me/calendarList",
+        "Authorization",
+        "Bearer fixture-key",
+    ),
+    (
+        "google_drive",
+        {},
+        "/files",
+        "https://www.googleapis.com/drive/v3/files",
+        "Authorization",
+        "Bearer fixture-key",
+    ),
+    (
+        "google_sheets",
+        {},
+        "/spreadsheets/fixture",
+        "https://sheets.googleapis.com/v4/spreadsheets/fixture",
+        "Authorization",
+        "Bearer fixture-key",
+    ),
+    (
+        "microsoft_excel",
+        {},
+        "/me/drive/items/fixture/workbook/worksheets",
+        "https://graph.microsoft.com/v1.0/me/drive/items/fixture/workbook/worksheets",
+        "Authorization",
+        "Bearer fixture-key",
+    ),
+    (
+        "microsoft_outlook",
+        {},
+        "/me/messages",
+        "https://graph.microsoft.com/v1.0/me/messages",
+        "Authorization",
+        "Bearer fixture-key",
+    ),
+    (
+        "microsoft_teams",
+        {},
+        "/me/joinedTeams",
+        "https://graph.microsoft.com/v1.0/me/joinedTeams",
+        "Authorization",
+        "Bearer fixture-key",
+    ),
+    (
         "cyberimpact",
         {},
         "/groups",
@@ -397,6 +445,42 @@ def test_4dem_malformed_auth_response_is_not_forwarded(tmp_path):
     "type_,path,url,body",
     [
         (
+            "google_calendar",
+            "/calendars",
+            "https://www.googleapis.com/calendar/v3/calendars",
+            {"summary": "Fixture calendar"},
+        ),
+        (
+            "google_drive",
+            "/files",
+            "https://www.googleapis.com/drive/v3/files",
+            {"name": "Fixture folder", "mimeType": "application/vnd.google-apps.folder"},
+        ),
+        (
+            "google_sheets",
+            "/spreadsheets",
+            "https://sheets.googleapis.com/v4/spreadsheets",
+            {"properties": {"title": "Fixture spreadsheet"}},
+        ),
+        (
+            "microsoft_excel",
+            "/me/drive/items/fixture/workbook/worksheets/add",
+            "https://graph.microsoft.com/v1.0/me/drive/items/fixture/workbook/worksheets/add",
+            {"name": "Fixture"},
+        ),
+        (
+            "microsoft_outlook",
+            "/me/mailFolders",
+            "https://graph.microsoft.com/v1.0/me/mailFolders",
+            {"displayName": "Fixture folder", "isHidden": False},
+        ),
+        (
+            "microsoft_teams",
+            "/teams/fixture/channels",
+            "https://graph.microsoft.com/v1.0/teams/fixture/channels",
+            {"displayName": "Fixture channel", "membershipType": "standard"},
+        ),
+        (
             "joggai",
             "/endpoint",
             "https://api.jogg.ai/v2/endpoint",
@@ -511,3 +595,27 @@ def test_laposta_read_has_no_body(tmp_path):
     assert request.data is None
     assert request.get_header("Content-type") is None
     assert request.get_header("Authorization") == "Basic Zml4dHVyZS1rZXk6"
+
+
+def test_sheets_repeated_range_query(tmp_path):
+    from urllib.parse import parse_qs, urlparse
+
+    paths = HarnessPaths(home=tmp_path)
+    record = Connectors(paths).add("google_sheets", "Sheets", secret="fixture-key")
+    bound = tools_for_bot(paths, "atlas", record_ids={record["id"]})
+    with patch("connectors.generic._open", return_value=_response({})) as send:
+        result = bound["google_sheets_get"][1](
+            {
+                "path": "/spreadsheets/fixture",
+                "query": {
+                    "ranges": ["Sheet1!A1:B2", "Sheet2!C1:D2"],
+                    "fields": "spreadsheetId,sheets",
+                    "unused": None,
+                },
+            }
+        )
+    assert "HTTP 200" in result
+    assert parse_qs(urlparse(send.call_args.args[0].full_url).query) == {
+        "ranges": ["Sheet1!A1:B2", "Sheet2!C1:D2"],
+        "fields": ["spreadsheetId,sheets"],
+    }
