@@ -15,6 +15,14 @@ from harness.paths import HarnessPaths
 # Literal expected requests intentionally independent of catalogue metadata.
 CASES = [
     (
+        "google_ad_manager",
+        {},
+        "/networks",
+        "https://admanager.googleapis.com/v1/networks",
+        "Authorization",
+        "Bearer fixture-key",
+    ),
+    (
         "facebook",
         {},
         "/v20.0/me/accounts",
@@ -2588,3 +2596,29 @@ def test_instagram_invalid_login_type(tmp_path):
     with patch("connectors.generic._open") as send:
         assert "error" in bound["instagram_get"][1]({"path": "/me"})
     send.assert_not_called()
+
+
+@pytest.mark.parametrize("project", [None, "fixture-project", "bad\r\nheader", ""])
+def test_ad_manager_report_and_quota_project(tmp_path, project):
+    paths = HarnessPaths(home=tmp_path)
+    record = Connectors(paths).add(
+        "google_ad_manager",
+        "Ad Manager",
+        secret="fixture-key",
+        config={} if project is None else {"quota_project": project},
+    )
+    bound = tools_for_bot(paths, "atlas", record_ids={record["id"]})
+    with patch("connectors.generic._open", return_value=_response({})) as send:
+        result = bound["google_ad_manager_request"][1](
+            {"method": "POST", "path": "/networks/123/reports/456:run", "body": {}}
+        )
+    if project in ("", "bad\r\nheader"):
+        assert "invalid" in result
+        send.assert_not_called()
+        return
+    assert "HTTP 200" in result
+    req = send.call_args.args[0]
+    assert req.full_url == "https://admanager.googleapis.com/v1/networks/123/reports/456:run"
+    assert req.get_header("X-goog-user-project") == project
+    assert req.get_header("Authorization") == "Bearer fixture-key"
+    assert json.loads(req.data) == {}

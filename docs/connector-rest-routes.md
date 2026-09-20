@@ -3,11 +3,11 @@
 Scope: implement the 144 catalogue connectors identified with missing REST hosts.
 This is an implementation ledger, not a claim of live-account verification.
 
-One hundred and twelve routes now have offline request-contract coverage through the real connector
+One hundred and thirteen routes now have offline request-contract coverage through the real connector
 registry and credential store. Tests assert the outbound origin, version prefix,
 credential header, query and JSON body. Credentials are never followed through
 HTTP redirects. Production authenticated reads and writes remain unverified for these
-one hundred and twelve routes. The remaining 32 connectors still need provider research and code.
+one hundred and thirteen routes. The remaining 31 connectors still need provider research and code.
 
 ## Implemented routes
 
@@ -255,7 +255,7 @@ Live evidence for the third batch:
 | `gitter` | Pending provider research and implementation |
 | `gobio_link` | Pending provider research and implementation |
 | `goodbits` | Pending: website, API and support hosts fail DNS resolution; official API contract unavailable |
-| `google_ad_manager` | Pending provider research and implementation |
+| `google_ad_manager` | Implemented REST route; authenticated account acceptance pending |
 | `google_ads` | Pending provider research and implementation |
 | `google_analytics` | Implemented; Data API request contracts pass; invalid token rejected live; authenticated account acceptance pending |
 | `google_calendar` | Implemented stored-token route; request contracts pass; OAuth lifecycle and live account verification pending |
@@ -1024,3 +1024,12 @@ A disposable-store unversioned GET /me?fields=id with an invalid token returned 
 Meta's [official collection](https://www.postman.com/meta/instagram/documentation/6yqw8pt/instagram-api) uses graph.instagram.com for Instagram Login and graph.facebook.com for Facebook Login. Added the login_type configuration selector with a fixed host allowlist, default Instagram Login, Bearer authentication and JSON request coverage. Invalid modes fail before transport. Versions stay in caller paths; offline v20.0 fixtures demonstrate URL formatting, not current version suitability.
 
 A disposable-store GET /me?fields=id on graph.instagram.com with an invalid token returned HTTP 401 OAuthException code 190. No messages or media were published. Facebook-host authentication has the preceding Facebook probe, but real Instagram account permissions and operation acceptance remain open for both modes. Focused suite: 455 passed; Ruff clean.
+
+
+## Google Ad Manager REST API
+
+The [official getting-started guide](https://developers.google.com/ad-manager/api/beta/getting-started) specifies admanager.googleapis.com/v1, OAuth tokens and x-goog-user-project for end-user credentials. Added the route and optional validated quota_project configuration. Store a current token with admanager or admanager.readonly scope; API enablement and network access are required. Service-account tokens can omit the quota project. Token issuance and refresh remain manual.
+
+Bound request contracts cover GET /networks and [POST /networks/NETWORK/reports/REPORT:run](https://developers.google.com/ad-manager/api/beta/reference/rest/v1/networks.reports/run) with an empty JSON object, including absent, valid and invalid project headers. Report execution is asynchronous; follow the returned operation and fetch result rows after completion. No live report was run.
+
+A disposable-store GET /networks with an invalid token returned HTTP 401 UNAUTHENTICATED. Real account authorization and report acceptance remain open. Focused suite: 460 passed; Ruff clean.

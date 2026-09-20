@@ -1148,6 +1148,7 @@ STUBS: list[dict] = [
     },
     {
         "type": "google_ad_manager",
+        "api_base": "https://admanager.googleapis.com/v1",
         "name": "Google Ad Manager",
         "auth": "api_key",
         "fields": [],

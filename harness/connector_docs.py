@@ -723,8 +723,8 @@ _ROWS: list[tuple[str, str, str, str]] = [
     (
         "google_ad_manager",
         "community",
-        "https://github.com/MatiousCorp/google-ad-manager-mcp",
-        "No official Google-published GAM MCP.",
+        "https://developers.google.com/ad-manager/api/beta/getting-started",
+        "REST uses a stored OAuth access token. Enable the API and grant network access. End-user tokens require config quota_project; service-account tokens may omit it. Paths omit /v1. Token issuance and refresh are not automatic.",
     ),
     (
         "google_ads",
