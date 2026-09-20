@@ -778,7 +778,13 @@ _ROWS: list[tuple[str, str, str, str]] = [
         "https://zapier.com/mcp/gozen-growth",
         "Also Composio toolkit.",
     ),
-    ("grade_us", "none", "https://gradeus.com/", "No public docs surfaced."),
+    (
+        "grade_us",
+        "official",
+        "https://api.grade.us/",
+        "Grade.us v4: raw API token in Authorization. JSON writes. "
+        "GET /profiles lists profiles; recipient creation may initiate review outreach.",
+    ),
     (
         "greenspark",
         "official",

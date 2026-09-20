@@ -2861,3 +2861,24 @@ def test_jellyreach_contact_form(tmp_path, method):
     if method == "POST":
         assert req.get_header("Content-type") == "application/x-www-form-urlencoded"
         assert parse_qs(req.data.decode()) == {k: [v] for k, v in body.items()}
+
+
+@pytest.mark.parametrize("method", ["GET", "PATCH"])
+def test_grade_us_profile_read_and_user_update(tmp_path, method):
+    paths = HarnessPaths(home=tmp_path)
+    record = Connectors(paths).add("grade_us", "Grade.us", secret="fixture-key")
+    bound = tools_for_bot(paths, "atlas", record_ids={record["id"]})
+    path = "/profiles" if method == "GET" else "/users/fixture-user"
+    args = {"path": path}
+    if method == "PATCH":
+        args.update(method=method, body={"last_name": "Test"})
+    with patch("connectors.generic._open", return_value=_response({})) as send:
+        result = bound["grade_us_get" if method == "GET" else "grade_us_request"][1](args)
+    assert "HTTP 200" in result
+    req = send.call_args.args[0]
+    assert req.full_url == "https://grade.us/api/v4" + path
+    assert req.method == method
+    assert req.get_header("Authorization") == "fixture-key"
+    if method == "PATCH":
+        assert req.get_header("Content-type") == "application/json"
+        assert json.loads(req.data) == {"last_name": "Test"}

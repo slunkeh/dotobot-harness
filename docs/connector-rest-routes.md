@@ -3,11 +3,11 @@
 Scope: implement the 144 catalogue connectors identified with missing REST hosts.
 This is an implementation ledger, not a claim of live-account verification.
 
-One hundred and twenty-four routes now have offline request-contract coverage through the real connector
+One hundred and twenty-five routes now have offline request-contract coverage through the real connector
 registry and credential store. Tests assert the outbound origin, version prefix,
 credential header, query and JSON body. Credentials are never followed through
 HTTP redirects. Production authenticated reads and writes remain unverified for these
-one hundred and twenty-four routes. The remaining 20 connectors still need provider research and code.
+one hundred and twenty-five routes. The remaining 19 connectors still need provider research and code.
 
 ## Implemented routes
 
@@ -263,7 +263,7 @@ Live evidence for the third batch:
 | `google_sheets` | Implemented stored-token route; request contracts pass; OAuth lifecycle and live account verification pending |
 | `gosquared` | Implemented; request contracts pass; official public demo read passes; production account acceptance pending |
 | `gozen_growth` | Pending provider research and implementation |
-| `grade_us` | Pending provider research and implementation |
+| `grade_us` | Implemented v4 raw Authorization; invalid-key read returned 401; valid account acceptance open |
 | `greenspark` | Implemented; request contracts pass; authenticated account verification pending |
 | `growsurf` | Route and offline request tests added; live verification pending |
 | `herobot` | Pending provider research and implementation |
@@ -1128,3 +1128,10 @@ A disposable-store GET /lists with invalid credentials returned HTTP 522 with an
 The [official reference](https://developers.jellyreach.com/) specifies https://api.jellyreach.com/v1, a raw API key in Authorization and form-encoded contact writes. Added bound GET and POST /contacts contracts. Event data must be supplied as a JSON string within its form field. Some reference labels contradict their curl examples; untested delete/list operations need account-level confirmation.
 
 A disposable-store GET /contacts with an invalid key returned HTTP 401 Unauthenticated. No contact was created or changed. Valid account read/write acceptance remains open. Focused suite: 485 passed; Ruff clean. The original ledger now has 124 configured hosts and 20 pending.
+
+
+## Grade.us v4 API
+
+The provider website links its [official API collection](https://api.grade.us/). Its published collection defines https://grade.us/api/v4, raw Authorization tokens and JSON writes. Added bound GET /profiles and PATCH /users/{id} contracts. The earlier catalogue link to gradeus.com was replaced with this verified documentation source. Recipient creation can initiate outreach and was not used for a live probe.
+
+A disposable-store GET /profiles with an invalid token returned HTTP 401, error_code 1000, explicitly rejecting the token. No users, recipients or campaigns were changed. Authenticated workflows remain open. Focused suite: 487 passed; Ruff clean. Host count: 125 of 144, with 19 pending.
