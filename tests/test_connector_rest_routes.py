@@ -14,6 +14,71 @@ from harness.paths import HarnessPaths
 
 # Literal expected requests intentionally independent of catalogue metadata.
 CASES = [
+    (
+        "acelle_mail",
+        {"instance_domain": "mail.example.com"},
+        "/me",
+        "https://mail.example.com/api/v1/me",
+        "Authorization",
+        "Bearer fixture-key",
+    ),
+    (
+        "emailable",
+        {},
+        "/account",
+        "https://api.emailable.com/v1/account",
+        "Authorization",
+        "Bearer fixture-key",
+    ),
+    (
+        "dropcontact",
+        {},
+        "/webhook",
+        "https://api.dropcontact.com/v1/enrich/webhook",
+        "X-access-token",
+        "fixture-key",
+    ),
+    (
+        "dynapictures",
+        {},
+        "/workspaces",
+        "https://api.dynapictures.com/workspaces",
+        "Authorization",
+        "Bearer fixture-key",
+    ),
+    ("egoi", {}, "/my-account", "https://api.egoiapp.com/my-account", "Apikey", "fixture-key"),
+    (
+        "email_on_acid",
+        {},
+        "/auth",
+        "https://api.emailonacid.com/v5/auth",
+        "Authorization",
+        "Basic dGVzdC11c2VyOnRlc3QtYXBpLXBhc3N3b3Jk",
+    ),
+    (
+        "fomo",
+        {},
+        "/applications/me/events",
+        "https://api.fomo.com/api/v1/applications/me/events",
+        "Authorization",
+        "Token fixture-key",
+    ),
+    (
+        "growsurf",
+        {},
+        "/campaign/example",
+        "https://api.growsurf.com/v2/campaign/example",
+        "Authorization",
+        "Bearer fixture-key",
+    ),
+    (
+        "instasent",
+        {},
+        "/project/example",
+        "https://api.instasent.com/v1/project/example",
+        "Authorization",
+        "Bearer fixture-key",
+    ),
     ("bigmailer", {}, "/me", "https://api.bigmailer.io/v1/me", "X-api-key", "fixture-key"),
     ("cardly", {}, "/art", "https://api.card.ly/v2/art", "Api-key", "fixture-key"),
     (
@@ -103,7 +168,9 @@ CASES = [
 @pytest.mark.parametrize("type_,config,path,url,header,value", CASES)
 def test_bound_connector_read_and_write_contract(tmp_path, type_, config, path, url, header, value):
     paths = HarnessPaths(home=tmp_path)
-    secret = "test-user:test-api-password" if type_ == "360nrs" else "fixture-key"
+    secret = (
+        "test-user:test-api-password" if type_ in {"360nrs", "email_on_acid"} else "fixture-key"
+    )
     record = Connectors(paths).add(type_, type_, config=config, secret=secret)
     bound = tools_for_bot(paths, "atlas", record_ids={record["id"]})
     for method, args, name in [
@@ -140,11 +207,12 @@ def test_bound_connector_read_and_write_contract(tmp_path, type_, config, path, 
         "sample.test?x=1",
     ],
 )
-def test_activecampaign_requires_host_only_configuration(tmp_path, domain):
+@pytest.mark.parametrize(
+    "type_,field", [("activecampaign", "api_domain"), ("acelle_mail", "instance_domain")]
+)
+def test_template_requires_host_only_configuration(tmp_path, domain, type_, field):
     paths = HarnessPaths(home=tmp_path)
-    record = Connectors(paths).add(
-        "activecampaign", "test", config={"api_domain": domain}, secret="fixture-key"
-    )
+    record = Connectors(paths).add(type_, "test", config={field: domain}, secret="fixture-key")
     ctx = ConnectorContext(paths=paths, bot="atlas", record=record)
     with patch("connectors.generic._open") as send:
         assert "no REST host" in generic._get(ctx, {"path": "/users/me"})

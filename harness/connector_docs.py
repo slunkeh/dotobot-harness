@@ -29,9 +29,9 @@ _ROWS: list[tuple[str, str, str, str]] = [
     ),
     (
         "acelle_mail",
-        "aggregator",
-        "https://zapier.com/mcp/acelle-mail",
-        "Zapier MCP for self-hosted Acelle Mail.",
+        "official",
+        "https://acellesend.com/rest-api",
+        "Set instance_domain to the HTTPS hostname of your Acelle Mail installation, without a scheme or path. Store the API token from My Profile > API and Authentication. Paths are relative to /api/v1, for example /me. Authentication uses Bearer. Installations under a URL subdirectory are not covered.",
     ),
     (
         "activecampaign",
@@ -420,9 +420,9 @@ _ROWS: list[tuple[str, str, str, str]] = [
     ),
     (
         "dropcontact",
-        "aggregator",
-        "https://zapier.com/mcp/dropcontact",
-        "Also composio.dev/toolkits/dropcontact.",
+        "official",
+        "https://developer.dropcontact.com/",
+        "Store a Dropcontact access token. Paths are relative to https://api.dropcontact.com/v1/enrich; use /all for enrichment and /webhook for callback configuration. Authentication uses X-Access-Token.",
     ),
     (
         "dub",
@@ -444,15 +444,15 @@ _ROWS: list[tuple[str, str, str, str]] = [
     ),
     (
         "dynapictures",
-        "aggregator",
-        "https://zapier.com/mcp/dynapictures",
-        "No official MCP.",
+        "official",
+        "https://dynapictures.com/docs/",
+        "Store a DynaPictures API key. Paths are relative to https://api.dynapictures.com, for example /workspaces or /designs/TEMPLATE_ID. Authentication uses Bearer.",
     ),
     (
         "egoi",
-        "none",
-        "https://e-goi.com/en/developers/",
-        "General API docs. No MCP.",
+        "official",
+        "https://developers.e-goi.com/api/v3/",
+        "Store the E-goi API key from account settings. Paths are relative to https://api.egoiapp.com, for example /my-account; do not add /v3. Authentication uses Apikey.",
     ),
     (
         "easypromos",
@@ -481,11 +481,16 @@ _ROWS: list[tuple[str, str, str, str]] = [
     ),
     (
         "email_on_acid",
-        "community",
-        "https://glama.ai/mcp/servers/KnakLabs/email-on-acid-mcp",
-        "Third-party (KnakLabs).",
+        "official",
+        "https://api.emailonacid.com/docs/latest",
+        "Store api_key:account_password as the secret for HTTP Basic authentication. Paths are relative to https://api.emailonacid.com/v5, for example /auth. The documented public sandbox uses sandbox:sandbox.",
     ),
-    ("emailable", "none", "https://emailable.com/docs/api", "No dedicated MCP."),
+    (
+        "emailable",
+        "official",
+        "https://emailable.com/docs/api/authentication/",
+        "Store an Emailable private API key or OAuth access token. Paths are relative to https://api.emailable.com/v1, for example /account. Authentication uses Bearer; public keys only allow verification. Test keys simulate verification without using credits.",
+    ),
     ("emailchef", "none", "https://www.emailchef.com/", "No dedicated MCP."),
     (
         "emaillistverify",
@@ -588,9 +593,9 @@ _ROWS: list[tuple[str, str, str, str]] = [
     ),
     (
         "fomo",
-        "aggregator",
-        "https://composio.dev/toolkits/fomo",
-        "Also listed at mcp.ai/fomo.",
+        "official",
+        "https://github.com/usefomo/fomo-python-sdk/blob/master/Fomo/fomo.py",
+        "Store the site Auth Token from Settings > Site. Paths are relative to https://api.fomo.com/api/v1, for example /applications/me/events. Authentication uses Authorization: Token KEY. API access normally requires a paid plan.",
     ),
     (
         "freshmarketer",
@@ -722,9 +727,9 @@ _ROWS: list[tuple[str, str, str, str]] = [
     ),
     (
         "growsurf",
-        "none",
+        "official",
         "https://docs.growsurf.com/developer-tools/rest-api",
-        "REST API + JS SDK, no MCP.",
+        "Store a GrowSurf API key. Paths are relative to https://api.growsurf.com/v2 and include the program ID, for example /campaign/PROGRAM_ID. Authentication uses Bearer; account plan eligibility is required.",
     ),
     (
         "handwrytten",
@@ -826,9 +831,9 @@ _ROWS: list[tuple[str, str, str, str]] = [
     ),
     (
         "instasent",
-        "none",
-        "https://spec.instasent.com/",
-        "General API docs only.",
+        "official",
+        "https://docs.instasent.com/developers/product-api/authentication/",
+        "Store a scoped Product API token. Paths are relative to https://api.instasent.com/v1, for example /project/PROJECT_UID. Include the real project UID in resource paths. Authentication uses Bearer. This route covers the Product API, not the separate transactional SMS API.",
     ),
     (
         "intercom",

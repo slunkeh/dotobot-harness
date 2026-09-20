@@ -3,11 +3,11 @@
 Scope: implement the 144 catalogue connectors identified with missing REST hosts.
 This is an implementation ledger, not a claim of live-account verification.
 
-Fourteen routes now have offline request-contract coverage through the real connector
+Twenty-three routes now have offline request-contract coverage through the real connector
 registry and credential store. Tests assert the outbound origin, version prefix,
 credential header, query and JSON body. Credentials are never followed through
-HTTP redirects. Live authenticated reads and writes remain unverified for these
-fourteen routes. The remaining 130 connectors still need provider research and code.
+HTTP redirects. Production authenticated reads and writes remain unverified for these
+twenty-three routes. The remaining 121 connectors still need provider research and code.
 
 ## Implemented routes
 
@@ -36,6 +36,17 @@ CloudConvert currently uses its production automatic-region API, not its sandbox
 | `bigmailer` | [Provider documentation](https://docs.bigmailer.io/docs/getting-started-api) | Store a BigMailer API key. Paths are relative to https://api.bigmailer.io/v1, for example /me. Authentication uses X-API-Key and JSON bodies. |
 | `cardly` | [Provider documentation](https://api.card.ly/v2/docs) | Store a Cardly test_ or live_ API key; use test_ keys to avoid order mutations while testing. Paths are relative to https://api.card.ly/v2, for example /art. Authentication uses API-Key and bodies use text/json as required by Cardly. |
 
+| `dropcontact` | [Provider documentation](https://developer.dropcontact.com/) | Store a Dropcontact access token. Paths are relative to https://api.dropcontact.com/v1/enrich; use /all for enrichment and /webhook for callback configuration. Authentication uses X-Access-Token. |
+| `dynapictures` | [Provider documentation](https://dynapictures.com/docs/) | Store a DynaPictures API key. Paths are relative to https://api.dynapictures.com, for example /workspaces or /designs/TEMPLATE_ID. Authentication uses Bearer. |
+| `egoi` | [Provider documentation](https://developers.e-goi.com/api/v3/) | Store the E-goi API key from account settings. Paths are relative to https://api.egoiapp.com, for example /my-account; do not add /v3. Authentication uses Apikey. |
+| `email_on_acid` | [Provider documentation](https://api.emailonacid.com/docs/latest) | Store api_key:account_password as the secret for HTTP Basic authentication. Paths are relative to https://api.emailonacid.com/v5, for example /auth. The documented public sandbox uses sandbox:sandbox. |
+| `fomo` | [Provider documentation](https://github.com/usefomo/fomo-python-sdk/blob/master/Fomo/fomo.py) | Store the site Auth Token from Settings > Site. Paths are relative to https://api.fomo.com/api/v1, for example /applications/me/events. Authentication uses Authorization: Token KEY. API access normally requires a paid plan. |
+| `growsurf` | [Provider documentation](https://docs.growsurf.com/developer-tools/rest-api) | Store a GrowSurf API key. Paths are relative to https://api.growsurf.com/v2 and include the program ID, for example /campaign/PROGRAM_ID. Authentication uses Bearer; account plan eligibility is required. |
+| `instasent` | [Provider documentation](https://docs.instasent.com/developers/product-api/authentication/) | Store a scoped Product API token. Paths are relative to https://api.instasent.com/v1, for example /project/PROJECT_UID. Include the real project UID in resource paths. Authentication uses Bearer. This route covers the Product API, not the separate transactional SMS API. |
+
+| `acelle_mail` | [Provider documentation](https://acellesend.com/rest-api) | Set instance_domain to the HTTPS hostname of your Acelle Mail installation, without a scheme or path. Store the API token from My Profile > API and Authentication. Paths are relative to /api/v1, for example /me. Authentication uses Bearer. Installations under a URL subdirectory are not covered. |
+| `emailable` | [Provider documentation](https://emailable.com/docs/api/authentication/) | Store an Emailable private API key or OAuth access token. Paths are relative to https://api.emailable.com/v1, for example /account. Authentication uses Bearer; public keys only allow verification. Test keys simulate verification without using credits. |
+
 ActiveCampaign host selection: [official base URL guidance](https://developers.activecampaign.com/reference/url).
 
 ## Verification evidence
@@ -59,13 +70,33 @@ Second batch adds seven routes and tests 4Dem token exchange, invalid-token refu
 authentication failure without a resource write, and token rotation between
 calls. These checks use synthetic credentials and do not verify real account access.
 
-Current focused validation: 186 tests pass across REST routes, generic connectors,
+Second-batch focused validation: 186 tests pass across REST routes, generic connectors,
 redaction, connector catalogue/tools, mentions and public export. Ruff passes.
 
 Second-batch invalid-credential probes: 360NRS, ActiveTrail, Campaign Monitor,
 Drip and Cardly returned HTTP 401; 4Dem rejected its authentication exchange with
 HTTP 401; BigMailer returned HTTP 400 with an invalid API-key error. No authenticated
 account access is claimed. Cardly JSON content-type handling is also covered.
+
+Third batch adds nine routes: Acelle Mail, Dropcontact, DynaPictures, E-goi,
+Email on Acid, Emailable, Fomo, GrowSurf and Instasent Product API. Current focused
+validation: 200 tests pass; Ruff passes. Acelle host configuration is tested for
+missing values, full URLs, path injection and userinfo injection before network I/O.
+
+Live evidence for the third batch:
+
+- Email on Acid: documented public sandbox credentials authenticate successfully
+  at `/auth` (HTTP 200, success true), and the bound registry tool reads
+  `/spam/clients` (HTTP 200, 14 entries). This validates sandbox auth and a read,
+  not production access or the email rendering workflow.
+- Dropcontact, DynaPictures and E-goi return HTTP 401 with an invalid key.
+- Fomo returns HTTP 401, "Token is required", for the deliberately invalid token;
+  its header format is checked against the provider-owned Python SDK.
+- GrowSurf and Emailable return HTTP 403 identifying the invalid key.
+- Instasent returns HTTP 403, "No token could be found", for the invalid token;
+  its bearer format is checked against the Product API documentation.
+- Acelle Mail needs an operator-supplied installation host and token; no live
+  instance was used.
 
 ## Full 144-connector ledger
 
@@ -74,7 +105,7 @@ account access is claimed. Cardly JSON content-type handling is also covered.
 | `360nrs` | Route and offline request tests added; live verification pending |
 | `4dem` | Route and offline request tests added; live verification pending |
 | `abyssale` | Route and offline request tests added; live verification pending |
-| `acelle_mail` | Pending provider research and implementation |
+| `acelle_mail` | Route and offline request tests added; live verification pending |
 | `activecampaign` | Route and offline request tests added; live verification pending |
 | `active_trail` | Route and offline request tests added; live verification pending |
 | `acumbamail` | Pending provider research and implementation |
@@ -130,17 +161,17 @@ account access is claimed. Cardly JSON content-type handling is also covered.
 | `dribbble` | Pending provider research and implementation |
 | `drip` | Route and offline request tests added; live verification pending |
 | `dripcel` | Pending provider research and implementation |
-| `dropcontact` | Pending provider research and implementation |
+| `dropcontact` | Route and offline request tests added; live verification pending |
 | `dux_soup` | Pending provider research and implementation |
 | `dynamic_content_snippet` | Pending provider research and implementation |
-| `dynapictures` | Pending provider research and implementation |
-| `egoi` | Pending provider research and implementation |
+| `dynapictures` | Route and offline request tests added; live verification pending |
+| `egoi` | Route and offline request tests added; live verification pending |
 | `easypromos` | Pending provider research and implementation |
 | `easysendy` | Pending provider research and implementation |
 | `echtpost_postcards` | Pending provider research and implementation |
 | `ecologi` | Pending provider research and implementation |
-| `email_on_acid` | Pending provider research and implementation |
-| `emailable` | Pending provider research and implementation |
+| `email_on_acid` | Route and offline tests added; public sandbox authentication and read passed; production verification pending |
+| `emailable` | Route and offline request tests added; live verification pending |
 | `emailchef` | Pending provider research and implementation |
 | `emaillistverify` | Pending provider research and implementation |
 | `emailoctopus` | Pending provider research and implementation |
@@ -159,7 +190,7 @@ account access is claimed. Cardly JSON content-type handling is also covered.
 | `feedblitz` | Pending provider research and implementation |
 | `flexmail` | Pending provider research and implementation |
 | `flippingbook` | Pending provider research and implementation |
-| `fomo` | Pending provider research and implementation |
+| `fomo` | Route and offline request tests added; live verification pending |
 | `freshmarketer` | Pending provider research and implementation |
 | `funnelcockpit` | Pending provider research and implementation |
 | `getemails` | Pending provider research and implementation |
@@ -180,7 +211,7 @@ account access is claimed. Cardly JSON content-type handling is also covered.
 | `gozen_growth` | Pending provider research and implementation |
 | `grade_us` | Pending provider research and implementation |
 | `greenspark` | Pending provider research and implementation |
-| `growsurf` | Pending provider research and implementation |
+| `growsurf` | Route and offline request tests added; live verification pending |
 | `herobot` | Pending provider research and implementation |
 | `heysummit` | Pending provider research and implementation |
 | `hippo_video` | Pending provider research and implementation |
@@ -194,7 +225,7 @@ account access is claimed. Cardly JSON content-type handling is also covered.
 | `inksprout` | Pending provider research and implementation |
 | `instabot` | Pending provider research and implementation |
 | `instagram` | Pending provider research and implementation |
-| `instasent` | Pending provider research and implementation |
+| `instasent` | Route and offline request tests added; live verification pending |
 | `jellyreach` | Pending provider research and implementation |
 | `joggai` | Pending provider research and implementation |
 | `jvzoo` | Pending provider research and implementation |
