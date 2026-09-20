@@ -3,11 +3,11 @@
 Scope: implement the 144 catalogue connectors identified with missing REST hosts.
 This is an implementation ledger, not a claim of live-account verification.
 
-Eighty-nine routes now have offline request-contract coverage through the real connector
+Ninety routes now have offline request-contract coverage through the real connector
 registry and credential store. Tests assert the outbound origin, version prefix,
 credential header, query and JSON body. Credentials are never followed through
 HTTP redirects. Production authenticated reads and writes remain unverified for these
-eighty-nine routes. The remaining 55 connectors still need provider research and code.
+ninety routes. The remaining 54 connectors still need provider research and code.
 
 ## Implemented routes
 
@@ -169,7 +169,7 @@ Live evidence for the third batch:
 | `adrapid` | Implemented; request contracts pass; invalid token rejected live, account acceptance pending |
 | `adroll` | Implemented PAT route with scalar multipart writes; tests pass; invalid application key rejected live; account acceptance and binary uploads pending |
 | `adtraction` | Implemented; request contracts pass; authenticated account verification pending |
-| `aimtell` | Pending provider research and implementation |
+| `aimtell` | Implemented REST route; website read/update contracts pass; live invalid API key rejected; authenticated acceptance open |
 | `airship` | Implemented regional HTTP/OAuth routes; version/auth contracts pass; invalid tokens rejected live; account acceptance pending |
 | `apexverify` | Implemented; request contracts pass; invalid key rejected live, authenticated account acceptance pending |
 | `appsflyer` | Implemented hq1 API V2 token route; contracts pass; invalid token rejected live; account acceptance pending |
@@ -846,3 +846,10 @@ No real account subdomain/key is available for a live acceptance check; no conta
 The [official developer documentation](https://docs.encharge.io/api-documentation) links the [current ReDoc specification](https://app-encharge-resources.s3.amazonaws.com/merged.yaml), which specifies https://api.encharge.io/v1 and X-Encharge-Token for own-account API keys. Added GET /people/all and JSON POST /tags request coverage. The older raw definition linked from the documentation uses a different S3 bucket; the current ReDoc specification explicitly documents header-key authentication.
 
 A disposable connector-store probe of GET /people/all?limit=1 returned HTTP 401, errorCode 10082, rejecting the invalid token. No customer records were read or written. Authenticated account acceptance remains open. Partner OAuth setup, automatic token refresh and top-level array bodies for bulk people creation are not implemented. The separate Ingest API is outside this REST host. Focused suite: 373 passed; Ruff clean.
+
+
+## Aimtell REST route
+
+The [official reference](https://developers.aimtell.com/api-reference/introduction) and [website OpenAPI specification](https://developers.aimtell.com/api-reference/sites-openapi.json) document the /prod base and X-Authorization-Api-Key header. Added website-list GET and JSON website-update PUT contracts. GET /sites/ supports limit/skip pagination; PUT /site/ID takes name and optional icon.
+
+A disposable connector-store request to GET /sites/?limit=1 returned HTTP 403 with Invalid API Key. No accepted write or push notification was attempted. Real-account acceptance remains open. Focused suite: 375 passed; Ruff clean.

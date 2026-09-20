@@ -15,6 +15,14 @@ from harness.paths import HarnessPaths
 # Literal expected requests intentionally independent of catalogue metadata.
 CASES = [
     (
+        "aimtell",
+        {},
+        "/sites/",
+        "https://api.aimtell.com/prod/sites/",
+        "X-authorization-api-key",
+        "fixture-key",
+    ),
+    (
         "encharge",
         {},
         "/people/all",
@@ -1808,4 +1816,20 @@ def test_encharge_tag_json(tmp_path):
     req = send.call_args.args[0]
     assert req.full_url == "https://api.encharge.io/v1/tags"
     assert req.get_header("X-encharge-token") == "fixture-key"
+    assert json.loads(req.data) == body
+
+
+def test_aimtell_website_update_json(tmp_path):
+    paths = HarnessPaths(home=tmp_path)
+    record = Connectors(paths).add("aimtell", "Aimtell", secret="fixture-key")
+    bound = tools_for_bot(paths, "atlas", record_ids={record["id"]})
+    body = {"name": "Fixture site", "icon": "https://example.com/icon.png"}
+    with patch("connectors.generic._open", return_value=_response({})) as send:
+        assert "HTTP 200" in bound["aimtell_request"][1](
+            {"method": "PUT", "path": "/site/123", "body": body}
+        )
+    req = send.call_args.args[0]
+    assert req.full_url == "https://api.aimtell.com/prod/site/123"
+    assert req.get_method() == "PUT"
+    assert req.get_header("X-authorization-api-key") == "fixture-key"
     assert json.loads(req.data) == body

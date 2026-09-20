@@ -159,6 +159,9 @@ STUBS: list[dict] = [
     {
         "type": "aimtell",
         "name": "Aimtell",
+        "api_base": "https://api.aimtell.com/prod",
+        "auth_style": "header",
+        "auth_header": "X-Authorization-Api-Key",
         "auth": "api_key",
         "fields": [],
         "category": "Email And Marketing",

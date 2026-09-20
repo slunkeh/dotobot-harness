@@ -84,9 +84,9 @@ _ROWS: list[tuple[str, str, str, str]] = [
     ),
     (
         "aimtell",
-        "none",
-        "https://developers.aimtell.com/reference/api-send-push-notification",
-        "Push notification REST API. No MCP.",
+        "official",
+        "https://developers.aimtell.com/api-reference/introduction",
+        "REST API key goes in X-Authorization-Api-Key. Paths are relative to /prod. GET /sites/ lists websites with limit/skip pagination; PUT /site/ID takes JSON name and optional icon. Campaign and subscriber operations can send pushes or trigger automations. Inspect result/message as well as HTTP status.",
     ),
     (
         "airship",
