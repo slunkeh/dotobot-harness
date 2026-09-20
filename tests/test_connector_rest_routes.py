@@ -15,6 +15,14 @@ from harness.paths import HarnessPaths
 # Literal expected requests intentionally independent of catalogue metadata.
 CASES = [
     (
+        "appsflyer",
+        {},
+        "/api/mng/apps",
+        "https://hq1.appsflyer.com/api/mng/apps",
+        "Authorization",
+        "Bearer fixture-key",
+    ),
+    (
         "demandbase",
         {},
         "/data/export/v1/jobs",
@@ -691,6 +699,12 @@ def test_4dem_malformed_auth_response_is_not_forwarded(tmp_path):
 @pytest.mark.parametrize(
     "type_,path,url,body",
     [
+        (
+            "appsflyer",
+            "/api/p360-click-signing/v2.0/test",
+            "https://hq1.appsflyer.com/api/p360-click-signing/v2.0/test",
+            {"url": "https://example.com/fixture", "signature_version": "v2"},
+        ),
         (
             "demandbase",
             "/data/intent/v1/companies/intent/query",

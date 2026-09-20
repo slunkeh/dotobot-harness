@@ -120,9 +120,9 @@ _ROWS: list[tuple[str, str, str, str]] = [
     ),
     (
         "appsflyer",
-        "none",
-        "https://dev.appsflyer.com/",
-        "AppsFlyer API docs. No MCP in the research table.",
+        "official",
+        "https://dev.appsflyer.com/hc/reference/app-list-ad-nets-api-get",
+        "Store a current API V2 token as Bearer, not an SDK dev key. GET /api/mng/apps lists accessible apps; use limit and offset to page results. Include each endpoint service/version in path. JSON requests on hq1 are supported, including POST /api/p360-click-signing/v2.0/test with url and signature_version. Other service hosts, binary exports and token issuance are not covered. Account permissions and endpoint quotas apply.",
     ),
     (
         "arpoone",

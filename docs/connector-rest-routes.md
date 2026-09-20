@@ -3,11 +3,11 @@
 Scope: implement the 144 catalogue connectors identified with missing REST hosts.
 This is an implementation ledger, not a claim of live-account verification.
 
-Eighty-six routes now have offline request-contract coverage through the real connector
+Eighty-seven routes now have offline request-contract coverage through the real connector
 registry and credential store. Tests assert the outbound origin, version prefix,
 credential header, query and JSON body. Credentials are never followed through
 HTTP redirects. Production authenticated reads and writes remain unverified for these
-eighty-six routes. The remaining 58 connectors still need provider research and code.
+eighty-seven routes. The remaining 57 connectors still need provider research and code.
 
 ## Implemented routes
 
@@ -172,7 +172,7 @@ Live evidence for the third batch:
 | `aimtell` | Pending provider research and implementation |
 | `airship` | Implemented regional HTTP/OAuth routes; version/auth contracts pass; invalid tokens rejected live; account acceptance pending |
 | `apexverify` | Implemented; request contracts pass; invalid key rejected live, authenticated account acceptance pending |
-| `appsflyer` | Pending provider research and implementation |
+| `appsflyer` | Implemented hq1 API V2 token route; contracts pass; invalid token rejected live; account acceptance pending |
 | `arpoone` | Pending provider research and implementation |
 | `asters` | Pending provider research and implementation |
 | `attentive` | Route and offline request tests added; live verification pending |
@@ -827,3 +827,9 @@ The bound GET /user with an invalid key returned HTTP 200 containing rsp stat=fa
 ## Endorsal authentication research
 
 The [official developer center](https://developers.endorsal.io/) confirms property-specific keys generated in Account > API and Authorization: Bearer authentication. GET may alternatively use key in the query. The linked /docs/endorsal/ endpoint reference returned the same developer landing content, without an API host or endpoint specification. Catalogue guidance now points to this verified official source. Host, version and request contracts remain pending; no route or live-account success is claimed.
+
+## AppsFlyer hq1 API
+
+The [app-list reference](https://dev.appsflyer.com/hc/reference/app-list-ad-nets-api-get) specifies hq1.appsflyer.com and API V2 Bearer authentication. Added bound contracts for the app list and [click-signing test](https://dev.appsflyer.com/hc/reference/click-signing-test-post) JSON request. Paths retain the service/version prefix. App lists require pagination; access depends on account permissions. Other service hosts and binary export workflows remain outside this route.
+
+A disposable-store GET /api/mng/apps?limit=1 with an invalid token returned HTTP 401 Authentication error. No signing test or account mutation was submitted. All 364 focused tests and Ruff pass. There are 87 routes and 57 pending; the midpoint full suite predates this addition.

@@ -194,6 +194,8 @@ STUBS: list[dict] = [
         "name": "AppsFlyer",
         "auth": "api_key",
         "fields": [],
+        "api_base": "https://hq1.appsflyer.com",
+        "auth_style": "bearer",
         "category": "Analytics",
         "description": "Connect AppsFlyer.",
         "icon": "chart.bar.xaxis",
