@@ -3,11 +3,11 @@
 Scope: implement the 144 catalogue connectors identified with missing REST hosts.
 This is an implementation ledger, not a claim of live-account verification.
 
-Sixty-nine routes now have offline request-contract coverage through the real connector
+Seventy routes now have offline request-contract coverage through the real connector
 registry and credential store. Tests assert the outbound origin, version prefix,
 credential header, query and JSON body. Credentials are never followed through
 HTTP redirects. Production authenticated reads and writes remain unverified for these
-sixty-nine routes. The remaining 75 connectors still need provider research and code.
+seventy routes. The remaining 74 connectors still need provider research and code.
 
 ## Implemented routes
 
@@ -19,6 +19,7 @@ CloudConvert currently uses its production automatic-region API, not its sandbox
 
 | Connector | Provider reference | Setup |
 |---|---|---|
+| `funnelcockpit` | [Provider documentation](https://api.funnelcockpit.com/) | Store the private API key, sent directly in Authorization without Bearer. GET /me verifies the user; GET /email/tags uses zero-based page and limit. POST /email/tag takes JSON contactId and tagId. Subscriber/tag operations may trigger automations; plan access applies. |
 | `kickofflabs` | [Provider documentation](https://support.kickofflabs.com/developer/common-api-behavior/) | Store the campaign API Access key. Uses Bearer with JSON Content-Type. GET /campaigns lists campaigns; POST /CAMPAIGN_ID/ creates or updates a lead with email or phone_number. Lead changes may trigger campaign automations. |
 | `flippingbook` | [Provider documentation](https://apidocs.flippingbook.com/) | Store an Online API key; uses Bearer. GET /fbonline/publication lists publications with count and offset. POST the same path with JSON name and url for a reachable PDF. Check success and source conversion status. Plan access applies. This route targets FlippingBook Online, not desktop Publisher. |
 | `lagrowthmachine` | [Provider documentation](https://documenter.getpostman.com/view/32966764/2sBXqFM2Vv) | Store the Settings > API key; uses Bearer. GET /members tests access. Paths are relative to /flow. Bodies are JSON except /audiences, /leads/status and /campaigns/ID/settings or status, which use form encoding. POST /audiences/create takes name. Campaign and inbox actions can trigger outreach. |
@@ -232,7 +233,7 @@ Live evidence for the third batch:
 | `flippingbook` | Implemented Online API; request contracts pass; invalid key rejected live, account acceptance pending |
 | `fomo` | Route and offline request tests added; live verification pending |
 | `freshmarketer` | Pending provider research and implementation |
-| `funnelcockpit` | Pending provider research and implementation |
+| `funnelcockpit` | Implemented; request contracts pass; invalid-key request rejected live, account acceptance pending |
 | `getemails` | Pending provider research and implementation |
 | `getresponse` | Route and offline request tests added; live verification pending |
 | `getswift` | Pending provider research and implementation |
@@ -655,3 +656,11 @@ and lead creation/update. Two new tests failed before implementation and pass af
 The focused suite passes 306 tests; Ruff passes. A disposable bound GET /campaigns
 rejected an invalid key with HTTP 409 Invalid API Access. No leads were submitted;
 authenticated account acceptance remains open.
+
+## FunnelCockpit validation
+
+The official OpenAPI document confirms the root host, raw Authorization API key,
+current-user GET and JSON tag assignment. Two tests failed before implementation
+and pass afterward. The focused suite passes 308 tests; Ruff passes. A disposable
+bound GET /me with an invalid key returned HTTP 401 Unauthorized access. This is
+reachability/rejection evidence, not authenticated acceptance. No tags were assigned.

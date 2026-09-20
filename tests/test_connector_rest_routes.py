@@ -15,6 +15,14 @@ from harness.paths import HarnessPaths
 # Literal expected requests intentionally independent of catalogue metadata.
 CASES = [
     (
+        "funnelcockpit",
+        {},
+        "/me",
+        "https://api.funnelcockpit.com/me",
+        "Authorization",
+        "fixture-key",
+    ),
+    (
         "kickofflabs",
         {},
         "/campaigns",
@@ -635,6 +643,12 @@ def test_4dem_malformed_auth_response_is_not_forwarded(tmp_path):
 @pytest.mark.parametrize(
     "type_,path,url,body",
     [
+        (
+            "funnelcockpit",
+            "/email/tag",
+            "https://api.funnelcockpit.com/email/tag",
+            {"contactId": "fixture-contact", "tagId": "fixture-tag"},
+        ),
         (
             "kickofflabs",
             "/123/",

@@ -633,9 +633,9 @@ _ROWS: list[tuple[str, str, str, str]] = [
     ),
     (
         "funnelcockpit",
-        "aggregator",
-        "https://zapier.com/mcp/funnelcockpit",
-        "No vendor-native server.",
+        "official",
+        "https://api.funnelcockpit.com/",
+        "Store the private API key, sent directly in Authorization without Bearer. GET /me verifies the user; GET /email/tags uses zero-based page and limit. JSON bodies are supported, including POST /email/tag with contactId and tagId. Plan access applies; subscriber and tag operations can trigger automations.",
     ),
     ("getemails", "none", "https://getemails.com/", "No dedicated MCP found."),
     (
