@@ -2915,3 +2915,24 @@ def test_gobio_user_and_project_contract(tmp_path, method):
             ).decode()
             for part in msg.iter_parts()
         } == body
+
+
+@pytest.mark.parametrize("method", ["GET", "POST"])
+def test_heysummit_events_contract(tmp_path, method):
+    paths = HarnessPaths(home=tmp_path)
+    record = Connectors(paths).add("heysummit", "HeySummit", secret="fixture-key")
+    bound = tools_for_bot(paths, "atlas", record_ids={record["id"]})
+    args = {"path": "/events/"}
+    body = {"title": "Test Event", "planning_stage": 0}
+    if method == "POST":
+        args.update(method=method, body=body)
+    with patch("connectors.generic._open", return_value=_response({})) as send:
+        result = bound["heysummit_get" if method == "GET" else "heysummit_request"][1](args)
+    assert "HTTP 200" in result
+    req = send.call_args.args[0]
+    assert req.full_url == "https://app.heysummit.com/api/v2/events/"
+    assert req.method == method
+    assert req.get_header("Authorization") == "Token fixture-key"
+    if method == "POST":
+        assert req.get_header("Content-type") == "application/json"
+        assert json.loads(req.data) == body

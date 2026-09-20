@@ -819,8 +819,10 @@ _ROWS: list[tuple[str, str, str, str]] = [
     (
         "heysummit",
         "official",
-        "https://help.heysummit.com/en/articles/11403933-how-to-set-up-webhooks-for-event-actions",
-        "Official help documents REST v2 webhook subscriptions and links API v2 documentation. The linked API documentation hosts currently return 403, so the full REST host/auth/request contract remains unverified. HeySummit also documents a separate official MCP server at https://api.heysummit.com/mcp/ with OAuth or Authorization: Token API_TOKEN; this is not a configured REST route.",
+        "https://app.heysummit.com/api/v2/docs/",
+        "REST v2 uses Authorization: Token API_TOKEN. Get the token from Event Setup > "
+        "API, MCP & Webhooks. GET /events/; JSON POST /events/ requires title. "
+        "Preserve trailing slashes. Stored token excludes the Token prefix.",
     ),
     (
         "hippo_video",

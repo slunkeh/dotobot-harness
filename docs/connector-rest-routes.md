@@ -3,11 +3,11 @@
 Scope: implement the 144 catalogue connectors identified with missing REST hosts.
 This is an implementation ledger, not a claim of live-account verification.
 
-One hundred and twenty-six routes now have offline request-contract coverage through the real connector
+One hundred and twenty-seven routes now have offline request-contract coverage through the real connector
 registry and credential store. Tests assert the outbound origin, version prefix,
 credential header, query and JSON body. Credentials are never followed through
 HTTP redirects. Production authenticated reads and writes remain unverified for these
-one hundred and twenty-six routes. The remaining 18 connectors still need provider research and code.
+one hundred and twenty-seven routes. The remaining 17 connectors still need provider research and code.
 
 ## Implemented routes
 
@@ -267,7 +267,7 @@ Live evidence for the third batch:
 | `greenspark` | Implemented; request contracts pass; authenticated account verification pending |
 | `growsurf` | Route and offline request tests added; live verification pending |
 | `herobot` | Pending provider research and implementation |
-| `heysummit` | Pending: official REST v2 help found, but linked api-v2 and api-docs documentation hosts return 403; full REST contract unverified |
+| `heysummit` | Implemented v2 Token authentication; invalid-key read returned 401; account acceptance open |
 | `hippo_video` | Implemented stored authentication-token route; contracts pass; invalid token/email rejected live; account acceptance pending |
 | `humanitix` | Implemented; request contracts pass; authenticated account verification pending |
 | `hypeauditor` | Implemented; request contracts pass; invalid credentials rejected live, account acceptance pending |
@@ -1154,3 +1154,10 @@ The public https://gobio.link/ homepage redirects to https://join.gobio.link/ an
 The earlier command-line documentation failures were resolved by viewing [the official reference](https://gobio.link/api-documentation) in the browser. It confirms https://gobio.link/api and Bearer API keys. The user reference documents GET /user; the projects reference specifies multipart POST /projects with required name and optional color. Added contracts for both through the registry and secret store. File uploads remain unsupported; scalar multipart fields work.
 
 The bound disposable-store GET /user with an invalid key returned HTTP 401: You do not have access to the API. No project or account was created. Valid account acceptance remains open. Focused suite: 489 passed; Ruff clean. Host count: 126 of 144, with 18 pending.
+
+
+## HeySummit v2: current documentation resolved
+
+The provider homepage now links [the current API reference](https://app.heysummit.com/api/v2/docs/), which loaded in the browser. It specifies https://app.heysummit.com/api/v2 and Authorization: Token API_TOKEN. Tokens come from Event Setup > API, MCP & Webhooks. Added GET /events/ and JSON POST /events/ contracts with required title and optional planning_stage. Trailing slashes are preserved. This supersedes the earlier documentation-host blocker.
+
+A disposable-store GET /events/ with an invalid token returned HTTP 401 Invalid token. No event or attendee was created. Valid account access and write acceptance remain open. Focused suite: 491 passed; Ruff clean. Host count: 127 of 144, with 17 pending.
