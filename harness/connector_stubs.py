@@ -922,6 +922,8 @@ STUBS: list[dict] = [
         "name": "FlippingBook",
         "auth": "api_key",
         "fields": [],
+        "api_base": "https://api-tc.is.flippingbook.com/api/v1",
+        "auth_style": "bearer",
         "category": "Design And Content",
         "description": "Connect FlippingBook.",
         "icon": "paintbrush",

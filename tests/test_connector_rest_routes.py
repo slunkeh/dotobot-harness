@@ -15,6 +15,14 @@ from harness.paths import HarnessPaths
 # Literal expected requests intentionally independent of catalogue metadata.
 CASES = [
     (
+        "flippingbook",
+        {},
+        "/fbonline/publication",
+        "https://api-tc.is.flippingbook.com/api/v1/fbonline/publication",
+        "Authorization",
+        "Bearer fixture-key",
+    ),
+    (
         "lagrowthmachine",
         {},
         "/members",
@@ -619,6 +627,12 @@ def test_4dem_malformed_auth_response_is_not_forwarded(tmp_path):
 @pytest.mark.parametrize(
     "type_,path,url,body",
     [
+        (
+            "flippingbook",
+            "/fbonline/publication",
+            "https://api-tc.is.flippingbook.com/api/v1/fbonline/publication",
+            {"name": "Fixture", "url": "https://example.com/fixture.pdf"},
+        ),
         (
             "apexverify",
             "/unit",

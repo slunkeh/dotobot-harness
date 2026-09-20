@@ -3,11 +3,11 @@
 Scope: implement the 144 catalogue connectors identified with missing REST hosts.
 This is an implementation ledger, not a claim of live-account verification.
 
-Sixty-seven routes now have offline request-contract coverage through the real connector
+Sixty-eight routes now have offline request-contract coverage through the real connector
 registry and credential store. Tests assert the outbound origin, version prefix,
 credential header, query and JSON body. Credentials are never followed through
 HTTP redirects. Production authenticated reads and writes remain unverified for these
-sixty-seven routes. The remaining 77 connectors still need provider research and code.
+sixty-eight routes. The remaining 76 connectors still need provider research and code.
 
 ## Implemented routes
 
@@ -19,6 +19,7 @@ CloudConvert currently uses its production automatic-region API, not its sandbox
 
 | Connector | Provider reference | Setup |
 |---|---|---|
+| `flippingbook` | [Provider documentation](https://apidocs.flippingbook.com/) | Store an Online API key; uses Bearer. GET /fbonline/publication lists publications with count and offset. POST the same path with JSON name and url for a reachable PDF. Check success and source conversion status. Plan access applies. This route targets FlippingBook Online, not desktop Publisher. |
 | `lagrowthmachine` | [Provider documentation](https://documenter.getpostman.com/view/32966764/2sBXqFM2Vv) | Store the Settings > API key; uses Bearer. GET /members tests access. Paths are relative to /flow. Bodies are JSON except /audiences, /leads/status and /campaigns/ID/settings or status, which use form encoding. POST /audiences/create takes name. Campaign and inbox actions can trigger outreach. |
 | `docupost` | [Provider documentation](https://help.docupost.com/developer-documentation/send-letter-api) | Store the Developer API token. POST /sendletter or /sendpostcard uses URL-encoded non-secret query parameters in path; Dotobot adds api_token securely. Supply sender/recipient and PDF or image URLs as documented. Enable account Sandbox Mode for testing. These operations send physical mail and can incur charges; no read endpoint is documented here. |
 | `curated` | [Provider documentation](https://support.curated.co/help/getting-started-with-the-api) | Store the Account API Key. Dotobot quotes it in Authorization: Token token. GET /publications retrieves IDs. POST /publications/ID/issues/ creates a draft. Bodies use JSON. Publishing requires the website. |
@@ -227,7 +228,7 @@ Live evidence for the third batch:
 | `facebook` | Pending provider research and implementation |
 | `feedblitz` | Pending provider research and implementation |
 | `flexmail` | Pending provider research and implementation |
-| `flippingbook` | Pending provider research and implementation |
+| `flippingbook` | Implemented Online API; request contracts pass; invalid key rejected live, account acceptance pending |
 | `fomo` | Route and offline request tests added; live verification pending |
 | `freshmarketer` | Pending provider research and implementation |
 | `funnelcockpit` | Pending provider research and implementation |
@@ -637,3 +638,11 @@ Seven new tests failed before implementation and pass afterward. The focused sui
 passes 302 tests; Ruff passes. A disposable bound GET /members returned HTTP 401
 Invalid apikey. No campaign, lead or inbox writes were attempted; authenticated
 account acceptance remains open.
+
+## FlippingBook validation
+
+The official API reference confirms the gateway, Bearer API key, publication list
+and JSON publication creation with a PDF URL. Two new tests failed before the route
+was added and pass afterward. The focused suite passes 304 tests; Ruff passes.
+A disposable bound publication GET rejected an invalid key with HTTP 403 InvalidApiKey.
+No publication was created. Authenticated access and PDF conversion remain unverified.

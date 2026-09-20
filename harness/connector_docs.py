@@ -597,9 +597,9 @@ _ROWS: list[tuple[str, str, str, str]] = [
     ),
     (
         "flippingbook",
-        "none",
-        "https://flippingbook.com/help/publisher-2",
-        "No MCP found.",
+        "official",
+        "https://apidocs.flippingbook.com/",
+        "Store a FlippingBook Online API key, sent as Bearer. GET /fbonline/publication lists publications with count and offset. POST the same path with JSON name and url for a reachable PDF; creation and conversion are separate, so inspect source status. Check success in responses. Access depends on your plan. This is the Online API, not desktop Publisher.",
     ),
     (
         "fomo",
