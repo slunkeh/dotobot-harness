@@ -3,11 +3,11 @@
 Scope: implement the 144 catalogue connectors identified with missing REST hosts.
 This is an implementation ledger, not a claim of live-account verification.
 
-Eighty-three routes now have offline request-contract coverage through the real connector
+Eighty-four routes now have offline request-contract coverage through the real connector
 registry and credential store. Tests assert the outbound origin, version prefix,
 credential header, query and JSON body. Credentials are never followed through
 HTTP redirects. Production authenticated reads and writes remain unverified for these
-eighty-three routes. The remaining 61 connectors still need provider research and code.
+eighty-four routes. The remaining 60 connectors still need provider research and code.
 
 ## Implemented routes
 
@@ -207,7 +207,7 @@ Live evidence for the third batch:
 | `crowdpower` | Implemented; request contracts pass; authenticated account verification pending |
 | `curated` | Implemented; request contracts pass; invalid-key probe returns 404 Record not found, authenticated acceptance pending |
 | `cyberimpact` | Implemented; request-contract tests pass; production account verification pending |
-| `demandbase` | Pending provider research and implementation |
+| `demandbase` | Implemented current JWT route; request contracts pass; invalid token rejected live; account acceptance pending |
 | `demio` | Pending: public Apiary reference did not expose the contract; blueprint endpoint requires authentication; host and auth contract still need verification |
 | `discourse` | Implemented configurable-host route; request contracts pass; live forum acceptance pending |
 | `docupost` | Implemented; request contracts pass; live missing-data rejection, authenticated acceptance pending |
@@ -805,3 +805,9 @@ The [CRUD examples](https://apidocs.nextroll.com/crud-api/examples.html) use mul
 Added the documented host, Token authentication and scalar multipart form bodies. Supply the application client ID in apikey URL query; it remains separate from the stored personal token. Tests parse MIME parts to verify field values and reject header-injection field names and nested file objects before transport. File uploads and OAuth consent are not supported.
 
 A bound GET /api/v1/organization/get_advertisables with invalid personal token and client ID returned HTTP 401 apiproxy:2 (invalid API key). This verifies reachability and application-key rejection, not personal-token or account acceptance. No advertising mutation was attempted. All 351 focused tests and Ruff pass. There are 83 routes and 61 pending. The midpoint full suite predates this addition.
+
+## Demandbase
+
+Added uapi.demandbase.com using current JWT Bearer access tokens and JSON. [API key-set guidance](https://support.demandbase.com/hc/en-us/articles/38999526296603-Generate-and-Manage-API-Key-Sets) explains token generation and the eight-hour lifetime. The connector accepts a stored access token; issuance and refresh are not implemented. [Export-job listing](https://developer.demandbase.com/reference/fetchexportjobsinfo) and [Intent query](https://developer.demandbase.com/reference/companyintent-1) have bound request-contract coverage. Product permissions apply and Intent is beta.
+
+A disposable-store GET /reporting/v1/usage?apiProduct=b2bapi returned HTTP 401 Authentication Failed - Unauthorized with an invalid token. No export or paid data request was submitted. All 353 focused tests and Ruff pass. There are 84 routes and 60 pending. The midpoint full-suite result predates this addition.

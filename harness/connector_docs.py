@@ -377,8 +377,8 @@ _ROWS: list[tuple[str, str, str, str]] = [
     (
         "demandbase",
         "official",
-        "https://developer.demandbase.com/docs/mcp",
-        "Vendor docs.",
+        "https://developer.demandbase.com/docs/demandbase-api-overview",
+        "Store a current JWT access token generated from an API key set, not a legacy API token or client secret. Uses Bearer and JSON. Tokens expire after eight hours; this route does not issue or refresh them. Include service/version in paths. GET /reporting/v1/usage with apiProduct=b2bapi reads credit usage. POST /data/intent/v1/companies/intent/query takes JSON filters and dates; Intent access is required and the endpoint is beta. Product permissions and quotas apply. Bulk job creation and completed export are separate outcomes.",
     ),
     (
         "demio",

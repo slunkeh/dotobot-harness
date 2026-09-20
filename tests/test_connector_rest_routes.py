@@ -15,6 +15,14 @@ from harness.paths import HarnessPaths
 # Literal expected requests intentionally independent of catalogue metadata.
 CASES = [
     (
+        "demandbase",
+        {},
+        "/data/export/v1/jobs",
+        "https://uapi.demandbase.com/data/export/v1/jobs",
+        "Authorization",
+        "Bearer fixture-key",
+    ),
+    (
         "google_analytics",
         {},
         "/v1beta/properties/1234/metadata",
@@ -683,6 +691,17 @@ def test_4dem_malformed_auth_response_is_not_forwarded(tmp_path):
 @pytest.mark.parametrize(
     "type_,path,url,body",
     [
+        (
+            "demandbase",
+            "/data/intent/v1/companies/intent/query",
+            "https://uapi.demandbase.com/data/intent/v1/companies/intent/query",
+            {
+                "companyIds": ["726263"],
+                "startDate": "2026-07-01",
+                "endDate": "2026-07-22",
+                "pageSize": 25,
+            },
+        ),
         (
             "google_analytics",
             "/v1beta/properties/1234:runReport",
