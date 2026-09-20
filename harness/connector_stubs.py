@@ -786,6 +786,9 @@ STUBS: list[dict] = [
     },
     {
         "type": "emailchef",
+        "api_base": "https://app.emailchef.com/apps/api/v1",
+        "auth_style": "header",
+        "auth_header": "authkey",
         "name": "Emailchef",
         "auth": "api_key",
         "fields": [],

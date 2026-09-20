@@ -511,7 +511,12 @@ _ROWS: list[tuple[str, str, str, str]] = [
         "https://emailable.com/docs/api/authentication/",
         "Store an Emailable private API key or OAuth access token. Paths are relative to https://api.emailable.com/v1, for example /account. Authentication uses Bearer; public keys only allow verification. Test keys simulate verification without using credits.",
     ),
-    ("emailchef", "none", "https://www.emailchef.com/", "No dedicated MCP."),
+    (
+        "emailchef",
+        "official",
+        "https://emailchef.com/integration/",
+        "Store a current authentication token, sent in authkey. GET /lists uses limit/offset. POST /lists takes JSON instance_in with list_name and optional list_description. Automatic login/token renewal and the separate consumerKey/consumerSecret header pair are not supported. Subscriber writes may trigger flows; sending campaigns is a separate operation.",
+    ),
     (
         "emaillistverify",
         "official",

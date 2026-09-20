@@ -15,6 +15,14 @@ from harness.paths import HarnessPaths
 # Literal expected requests intentionally independent of catalogue metadata.
 CASES = [
     (
+        "emailchef",
+        {},
+        "/lists",
+        "https://app.emailchef.com/apps/api/v1/lists",
+        "Authkey",
+        "fixture-key",
+    ),
+    (
         "catch_all_verifier",
         {},
         "/credits",
@@ -1881,4 +1889,19 @@ def test_catch_all_verifier_single_json(tmp_path):
     req = send.call_args.args[0]
     assert req.full_url == "https://app.catchallverifier.com/api/v1/verify/single"
     assert req.get_header("Authorization") == "fixture-key"
+    assert json.loads(req.data) == body
+
+
+def test_emailchef_list_json(tmp_path):
+    paths = HarnessPaths(home=tmp_path)
+    record = Connectors(paths).add("emailchef", "Emailchef", secret="fixture-key")
+    bound = tools_for_bot(paths, "atlas", record_ids={record["id"]})
+    body = {"instance_in": {"list_name": "Fixture", "list_description": "Test list"}}
+    with patch("connectors.generic._open", return_value=_response({})) as send:
+        assert "HTTP 200" in bound["emailchef_request"][1](
+            {"method": "POST", "path": "/lists", "body": body}
+        )
+    req = send.call_args.args[0]
+    assert req.full_url == "https://app.emailchef.com/apps/api/v1/lists"
+    assert req.get_header("Authkey") == "fixture-key"
     assert json.loads(req.data) == body

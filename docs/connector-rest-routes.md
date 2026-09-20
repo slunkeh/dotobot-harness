@@ -3,11 +3,11 @@
 Scope: implement the 144 catalogue connectors identified with missing REST hosts.
 This is an implementation ledger, not a claim of live-account verification.
 
-Ninety-two routes now have offline request-contract coverage through the real connector
+Ninety-three routes now have offline request-contract coverage through the real connector
 registry and credential store. Tests assert the outbound origin, version prefix,
 credential header, query and JSON body. Credentials are never followed through
 HTTP redirects. Production authenticated reads and writes remain unverified for these
-ninety-two routes. The remaining 52 connectors still need provider research and code.
+ninety-three routes. The remaining 51 connectors still need provider research and code.
 
 ## Implemented routes
 
@@ -226,7 +226,7 @@ Live evidence for the third batch:
 | `ecologi` | Implemented; request contracts pass; authenticated account verification pending |
 | `email_on_acid` | Route and offline tests added; public sandbox authentication and read passed; production verification pending |
 | `emailable` | Route and offline request tests added; live verification pending |
-| `emailchef` | Pending provider research and implementation |
+| `emailchef` | Implemented authkey REST route; list read/create contracts pass; live invalid token rejected; authenticated acceptance open |
 | `emaillistverify` | Implemented; request contracts pass; authenticated account verification pending |
 | `emailoctopus` | Implemented; request-contract tests pass; production account verification pending |
 | `emailverify_io` | Implemented; request contracts pass; invalid key rejected live, authenticated account acceptance pending |
@@ -867,3 +867,10 @@ A disposable connector-store GET /event/all?page=1 returned HTTP 401, Not authen
 The [official reference](https://catchallverifier.readme.io/reference/post_api-v1-verify-single) embeds the OpenAPI contract for https://app.catchallverifier.com/api/v1. API Settings keys go directly in Authorization. Added credit-balance GET and single-verification JSON POST contracts. Verification creates a paid task; retrieve its result using the returned id. Bulk verification uses /verify/bulk and can return HTTP 202 while processing.
 
 A disposable connector-store GET /credits returned HTTP 401, Authorization information is invalid. No email was submitted or credits spent. Authenticated acceptance remains open. Focused suite: 379 passed; Ruff clean.
+
+
+## Emailchef REST route
+
+The [official integration page](https://emailchef.com/integration/) loads its [OpenAPI specification](https://emailchef.com/integration/data/openapi.yaml), version 1.4. It specifies app.emailchef.com, /apps/api/v1 resources and the authkey header. Added list GET and JSON POST coverage, including the required instance_in wrapper. A current token must be stored as the connector secret; automatic login/renewal and alternative consumerKey/consumerSecret authentication are not implemented.
+
+A disposable connector-store GET /lists?limit=1 returned HTTP 401 with unauthorized_request. No list or subscriber was created. Authenticated acceptance remains open. Focused suite: 381 passed; Ruff clean.
