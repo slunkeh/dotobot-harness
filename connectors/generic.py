@@ -337,6 +337,11 @@ def _http(
     else:
         auth_key = key
     hdrs = _headers(ctx, auth_key)
+    if ctx.record.get("type") == "hypeauditor":
+        client_id = str((ctx.record.get("config") or {}).get("client_id") or "")
+        if not re.fullmatch(r"[0-9]+", client_id):
+            return "error: configure HypeAuditor client_id as a numeric account ID"
+        hdrs["X-Auth-Id"] = client_id
     from harness.connectors import _CATALOG_TYPES
 
     cat = _CATALOG_TYPES.get(str(ctx.record.get("type") or "")) or {}

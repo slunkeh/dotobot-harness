@@ -1245,3 +1245,41 @@ def test_lagrowthmachine_body_formats(tmp_path, path, body, is_form):
     else:
         assert json.loads(req.data) == body
         assert req.get_header("Content-type") == "application/json"
+
+
+@pytest.mark.parametrize("client_id", ["12345", "", "12\r\nInjected: yes", "abc"])
+def test_hypeauditor_client_id_and_token(tmp_path, client_id):
+    paths = HarnessPaths(home=tmp_path)
+    record = Connectors(paths).add(
+        "hypeauditor", "HypeAuditor", config={"client_id": client_id}, secret="fixture-key"
+    )
+    bound = tools_for_bot(paths, "atlas", record_ids={record["id"]})
+    with patch("connectors.generic._open", return_value=_response({})) as send:
+        result = bound["hypeauditor_get"][1]({"path": "/api/v1/media-plan/plans"})
+    if client_id != "12345":
+        assert "client_id" in result
+        send.assert_not_called()
+        return
+    assert "HTTP 200" in result
+    req = send.call_args.args[0]
+    assert req.full_url == "https://hypeauditor.com/api/v1/media-plan/plans"
+    assert req.get_header("X-auth-id") == "12345"
+    assert req.get_header("X-auth-hash") == "fixture-key"
+    assert req.get_header("Authorization") is None
+
+
+def test_hypeauditor_create_plan(tmp_path):
+    paths = HarnessPaths(home=tmp_path)
+    record = Connectors(paths).add(
+        "hypeauditor", "HypeAuditor", config={"client_id": "12345"}, secret="fixture-key"
+    )
+    bound = tools_for_bot(paths, "atlas", record_ids={record["id"]})
+    with patch("connectors.generic._open", return_value=_response({})) as send:
+        assert "HTTP 200" in bound["hypeauditor_request"][1](
+            {"method": "POST", "path": "/api/v1/media-plan/plans", "body": {"title": "Fixture"}}
+        )
+    req = send.call_args.args[0]
+    assert req.full_url == "https://hypeauditor.com/api/v1/media-plan/plans"
+    assert req.get_header("X-auth-id") == "12345"
+    assert req.get_header("X-auth-hash") == "fixture-key"
+    assert json.loads(req.data) == {"title": "Fixture"}

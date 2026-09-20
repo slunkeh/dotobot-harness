@@ -3,11 +3,11 @@
 Scope: implement the 144 catalogue connectors identified with missing REST hosts.
 This is an implementation ledger, not a claim of live-account verification.
 
-Seventy routes now have offline request-contract coverage through the real connector
+Seventy-one routes now have offline request-contract coverage through the real connector
 registry and credential store. Tests assert the outbound origin, version prefix,
 credential header, query and JSON body. Credentials are never followed through
 HTTP redirects. Production authenticated reads and writes remain unverified for these
-seventy routes. The remaining 74 connectors still need provider research and code.
+seventy-one routes. The remaining 73 connectors still need provider research and code.
 
 ## Implemented routes
 
@@ -19,6 +19,7 @@ CloudConvert currently uses its production automatic-region API, not its sandbox
 
 | Connector | Provider reference | Setup |
 |---|---|---|
+| `hypeauditor` | [Provider documentation](https://hypeauditor.com/swagger/public-api/v1/) | Store the API token and configure numeric client_id. Uses X-Auth-Hash and X-Auth-Id. GET /api/v1/media-plan/plans lists plans; POST with JSON title creates a plan. Include full API prefixes in paths. API entitlement and credits apply; report requests may consume credits. |
 | `funnelcockpit` | [Provider documentation](https://api.funnelcockpit.com/) | Store the private API key, sent directly in Authorization without Bearer. GET /me verifies the user; GET /email/tags uses zero-based page and limit. POST /email/tag takes JSON contactId and tagId. Subscriber/tag operations may trigger automations; plan access applies. |
 | `kickofflabs` | [Provider documentation](https://support.kickofflabs.com/developer/common-api-behavior/) | Store the campaign API Access key. Uses Bearer with JSON Content-Type. GET /campaigns lists campaigns; POST /CAMPAIGN_ID/ creates or updates a lead with email or phone_number. Lead changes may trigger campaign automations. |
 | `flippingbook` | [Provider documentation](https://apidocs.flippingbook.com/) | Store an Online API key; uses Bearer. GET /fbonline/publication lists publications with count and offset. POST the same path with JSON name and url for a reachable PDF. Check success and source conversion status. Plan access applies. This route targets FlippingBook Online, not desktop Publisher. |
@@ -257,7 +258,7 @@ Live evidence for the third batch:
 | `heysummit` | Pending provider research and implementation |
 | `hippo_video` | Pending provider research and implementation |
 | `humanitix` | Implemented; request contracts pass; authenticated account verification pending |
-| `hypeauditor` | Pending provider research and implementation |
+| `hypeauditor` | Implemented; request contracts pass; invalid credentials rejected live, account acceptance pending |
 | `hyperise` | Pending: official API support pages currently fail TLS certificate validation; host and authentication still require verification |
 | `icontact` | Pending provider research and implementation |
 | `impression` | Pending provider research and implementation |
@@ -664,3 +665,13 @@ current-user GET and JSON tag assignment. Two tests failed before implementation
 and pass afterward. The focused suite passes 308 tests; Ruff passes. A disposable
 bound GET /me with an invalid key returned HTTP 401 Unauthorized access. This is
 reachability/rejection evidence, not authenticated acceptance. No tags were assigned.
+
+## HypeAuditor validation
+
+The official public API OpenAPI document specifies both authentication headers and
+media-plan read/write contracts. Numeric client_id validation rejects missing,
+non-numeric and injected header values before transport. Four initial tests failed
+before implementation; all five new tests pass. The focused suite passes 313 tests;
+Ruff passes. A disposable bound media-plan GET using client ID 0 and an invalid token
+returned HTTP 403 Access denied. No plans or reports were created; authenticated
+account acceptance remains open.

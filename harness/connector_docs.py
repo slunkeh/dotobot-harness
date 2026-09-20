@@ -791,9 +791,9 @@ _ROWS: list[tuple[str, str, str, str]] = [
     ),
     (
         "hypeauditor",
-        "aggregator",
-        "https://composio.dev/toolkits/hypeauditor",
-        "Also via Zapier.",
+        "official",
+        "https://hypeauditor.com/swagger/public-api/v1/",
+        "Store the API token and configure numeric client_id. Sent as X-Auth-Hash and X-Auth-Id. GET /api/v1/media-plan/plans lists plans; POST the same path with JSON title creates one. Paths include their full API prefix. API access and credits are separate account entitlements. Report requests may consume credits; HTTP 202 requires waiting result.retryTtl before retrying.",
     ),
     (
         "hyperise",
