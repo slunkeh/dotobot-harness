@@ -320,14 +320,18 @@ def _http(
     else:
         auth_key = key
     hdrs = _headers(ctx, auth_key)
-    if data is not None:
-        from harness.connectors import _CATALOG_TYPES
+    from harness.connectors import _CATALOG_TYPES
 
-        cat = _CATALOG_TYPES.get(str(ctx.record.get("type") or "")) or {}
+    cat = _CATALOG_TYPES.get(str(ctx.record.get("type") or "")) or {}
+    if data is not None or cat.get("content_type"):
         hdrs["Content-Type"] = str(cat.get("content_type") or "application/json")
-        if cat.get("body_encoding") == "form" and not any(
-            re.fullmatch(pattern, urllib.parse.urlparse(url).path)
-            for pattern in cat.get("json_body_paths", [])
+        if (
+            data is not None
+            and cat.get("body_encoding") == "form"
+            and not any(
+                re.fullmatch(pattern, urllib.parse.urlparse(url).path)
+                for pattern in cat.get("json_body_paths", [])
+            )
         ):
             # Resolve redaction sentinels before encoding so substituted secrets
             # cannot introduce form fields through ampersands or equals signs.

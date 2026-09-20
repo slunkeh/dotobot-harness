@@ -3,11 +3,11 @@
 Scope: implement the 144 catalogue connectors identified with missing REST hosts.
 This is an implementation ledger, not a claim of live-account verification.
 
-Forty-five routes now have offline request-contract coverage through the real connector
+Forty-eight routes now have offline request-contract coverage through the real connector
 registry and credential store. Tests assert the outbound origin, version prefix,
 credential header, query and JSON body. Credentials are never followed through
 HTTP redirects. Production authenticated reads and writes remain unverified for these
-forty-five routes. The remaining 99 connectors still need provider research and code.
+forty-eight routes. The remaining 96 connectors still need provider research and code.
 
 ## Implemented routes
 
@@ -64,6 +64,9 @@ CloudConvert currently uses its production automatic-region API, not its sandbox
 | `ecologi` | [Provider documentation](https://docs.ecologi.com/) | Store the Ecologi Impact API key; authentication uses Bearer. Paths are relative to https://public.ecologi.com. POST /impact/trees takes a JSON number and test flag. Set test to true for non-billable test requests; live impact purchases are billed. Public reporting uses GET /users/USERNAME/trees and does not require authentication at the provider, although this connector currently requires a stored key. Idempotency-Key headers are not exposed; do not automatically retry purchase requests. |
 | `greenspark` | [Provider documentation](https://docs.getgreenspark.com/reference/authentication) | Store a Greenspark API key, not a Widget key. Authentication uses X-API-KEY. Paths are relative to the production /v1 API, for example GET /projects. Impact writes take JSON and may incur charges. This route uses production; the separate demo and sandbox environments are not configured. Plan eligibility and key permissions apply. |
 | `enormail` | [Provider documentation](https://developer.enormail.eu/) | Store the Enormail API key alone. HTTP Basic uses it as username with an empty password. Paths are relative to /api/1.0, for example GET /account.json. Keep the .json endpoint suffix. POST and PUT bodies are form encoded, including bracket notation for nested fields. Pass body as an object. DELETE parameters belong in the path query string. |
+| `gist` | [Provider documentation](https://developers.getgist.com/api/) | Store the Gist workspace API key from Integration Settings. Authentication uses Bearer. Paths are relative to https://api.getgist.com, for example GET /contacts. Writes use JSON. This is Gist customer messaging, not GitHub Gists or gist.ai. |
+| `cometly` | [Provider documentation](https://docs.cometly.com/introduction/authentication) | Store the Cometly API integration key. Authentication uses Bearer; Accept and Content-Type are application/json, including GET requests. Paths are relative to /public-api/v1. GET /events requires start_date and end_date in YYYY-MM-DD HH:MM:SS format in the space timezone. This is the REST API, not the separate MCP endpoint. |
+| `crowdpower` | [Provider documentation](https://docs.crowdpower.io/getting-started/beacon-api) | Store a CrowdPower project secret or application key. Authentication uses Bearer. Uses the Beacon ingestion API, for example POST /customers with user_id and customer fields as JSON, or /customers/bulk with a customers array. This scope provides ingestion, not a documented customer-list GET. Inspect the response success and code fields. Ingestion can trigger configured marketing automations. |
 
 ActiveCampaign host selection: [official base URL guidance](https://developers.activecampaign.com/reference/url).
 
@@ -162,13 +165,13 @@ Live evidence for the third batch:
 | `clevertap` | Pending provider research and implementation |
 | `clickfunnels` | Pending provider research and implementation |
 | `cloud_convert` | Route and offline request tests added; live verification pending |
-| `cometly` | Pending provider research and implementation |
+| `cometly` | Implemented; request contracts pass; authenticated account verification pending |
 | `constant_contact` | Implemented; request-contract tests pass; production account verification pending |
 | `contentdrips` | Pending provider research and implementation |
 | `convertkit` | Implemented; request-contract tests pass; production account verification pending |
 | `copicake` | Implemented; request-contract tests pass; production account verification pending |
 | `coupontools` | Pending provider research and implementation |
-| `crowdpower` | Pending provider research and implementation |
+| `crowdpower` | Implemented; request contracts pass; authenticated account verification pending |
 | `curated` | Pending provider research and implementation |
 | `cyberimpact` | Implemented; request-contract tests pass; production account verification pending |
 | `demandbase` | Pending provider research and implementation |
@@ -215,7 +218,7 @@ Live evidence for the third batch:
 | `getresponse` | Route and offline request tests added; live verification pending |
 | `getswift` | Pending provider research and implementation |
 | `giantcampaign` | Pending provider research and implementation |
-| `gist` | Pending provider research and implementation |
+| `gist` | Implemented; request contracts pass; authenticated account verification pending |
 | `gitter` | Pending provider research and implementation |
 | `gobio_link` | Pending provider research and implementation |
 | `goodbits` | Pending provider research and implementation |
@@ -395,3 +398,19 @@ and refuses redirects. GET /account.json through a disposable bound connector
 with an invalid key returned HTTP 401 Authentication failed. No authenticated
 account operation or external write was performed. The previously pending
 Enormail body-format check is now resolved.
+
+### Twelfth batch: Gist, Cometly and CrowdPower
+
+2026-09-20: four new route/header cases failed before implementation and pass
+afterward. 244 focused tests pass; Ruff passes. Gist and Cometly bound reads
+with invalid credentials returned HTTP 401. CrowdPower Beacon /customers with
+an invalid key and a synthetic user ID returned HTTP 401 with token.invalid;
+no customer was accepted. No real account operations are verified.
+
+Cometly requires Content-Type even on GET requests. Explicit catalogue content
+types now apply to requests without bodies too (also matching Cardly's explicit
+text/json format), while default GET requests remain without Content-Type.
+CrowdPower has a documented ingestion scope, not a documented GET list API;
+its request test follows [Identify Customer](https://docs.crowdpower.io/getting-started/beacon-api/identify-customer).
+Cometly event reads require dates, as shown in
+[List Events](https://docs.cometly.com/api-reference/endpoint/list-events).

@@ -300,8 +300,8 @@ _ROWS: list[tuple[str, str, str, str]] = [
     (
         "cometly",
         "official",
-        "https://docs.cometly.com/mcp/overview",
-        "Vendor MCP.",
+        "https://docs.cometly.com/introduction/authentication",
+        "Store the Cometly API integration key. Authentication uses Bearer; Accept and Content-Type are application/json, including GET requests. Paths are relative to /public-api/v1. GET /events requires start_date and end_date in YYYY-MM-DD HH:MM:SS format in the space timezone. This is the REST API, not the separate MCP endpoint.",
     ),
     (
         "constant_contact",
@@ -341,9 +341,9 @@ _ROWS: list[tuple[str, str, str, str]] = [
     ),
     (
         "crowdpower",
-        "none",
-        "https://docs.crowdpower.io/",
-        "REST API, no MCP.",
+        "official",
+        "https://docs.crowdpower.io/getting-started/beacon-api",
+        "Store a CrowdPower project secret or application key. Authentication uses Bearer. Uses the Beacon ingestion API, for example POST /customers with user_id and customer fields as JSON, or /customers/bulk with a customers array. This scope provides ingestion, not a documented customer-list GET. Inspect the response success and code fields. Ingestion can trigger configured marketing automations.",
     ),
     (
         "cufinder",
@@ -653,9 +653,9 @@ _ROWS: list[tuple[str, str, str, str]] = [
     ("giantcampaign", "none", "https://www.giantcampaign.com/", "No known MCP server."),
     (
         "gist",
-        "partial",
-        "https://composio.dev/toolkits/gist",
-        "No official vendor server.",
+        "official",
+        "https://developers.getgist.com/api/",
+        "Store the Gist workspace API key from Integration Settings. Authentication uses Bearer. Paths are relative to https://api.getgist.com, for example GET /contacts. Writes use JSON. This is Gist customer messaging, not GitHub Gists or gist.ai.",
     ),
     (
         "github",

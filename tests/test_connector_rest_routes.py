@@ -15,6 +15,22 @@ from harness.paths import HarnessPaths
 # Literal expected requests intentionally independent of catalogue metadata.
 CASES = [
     (
+        "gist",
+        {},
+        "/contacts",
+        "https://api.getgist.com/contacts",
+        "Authorization",
+        "Bearer fixture-key",
+    ),
+    (
+        "cometly",
+        {},
+        "/events",
+        "https://app.cometly.com/public-api/v1/events",
+        "Authorization",
+        "Bearer fixture-key",
+    ),
+    (
         "ecologi",
         {},
         "/users/fixture/trees",
@@ -493,6 +509,12 @@ def test_4dem_malformed_auth_response_is_not_forwarded(tmp_path):
     "type_,path,url,body",
     [
         (
+            "crowdpower",
+            "/customers",
+            "https://beacon.crowdpower.io/customers",
+            {"user_id": "fixture", "custom_attributes": {"plan": "test"}},
+        ),
+        (
             "ecologi",
             "/impact/trees",
             "https://public.ecologi.com/impact/trees",
@@ -703,3 +725,15 @@ def test_enormail_request_contract(tmp_path, method):
     else:
         assert request.get_header("Content-type") == "application/x-www-form-urlencoded"
         assert parse_qs(request.data.decode()) == {"title": ["Fixture & list"]}
+
+
+def test_cometly_get_sends_required_content_type(tmp_path):
+    paths = HarnessPaths(home=tmp_path)
+    record = Connectors(paths).add("cometly", "Cometly", secret="fixture-key")
+    ctx = ConnectorContext(paths=paths, bot="atlas", record=record)
+    with patch("connectors.generic._open", return_value=_response({})) as send:
+        assert "HTTP 200" in generic._get(ctx, {"path": "/events"})
+    request = send.call_args.args[0]
+    assert request.get_header("Content-type") == "application/json"
+    assert request.get_header("Accept") == "application/json"
+    assert request.data is None
