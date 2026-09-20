@@ -14,6 +14,7 @@ from harness.paths import HarnessPaths
 
 # Literal expected requests intentionally independent of catalogue metadata.
 CASES = [
+    ("humanitix", {}, "/events", "https://api.humanitix.com/v1/events", "X-api-key", "fixture-key"),
     (
         "campaign_cleaner",
         {},
@@ -770,3 +771,32 @@ def test_cometly_get_sends_required_content_type(tmp_path):
     assert request.get_header("Content-type") == "application/json"
     assert request.get_header("Accept") == "application/json"
     assert request.data is None
+
+
+def test_humanitix_check_in_without_body(tmp_path):
+    paths = HarnessPaths(home=tmp_path)
+    record = Connectors(paths).add("humanitix", "Humanitix", secret="fixture-key")
+    bound = tools_for_bot(paths, "atlas", record_ids={record["id"]})
+    with patch("connectors.generic._open", return_value=_response({"messages": []})) as send:
+        result = bound["humanitix_request"][1](
+            {"method": "POST", "path": "/events/fixture-event/tickets/fixture-ticket/check-in"}
+        )
+    assert "HTTP 200" in result
+    request = send.call_args.args[0]
+    assert (
+        request.full_url
+        == "https://api.humanitix.com/v1/events/fixture-event/tickets/fixture-ticket/check-in"
+    )
+    assert request.get_method() == "POST"
+    assert request.data is None
+    assert request.get_header("X-api-key") == "fixture-key"
+
+
+def test_humanitix_required_page_query(tmp_path):
+    paths = HarnessPaths(home=tmp_path)
+    record = Connectors(paths).add("humanitix", "Humanitix", secret="fixture-key")
+    bound = tools_for_bot(paths, "atlas", record_ids={record["id"]})
+    with patch("connectors.generic._open", return_value=_response({"events": []})) as send:
+        result = bound["humanitix_get"][1]({"path": "/events", "query": {"page": 1}})
+    assert "HTTP 200" in result
+    assert send.call_args.args[0].full_url == "https://api.humanitix.com/v1/events?page=1"

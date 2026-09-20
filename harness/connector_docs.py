@@ -774,9 +774,9 @@ _ROWS: list[tuple[str, str, str, str]] = [
     ),
     (
         "humanitix",
-        "aggregator",
-        "https://composio.dev/toolkits/humanitix",
-        "No dedicated vendor server.",
+        "official",
+        "https://api.humanitix.com/v1/documentation/json",
+        "Store the public API key from Humanitix Account > Advanced. Authentication uses x-api-key. Production paths are relative to /v1, for example GET /events with query page=1, or /tags. The current API reference also lists bodyless POST /events/EVENT_ID/tickets/TICKET_ID/check-in and check-out. Event creation, event updates and ticket transfers require additional provider permission. Old console API keys do not work. Staging and optional location override headers are not configured.",
     ),
     (
         "hygraph",
