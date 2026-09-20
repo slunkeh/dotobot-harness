@@ -1542,3 +1542,45 @@ def test_airship_version_header(tmp_path):
     assert req.full_url == "https://go.urbanairship.com/api/channels?limit=1"
     assert req.get_header("Accept") == "application/vnd.urbanairship+json; version=3"
     assert req.get_header("Authorization") == "Bearer fixture-key"
+
+
+@pytest.mark.parametrize(
+    "region,mode,host",
+    [
+        ("us", "bearer", "go.urbanairship.com"),
+        ("eu", "bearer", "go.airship.eu"),
+        ("us", "basic", "go.urbanairship.com"),
+        ("eu", "basic", "go.airship.eu"),
+        ("us", "oauth", "api.asnapius.com"),
+        ("eu", "oauth", "api.asnapieu.com"),
+    ],
+)
+def test_airship_region_auth(tmp_path, region, mode, host):
+    import base64
+
+    paths = HarnessPaths(home=tmp_path)
+    record = Connectors(paths).add(
+        "airship", "Airship", config={"region": region, "auth_mode": mode}, secret="app:key"
+    )
+    bound = tools_for_bot(paths, "atlas", record_ids={record["id"]})
+    with patch("connectors.generic._open", return_value=_response({"ok": True})) as send:
+        assert "HTTP 200" in bound["airship_get"][1]({"path": "/api/channels"})
+    req = send.call_args.args[0]
+    assert req.full_url == "https://" + host + "/api/channels"
+    expected = (
+        "Basic " + base64.b64encode(b"app:key").decode() if mode == "basic" else "Bearer app:key"
+    )
+    assert req.get_header("Authorization") == expected
+    assert req.get_header("Accept") == "application/vnd.urbanairship+json; version=3"
+
+
+@pytest.mark.parametrize(
+    "config", [{"region": "other"}, {"region": "https://evil.example"}, {"auth_mode": "unknown"}]
+)
+def test_airship_invalid_config_blocks_transport(tmp_path, config):
+    paths = HarnessPaths(home=tmp_path)
+    record = Connectors(paths).add("airship", "Airship", config=config, secret="fixture-key")
+    bound = tools_for_bot(paths, "atlas", record_ids={record["id"]})
+    with patch("connectors.generic._open") as send:
+        assert "error:" in bound["airship_get"][1]({"path": "/api/channels"})
+    send.assert_not_called()

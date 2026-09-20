@@ -164,7 +164,7 @@ STUBS: list[dict] = [
         "type": "airship",
         "name": "Airship",
         "auth": "api_key",
-        "fields": [],
+        "fields": ["region", "auth_mode"],
         "api_base": "https://go.urbanairship.com",
         "auth_style": "bearer",
         "accept": "application/vnd.urbanairship+json; version=3",

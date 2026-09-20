@@ -105,6 +105,18 @@ def resolve_base(ctx: ConnectorContext) -> str | None:
 
     type_ = str(ctx.record.get("type") or "")
     cat = _CATALOG_TYPES.get(type_) or {}
+    if type_ == "airship":
+        config = ctx.record.get("config") or {}
+        region = config.get("region", "us")
+        mode = config.get("auth_mode", "bearer")
+        if region not in ("us", "eu") or mode not in ("bearer", "basic", "oauth"):
+            return None
+        hosts = (
+            ("api.asnapius.com", "api.asnapieu.com")
+            if mode == "oauth"
+            else ("go.urbanairship.com", "go.airship.eu")
+        )
+        return "https://" + hosts[region == "eu"]
     url = str(cat.get("api_base") or "").strip()
     if not url:
         template = str(cat.get("api_base_template") or "").strip()
@@ -129,6 +141,8 @@ def auth_style(ctx: ConnectorContext) -> str:
 
     type_ = str(ctx.record.get("type") or "")
     cat = _CATALOG_TYPES.get(type_) or {}
+    if type_ == "airship" and (ctx.record.get("config") or {}).get("auth_mode") == "basic":
+        return "basic"
     style = str(cat.get("auth_style") or "").strip().lower()
     if style in _STYLES:
         return style

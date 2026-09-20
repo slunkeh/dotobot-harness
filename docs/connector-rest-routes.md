@@ -170,7 +170,7 @@ Live evidence for the third batch:
 | `adroll` | Pending provider research and implementation |
 | `adtraction` | Implemented; request contracts pass; authenticated account verification pending |
 | `aimtell` | Pending provider research and implementation |
-| `airship` | Implemented North American dashboard-token route; version-header contract passes; invalid token rejected live; EU/OAuth routing and account acceptance pending |
+| `airship` | Implemented regional HTTP/OAuth routes; version/auth contracts pass; invalid tokens rejected live; account acceptance pending |
 | `apexverify` | Implemented; request contracts pass; invalid key rejected live, authenticated account acceptance pending |
 | `appsflyer` | Pending provider research and implementation |
 | `arpoone` | Pending provider research and implementation |
@@ -786,4 +786,10 @@ A bound disposable-store POST /webinars with an invalid key returned HTTP 401 wi
 
 The [official introduction](https://www.airship.com/docs/developer/rest-api/ua/introduction/) documents dashboard Bearer tokens on go.urbanairship.com and the mandatory application/vnd.urbanairship+json; version=3 Accept header. Catalogue-owned Accept metadata now supplies this version without allowing caller header overrides. The [OpenAPI specification](https://www.airship.com/docs/openapi/go/spec.json) confirms GET /api/channels.
 
-The bound North American channels probe returned HTTP 401 with Unauthorized and error_code 40101. No message was sent. This route does not yet cover EU or OAuth-specific hosts, Basic credentials or CSV uploads. Production account acceptance remains open. All 339 focused tests and Ruff pass; 82 routes are implemented and 62 pending. The midpoint full suite predates this addition.
+The bound North American channels probe returned HTTP 401 with Unauthorized and error_code 40101. No message was sent. The initial route covered North American dashboard tokens; the extension below adds other regions and authentication modes. CSV uploads remain unsupported. Production account acceptance remains open. All 339 focused tests and Ruff pass; 82 routes are implemented and 62 pending. The midpoint full suite predates this addition.
+
+## Airship regional and authentication extension
+
+Configure region as us or eu and auth_mode as bearer, basic or oauth; omitted values preserve us/bearer. Dashboard and Basic credentials use the regional HTTP host; OAuth access tokens use the documented regional OAuth host. Basic secrets contain appKey:appSecret or appKey:masterSecret. Token issuance/refresh is not implemented. Only the four official hosts can be selected; unknown modes or regions block transport.
+
+Nine additional tests cover six region/auth combinations and invalid configuration. Bound probes against the EU HTTP host and both OAuth hosts returned HTTP 401 for invalid tokens. All 348 focused tests and Ruff pass. The overall route count remains 82 with 62 pending. No audience was contacted.
