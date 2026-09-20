@@ -499,8 +499,8 @@ _ROWS: list[tuple[str, str, str, str]] = [
     (
         "echtpost_postcards",
         "aggregator",
-        "https://mcp.composio.dev/echtpost",
-        "Composio toolkit.",
+        "https://api.echtpost.de/v2/docs",
+        "Store a Bearer API key. Use an ep_test_ sandbox key for testing; live keys can incur printing and postage charges. Paths omit /v2. GET /me; POST /cards/preview_fit checks text layout. Card creation, printing and delivery are separate outcomes.",
     ),
     (
         "ecologi",

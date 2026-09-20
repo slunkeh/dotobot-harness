@@ -15,6 +15,14 @@ from harness.paths import HarnessPaths
 # Literal expected requests intentionally independent of catalogue metadata.
 CASES = [
     (
+        "echtpost_postcards",
+        {},
+        "/me",
+        "https://api.echtpost.de/v2/me",
+        "Authorization",
+        "Bearer fixture-key",
+    ),
+    (
         "emelia",
         {},
         "/lists/list",
@@ -2789,3 +2797,19 @@ def test_getemails_retention_credentials(tmp_path):
     assert req.get_header("Api-id") == "fixture-id"
     assert req.get_header("Api-key") == "fixture-key"
     assert req.get_header("Authorization") is None
+
+
+def test_echtpost_preview_json(tmp_path):
+    paths = HarnessPaths(home=tmp_path)
+    record = Connectors(paths).add("echtpost_postcards", "EchtPost", secret="fixture-key")
+    bound = tools_for_bot(paths, "atlas", record_ids={record["id"]})
+    body = {"content": "Fixture text", "font": {"family": "architects_daughter", "size": 13}}
+    with patch("connectors.generic._open", return_value=_response({})) as send:
+        result = bound["echtpost_postcards_request"][1](
+            {"method": "POST", "path": "/cards/preview_fit", "body": body}
+        )
+    assert "HTTP 200" in result
+    req = send.call_args.args[0]
+    assert req.full_url == "https://api.echtpost.de/v2/cards/preview_fit"
+    assert req.get_header("Authorization") == "Bearer fixture-key"
+    assert json.loads(req.data) == body

@@ -3,11 +3,11 @@
 Scope: implement the 144 catalogue connectors identified with missing REST hosts.
 This is an implementation ledger, not a claim of live-account verification.
 
-One hundred and twenty-one routes now have offline request-contract coverage through the real connector
+One hundred and twenty-two routes now have offline request-contract coverage through the real connector
 registry and credential store. Tests assert the outbound origin, version prefix,
 credential header, query and JSON body. Credentials are never followed through
 HTTP redirects. Production authenticated reads and writes remain unverified for these
-one hundred and twenty-one routes. The remaining 23 connectors still need provider research and code.
+one hundred and twenty-two routes. The remaining 22 connectors still need provider research and code.
 
 ## Implemented routes
 
@@ -222,7 +222,7 @@ Live evidence for the third batch:
 | `egoi` | Route and offline request tests added; live verification pending |
 | `easypromos` | Implemented; request contracts pass; authenticated account verification pending |
 | `easysendy` | Implemented JSON REST route; read/write contracts pass; invalid-key live response is empty OK and does not prove authentication |
-| `echtpost_postcards` | Pending provider research and implementation |
+| `echtpost_postcards` | Implemented v2 route; sandbox account and delivery acceptance pending |
 | `ecologi` | Implemented; request contracts pass; authenticated account verification pending |
 | `email_on_acid` | Route and offline tests added; public sandbox authentication and read passed; production verification pending |
 | `emailable` | Route and offline request tests added; live verification pending |
@@ -1105,3 +1105,12 @@ Removed the catalogue's unsupported assertion that Automizy was discontinued or 
 The [current introduction](https://docs.emelia.io/docs/emelia/emelia) confirms REST support and explicitly separates the old GraphQL documentation. It specifies api.emelia.io for Lists and the raw API key in Authorization. Added the host and a bound [GET /lists/list](https://docs.emelia.io/docs/emelia/list-all-lists) contract. Page and limit are optional; unpaginated reads return an array. New integrations should use current Campaigns and Lists; campaign actions can initiate outreach.
 
 A disposable-store GET /lists/list with an invalid key returned HTTP 401 Authentication required. No campaigns, contacts or enrichment jobs were created. Real account access and write acceptance remain unverified. Focused suite: 479 passed; Ruff clean.
+
+
+## EchtPost v2 postcards API
+
+The [official v2 reference](https://api.echtpost.de/v2/docs) specifies api.echtpost.de/v2 and Bearer or X-Api-Key authentication. Added Bearer routing with GET /me and nested JSON POST /cards/preview_fit contracts. Use an ep_test_ sandbox key for account-level tests; the provider separates sandbox data and suppresses billing and printing. Live card creation can incur printing/postage charges and was not attempted.
+
+A disposable-store GET /me with an invalid key returned HTTP 401 authentication-required. No postcard, contact or mailing was created. Real sandbox acceptance, card rendering and physical delivery remain separate open checks. Focused suite: 481 passed; Ruff clean.
+
+Hyperise's published token documentation was rechecked during this pass and still fails HTTPS certificate validation with a self-signed certificate error. No bypass was used; its route remains pending.

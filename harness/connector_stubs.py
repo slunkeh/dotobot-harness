@@ -793,6 +793,8 @@ STUBS: list[dict] = [
     },
     {
         "type": "echtpost_postcards",
+        "api_base": "https://api.echtpost.de/v2",
+        "auth_style": "bearer",
         "name": "Echtpost Postcards",
         "auth": "api_key",
         "fields": [],
