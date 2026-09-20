@@ -198,7 +198,12 @@ _ROWS: list[tuple[str, str, str, str]] = [
         "https://docs.brandfetch.com/mcp/overview",
         "Dotobot uses mcp.brandfetch.io/mcp.",
     ),
-    ("brandmentions", "none", "https://brandmentions.com/", "No MCP found."),
+    (
+        "brandmentions",
+        "official",
+        "https://help.brandmentions.com/en/articles/12814618-how-do-i-authenticate-api-requests-safely",
+        "Store the API key issued by BrandMentions. GET /command.php with query command=GetRemainingCredits checks credits; ListProjects lists projects. Dotobot inserts api_key from the secret store. Commands, including mutations and paid search jobs, share this endpoint; GET does not imply read-only. API access must be enabled by the provider.",
+    ),
     (
         "braze",
         "official",

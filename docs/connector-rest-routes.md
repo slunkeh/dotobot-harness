@@ -3,11 +3,11 @@
 Scope: implement the 144 catalogue connectors identified with missing REST hosts.
 This is an implementation ledger, not a claim of live-account verification.
 
-Seventy-three routes now have offline request-contract coverage through the real connector
+Seventy-four routes now have offline request-contract coverage through the real connector
 registry and credential store. Tests assert the outbound origin, version prefix,
 credential header, query and JSON body. Credentials are never followed through
 HTTP redirects. Production authenticated reads and writes remain unverified for these
-seventy-three routes. The remaining 71 connectors still need provider research and code.
+seventy-four routes. The remaining 70 connectors still need provider research and code.
 
 ## Implemented routes
 
@@ -19,6 +19,7 @@ CloudConvert currently uses its production automatic-region API, not its sandbox
 
 | Connector | Provider reference | Setup |
 |---|---|---|
+| `brandmentions` | [Provider documentation](https://help.brandmentions.com/en/articles/12814618-how-do-i-authenticate-api-requests-safely) | Store the provider-issued API key. GET /command.php with query command=GetRemainingCredits reads credits; ListProjects lists projects. Dotobot supplies api_key. Commands can also mutate data or spend credits, even through GET. Provider-enabled API access is required. |
 | `discourse` | [Provider documentation](https://docs.discourse.org/) | Store an admin-generated API key. Configure api_domain as a hostname and api_username. Uses Api-Key and Api-Username. GET /categories.json reads categories; POST /posts.json takes JSON title and raw. Key scopes/user permissions apply. Root-host HTTPS and ASCII usernames are supported; subdirectory installations and User API key authorization are not implemented. |
 | `jvzoo` | [Provider documentation](https://api.jvzoo.com/docs/) | Store the API Application key alone; Basic auth uses it as username and x as password. Include /v3.0, /v2.1 or /v2.0 in paths. GET /v3.0/transactions takes start_date and end_date. JSON writes are supported; inspect meta.status and results. |
 | `hypeauditor` | [Provider documentation](https://hypeauditor.com/swagger/public-api/v1/) | Store the API token and configure numeric client_id. Uses X-Auth-Hash and X-Auth-Id. GET /api/v1/media-plan/plans lists plans; POST with JSON title creates a plan. Include full API prefixes in paths. API entitlement and credits apply; report requests may consume credits. |
@@ -174,7 +175,7 @@ Live evidence for the third batch:
 | `benchmark_email` | Implemented; request contracts pass; authenticated account verification pending |
 | `bigmailer` | Route and offline request tests added; live verification pending |
 | `botconversa` | Implemented; request contracts pass; authenticated account verification pending |
-| `brandmentions` | Pending provider research and implementation |
+| `brandmentions` | Implemented; request contracts pass; live Python request blocked by certificate-chain validation |
 | `builderall_mailingboss` | Pending provider research and implementation |
 | `buysellads` | Pending provider research and implementation |
 | `callpage` | Pending provider research and implementation |
@@ -712,3 +713,13 @@ api_username as a hostname; only fields used by the trusted URL template are now
 subject to hostname validation. Username validation remains separate and fail-closed.
 The focused suite passes 322 tests; Ruff passes. No real forum or token was used;
 no topics were posted. Live authenticated acceptance remains pending.
+
+## BrandMentions validation
+
+Two documented command-query tests failed before implementation and pass afterward.
+The focused suite passes 324 tests; Ruff passes. The bound invalid-key balance probe
+returned a connection error. A credential-free Python probe identifies certificate
+verification failure: unable to get local issuer certificate. The system curl client
+can reach the same HTTPS endpoint (400 for missing parameters), so this is a runtime
+trust-chain difference, not evidence the provider is down. TLS verification remains
+enabled. Authenticated acceptance and Python-runtime connectivity remain unresolved.

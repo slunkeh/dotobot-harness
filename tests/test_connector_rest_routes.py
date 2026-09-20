@@ -1360,3 +1360,23 @@ def test_discourse_json_topic_request(tmp_path):
     assert req.full_url == "https://forum.example.com/posts.json"
     assert req.get_header("Api-username") == "fixture_user"
     assert json.loads(req.data) == body
+
+
+@pytest.mark.parametrize("command", ["GetRemainingCredits", "ListProjects"])
+def test_brandmentions_command_query(tmp_path, command):
+    from urllib.parse import parse_qs, urlsplit
+
+    paths = HarnessPaths(home=tmp_path)
+    record = Connectors(paths).add("brandmentions", "BrandMentions", secret="key&= +?")
+    bound = tools_for_bot(paths, "atlas", record_ids={record["id"]})
+    with patch("connectors.generic._open", return_value=_response({})) as send:
+        assert "HTTP 200" in bound["brandmentions_get"][1](
+            {"path": "/command.php", "query": {"command": command}}
+        )
+    req = send.call_args.args[0]
+    parts = urlsplit(req.full_url)
+    assert parts.netloc == "api.brandmentions.com"
+    assert parts.path == "/command.php"
+    assert parse_qs(parts.query) == {"command": [command], "api_key": ["key&= +?"]}
+    assert req.get_header("Authorization") is None
+    assert req.data is None
