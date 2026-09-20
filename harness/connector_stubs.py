@@ -1394,6 +1394,8 @@ STUBS: list[dict] = [
     },
     {
         "type": "instagram",
+        "api_base": "https://graph.instagram.com",
+        "auth_style": "bearer",
         "name": "Instagram",
         "auth": "api_key",
         "fields": [],

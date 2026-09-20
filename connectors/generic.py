@@ -121,6 +121,12 @@ def resolve_base(ctx: ConnectorContext) -> str | None:
 
     type_ = str(ctx.record.get("type") or "")
     cat = _CATALOG_TYPES.get(type_) or {}
+    if type_ == "instagram":
+        mode = (ctx.record.get("config") or {}).get("login_type", "instagram")
+        return {
+            "instagram": "https://graph.instagram.com",
+            "facebook": "https://graph.facebook.com",
+        }.get(mode)
     if type_ == "airship":
         config = ctx.record.get("config") or {}
         region = config.get("region", "us")

@@ -2547,3 +2547,44 @@ def test_facebook_messenger_json(tmp_path):
     assert req.full_url == "https://graph.facebook.com/v20.0/123/messages"
     assert req.get_header("Authorization") == "Bearer fixture-key"
     assert json.loads(req.data) == body
+
+
+@pytest.mark.parametrize(
+    "mode,host", [("instagram", "graph.instagram.com"), ("facebook", "graph.facebook.com")]
+)
+def test_instagram_login_hosts(tmp_path, mode, host):
+    paths = HarnessPaths(home=tmp_path)
+    record = Connectors(paths).add(
+        "instagram", "Instagram", secret="fixture-key", config={"login_type": mode}
+    )
+    bound = tools_for_bot(paths, "atlas", record_ids={record["id"]})
+    with patch("connectors.generic._open", return_value=_response({})) as send:
+        result = bound["instagram_get"][1]({"path": "/v20.0/123", "query": {"fields": "id"}})
+    assert "HTTP 200" in result
+    assert send.call_args.args[0].full_url == "https://" + host + "/v20.0/123?fields=id"
+    assert send.call_args.args[0].get_header("Authorization") == "Bearer fixture-key"
+
+
+def test_instagram_default_json_message(tmp_path):
+    paths = HarnessPaths(home=tmp_path)
+    record = Connectors(paths).add("instagram", "Instagram", secret="fixture-key")
+    bound = tools_for_bot(paths, "atlas", record_ids={record["id"]})
+    body = {"recipient": {"id": "fixture-person"}, "message": {"text": "Fixture"}}
+    with patch("connectors.generic._open", return_value=_response({})) as send:
+        result = bound["instagram_request"][1](
+            {"method": "POST", "path": "/v20.0/123/messages", "body": body}
+        )
+    assert "HTTP 200" in result
+    assert send.call_args.args[0].full_url == "https://graph.instagram.com/v20.0/123/messages"
+    assert json.loads(send.call_args.args[0].data) == body
+
+
+def test_instagram_invalid_login_type(tmp_path):
+    paths = HarnessPaths(home=tmp_path)
+    record = Connectors(paths).add(
+        "instagram", "Instagram", secret="fixture-key", config={"login_type": "other"}
+    )
+    bound = tools_for_bot(paths, "atlas", record_ids={record["id"]})
+    with patch("connectors.generic._open") as send:
+        assert "error" in bound["instagram_get"][1]({"path": "/me"})
+    send.assert_not_called()

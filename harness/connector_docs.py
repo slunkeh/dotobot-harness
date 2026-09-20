@@ -874,9 +874,9 @@ _ROWS: list[tuple[str, str, str, str]] = [
     ),
     (
         "instagram",
-        "community",
-        "https://github.com/AleemHaider/instagram-mcp",
-        "Meta has no official server; Composio/Apify also offer wrappers.",
+        "official",
+        "https://www.postman.com/meta/instagram/documentation/6yqw8pt/instagram-api",
+        "Store the appropriate OAuth access token. Config login_type defaults to instagram (graph.instagram.com); facebook selects graph.facebook.com for Facebook Login and its linked Page token. Include a supported API version in paths. Professional account and approved endpoint permissions are required. JSON messaging bodies and query-based media publishing requests are supported. Publish and messaging calls have external effects. OAuth refresh, binary uploads and appsecret_proof generation are not automated.",
     ),
     (
         "instantly",

@@ -3,11 +3,11 @@
 Scope: implement the 144 catalogue connectors identified with missing REST hosts.
 This is an implementation ledger, not a claim of live-account verification.
 
-One hundred and eleven routes now have offline request-contract coverage through the real connector
+One hundred and twelve routes now have offline request-contract coverage through the real connector
 registry and credential store. Tests assert the outbound origin, version prefix,
 credential header, query and JSON body. Credentials are never followed through
 HTTP redirects. Production authenticated reads and writes remain unverified for these
-one hundred and eleven routes. The remaining 33 connectors still need provider research and code.
+one hundred and twelve routes. The remaining 32 connectors still need provider research and code.
 
 ## Implemented routes
 
@@ -278,7 +278,7 @@ Live evidence for the third batch:
 | `infusionsoft` | Implemented; request-contract tests pass; production account verification pending |
 | `inksprout` | Pending provider research and implementation |
 | `instabot` | Implemented master-key REST route; read/query contracts pass; live API key rejected; authenticated acceptance open |
-| `instagram` | Pending provider research and implementation |
+| `instagram` | Implemented both documented login hosts; request contracts pass; live invalid token rejected; authenticated acceptance open |
 | `instasent` | Route and offline request tests added; live verification pending |
 | `jellyreach` | Pending provider research and implementation |
 | `joggai` | Implemented; request-contract tests pass; production account verification pending |
@@ -1018,3 +1018,9 @@ A disposable-store GET /v2/userinfo with an invalid token returned HTTP 401 INVA
 Meta's [Page discovery example](https://www.postman.com/meta/instagram/request/0vuw3vk/get-access-tokens-of-pages-you-manage) and [Messenger example](https://www.postman.com/meta/messenger-platform-api/request/ikvz4xw/mark-seen) establish graph.facebook.com, Bearer tokens and nested JSON writes. The route leaves the version in caller paths. Offline examples use the version in Meta's published collection; this is not a claim that version 20 remains suitable for a current app.
 
 A disposable-store unversioned GET /me?fields=id with an invalid token returned HTTP 401, OAuthException code 190. This proves credential parsing rejection, not Page permissions or version acceptance. No messages, read receipts or posts were sent. Valid tokens, scopes and authenticated acceptance remain open. Focused suite: 451 passed; Ruff clean.
+
+## Instagram API login modes
+
+Meta's [official collection](https://www.postman.com/meta/instagram/documentation/6yqw8pt/instagram-api) uses graph.instagram.com for Instagram Login and graph.facebook.com for Facebook Login. Added the login_type configuration selector with a fixed host allowlist, default Instagram Login, Bearer authentication and JSON request coverage. Invalid modes fail before transport. Versions stay in caller paths; offline v20.0 fixtures demonstrate URL formatting, not current version suitability.
+
+A disposable-store GET /me?fields=id on graph.instagram.com with an invalid token returned HTTP 401 OAuthException code 190. No messages or media were published. Facebook-host authentication has the preceding Facebook probe, but real Instagram account permissions and operation acceptance remain open for both modes. Focused suite: 455 passed; Ruff clean.
