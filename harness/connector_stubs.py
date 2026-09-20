@@ -1442,6 +1442,10 @@ STUBS: list[dict] = [
     },
     {
         "type": "jellyreach",
+        "api_base": "https://api.jellyreach.com/v1",
+        "auth_style": "header",
+        "auth_header": "Authorization",
+        "body_encoding": "form",
         "name": "JellyReach",
         "auth": "api_key",
         "fields": [],

@@ -906,7 +906,12 @@ _ROWS: list[tuple[str, str, str, str]] = [
         "https://developers.intercom.com/docs/guides/mcp",
         "Official. Also github.com/intercom/intercom-mcp-server.",
     ),
-    ("jellyreach", "none", "", "No clear public docs found."),
+    (
+        "jellyreach",
+        "none",
+        "https://developers.jellyreach.com/",
+        "Store the API key directly in Authorization. GET /contacts; writes use URL-encoded form fields. Event data must be a JSON string in event_data. Contact updates and events may trigger messaging; account acceptance remains unverified.",
+    ),
     (
         "jira",
         "official",

@@ -2839,3 +2839,25 @@ def test_engage_list_contract(tmp_path, method):
     )
     if method == "POST":
         assert json.loads(req.data) == body
+
+
+@pytest.mark.parametrize("method", ["GET", "POST"])
+def test_jellyreach_contact_form(tmp_path, method):
+    from urllib.parse import parse_qs
+
+    paths = HarnessPaths(home=tmp_path)
+    record = Connectors(paths).add("jellyreach", "Jellyreach", secret="fixture-key")
+    bound = tools_for_bot(paths, "atlas", record_ids={record["id"]})
+    body = {"contact_id": "fixture123", "first_name": "Test User"}
+    with patch("connectors.generic._open", return_value=_response({})) as send:
+        args = {"path": "/contacts"}
+        if method == "POST":
+            args.update(method=method, body=body)
+        result = bound["jellyreach_get" if method == "GET" else "jellyreach_request"][1](args)
+    assert "HTTP 200" in result
+    req = send.call_args.args[0]
+    assert req.full_url == "https://api.jellyreach.com/v1/contacts"
+    assert req.get_header("Authorization") == "fixture-key"
+    if method == "POST":
+        assert req.get_header("Content-type") == "application/x-www-form-urlencoded"
+        assert parse_qs(req.data.decode()) == {k: [v] for k, v in body.items()}

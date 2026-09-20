@@ -3,11 +3,11 @@
 Scope: implement the 144 catalogue connectors identified with missing REST hosts.
 This is an implementation ledger, not a claim of live-account verification.
 
-One hundred and twenty-three routes now have offline request-contract coverage through the real connector
+One hundred and twenty-four routes now have offline request-contract coverage through the real connector
 registry and credential store. Tests assert the outbound origin, version prefix,
 credential header, query and JSON body. Credentials are never followed through
 HTTP redirects. Production authenticated reads and writes remain unverified for these
-one hundred and twenty-three routes. The remaining 21 connectors still need provider research and code.
+one hundred and twenty-four routes. The remaining 20 connectors still need provider research and code.
 
 ## Implemented routes
 
@@ -280,7 +280,7 @@ Live evidence for the third batch:
 | `instabot` | Implemented master-key REST route; read/query contracts pass; live API key rejected; authenticated acceptance open |
 | `instagram` | Implemented both documented login hosts; request contracts pass; live invalid token rejected; authenticated acceptance open |
 | `instasent` | Route and offline request tests added; live verification pending |
-| `jellyreach` | Pending provider research and implementation |
+| `jellyreach` | Implemented raw Authorization and form requests; invalid-key GET returned 401; account acceptance open |
 | `joggai` | Implemented; request-contract tests pass; production account verification pending |
 | `jvzoo` | Implemented; request contract passes; invalid key rejected live, account acceptance pending |
 | `kartra` | Implemented form POST API; nested read contract passes; invalid app ID explicitly rejected; authenticated acceptance open |
@@ -1121,3 +1121,10 @@ Hyperise's published token documentation was rechecked during this pass and stil
 The [provider API overview](https://docs.engage.so/en-us/a/62bbdd015bfea4dca4834041-api-overview) specifies api.engage.so/v1, JSON requests and Basic authentication with API key and secret. The messaging product matches the existing integration name and purpose; catalogue text now explicitly identifies Engage.so. Added bound [list read and creation](https://docs.engage.so/en-us/a/62bbdd2e5bfea4dca4834045-lists) contracts, including title and double_optin. Store key:secret.
 
 A disposable-store GET /lists with invalid credentials returned HTTP 522 with an origin connection timeout. This proves neither valid authentication nor credential rejection. No list or subscriber was created. Live availability and authenticated workflows remain open. Focused suite: 483 passed; Ruff clean. A fresh catalogue/ledger audit confirms all original 144 entries remain present, with 123 configured hosts and 21 still without hosts.
+
+
+## Jellyreach contact API
+
+The [official reference](https://developers.jellyreach.com/) specifies https://api.jellyreach.com/v1, a raw API key in Authorization and form-encoded contact writes. Added bound GET and POST /contacts contracts. Event data must be supplied as a JSON string within its form field. Some reference labels contradict their curl examples; untested delete/list operations need account-level confirmation.
+
+A disposable-store GET /contacts with an invalid key returned HTTP 401 Unauthenticated. No contact was created or changed. Valid account read/write acceptance remains open. Focused suite: 485 passed; Ruff clean. The original ledger now has 124 configured hosts and 20 pending.
