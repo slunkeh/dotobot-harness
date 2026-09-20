@@ -403,8 +403,8 @@ _ROWS: list[tuple[str, str, str, str]] = [
     (
         "demio",
         "aggregator",
-        "https://composio.dev/toolkits/demio",
-        "Composio toolkit.",
+        "https://publicdemioapi.docs.apiary.io/",
+        "REST credentials are a stored JSON array [API key, API secret]. GET /ping checks authorization; PUT /event/register accepts JSON and can send registration emails. Use sandbox credentials for tests.",
     ),
     (
         "discourse",

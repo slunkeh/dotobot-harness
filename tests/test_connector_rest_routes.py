@@ -2665,3 +2665,25 @@ def test_google_ads_credentials_and_customer_headers(tmp_path, config, method):
     assert req.get_header("Linked-customer-id") == config.get("linked_customer_id")
     if method == "POST":
         assert json.loads(req.data) == body
+
+
+@pytest.mark.parametrize("method", ["GET", "PUT"])
+def test_demio_header_pair_and_registration(tmp_path, method):
+    paths = HarnessPaths(home=tmp_path)
+    record = Connectors(paths).add(
+        "demio", "Demio", secret=json.dumps(["fixture-key", "fixture-secret"])
+    )
+    bound = tools_for_bot(paths, "atlas", record_ids={record["id"]})
+    path = "/ping" if method == "GET" else "/event/register"
+    body = {"id": 1, "date_id": 35, "name": "Fixture", "email": "fixture@example.com"}
+    args = {"path": path} if method == "GET" else {"path": path, "method": method, "body": body}
+    with patch("connectors.generic._open", return_value=_response({})) as send:
+        result = bound["demio_get" if method == "GET" else "demio_request"][1](args)
+    assert "HTTP 200" in result
+    req = send.call_args.args[0]
+    assert req.full_url == "https://my.demio.com/api/v1" + path
+    assert req.get_header("Api-key") == "fixture-key"
+    assert req.get_header("Api-secret") == "fixture-secret"
+    assert req.get_header("Authorization") is None
+    if method == "PUT":
+        assert json.loads(req.data) == body

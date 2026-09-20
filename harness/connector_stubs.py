@@ -628,6 +628,9 @@ STUBS: list[dict] = [
     },
     {
         "type": "demio",
+        "api_base": "https://my.demio.com/api/v1",
+        "auth_style": "header_pair",
+        "auth_headers": ["Api-Key", "Api-Secret"],
         "name": "Demio",
         "auth": "api_key",
         "fields": [],

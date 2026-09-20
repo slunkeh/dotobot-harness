@@ -3,11 +3,11 @@
 Scope: implement the 144 catalogue connectors identified with missing REST hosts.
 This is an implementation ledger, not a claim of live-account verification.
 
-One hundred and fourteen routes now have offline request-contract coverage through the real connector
+One hundred and fifteen routes now have offline request-contract coverage through the real connector
 registry and credential store. Tests assert the outbound origin, version prefix,
 credential header, query and JSON body. Credentials are never followed through
 HTTP redirects. Production authenticated reads and writes remain unverified for these
-one hundred and fourteen routes. The remaining 30 connectors still need provider research and code.
+one hundred and fifteen routes. The remaining 29 connectors still need provider research and code.
 
 ## Implemented routes
 
@@ -208,7 +208,7 @@ Live evidence for the third batch:
 | `curated` | Implemented; request contracts pass; invalid-key probe returns 404 Record not found, authenticated acceptance pending |
 | `cyberimpact` | Implemented; request-contract tests pass; production account verification pending |
 | `demandbase` | Implemented current JWT route; request contracts pass; invalid token rejected live; account acceptance pending |
-| `demio` | Pending: public Apiary reference did not expose the contract; blueprint endpoint requires authentication; host and auth contract still need verification |
+| `demio` | Implemented; official sandbox ping passed; production account acceptance pending |
 | `discourse` | Implemented configurable-host route; request contracts pass; live forum acceptance pending |
 | `docupost` | Implemented; request contracts pass; live missing-data rejection, authenticated acceptance pending |
 | `doppler` | Route and offline request tests added; live verification pending |
@@ -1042,3 +1042,10 @@ The [official authorization reference](https://developers.google.com/google-ads/
 Contracts cover GET /v25/customers:listAccessibleCustomers and [POST /v25/customers/ID/googleAds:search](https://developers.google.com/google-ads/api/rest/common/search) with a limited GAQL query, including both customer headers and invalid-header rejection. Keep queries small because the generic response limit can truncate large reports; pagination is caller-managed and streaming is not incremental.
 
 A disposable-store account-list read with invalid credentials returned HTTP 401 UNAUTHENTICATED. This does not prove developer-token approval or account permissions. No ads, budgets or campaign mutations were submitted. Real account acceptance remains open. Focused suite: 468 passed; Ruff clean.
+
+
+## Demio REST API
+
+Retrieved the [provider-published API Blueprint](https://jsapi.apiary.io/apis/publicdemioapi.apib) behind the [official reference](https://publicdemioapi.docs.apiary.io/), resolving the earlier inaccessible-documentation blocker. It specifies my.demio.com/api/v1 and Api-Key/Api-Secret headers. Store credentials as a JSON array [key, secret]. Contracts cover GET /ping and JSON PUT /event/register. Registration can contact attendees and was tested offline only.
+
+Disposable-store GET /ping rejected invalid credentials with HTTP 401 Authorization failed. The provider's published sandbox example credentials returned HTTP 200 with pong true and sandbox true. This proves sandbox authentication, not production account permissions or registration delivery. No attendee was registered. Focused suite: 470 passed; Ruff clean.
