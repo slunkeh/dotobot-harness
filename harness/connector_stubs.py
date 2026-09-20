@@ -104,6 +104,9 @@ STUBS: list[dict] = [
     {
         "type": "add_to_calendar_pro",
         "name": "Add to Calendar PRO",
+        "api_base": "https://api.add-to-calendar-pro.com/v1",
+        "auth_style": "header",
+        "auth_header": "Authorization",
         "auth": "api_key",
         "fields": [],
         "category": "Productivity",

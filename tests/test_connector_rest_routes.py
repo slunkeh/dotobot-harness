@@ -15,6 +15,14 @@ from harness.paths import HarnessPaths
 # Literal expected requests intentionally independent of catalogue metadata.
 CASES = [
     (
+        "add_to_calendar_pro",
+        {},
+        "/event/all",
+        "https://api.add-to-calendar-pro.com/v1/event/all",
+        "Authorization",
+        "fixture-key",
+    ),
+    (
         "aimtell",
         {},
         "/sites/",
@@ -1832,4 +1840,22 @@ def test_aimtell_website_update_json(tmp_path):
     assert req.full_url == "https://api.aimtell.com/prod/site/123"
     assert req.get_method() == "PUT"
     assert req.get_header("X-authorization-api-key") == "fixture-key"
+    assert json.loads(req.data) == body
+
+
+def test_add_to_calendar_pro_event_json(tmp_path):
+    paths = HarnessPaths(home=tmp_path)
+    record = Connectors(paths).add("add_to_calendar_pro", "Calendar", secret="fixture-key")
+    bound = tools_for_bot(paths, "atlas", record_ids={record["id"]})
+    body = {
+        "new_event_group_name": "Fixture",
+        "dates": [{"name": "Fixture date", "startDate": "2027-01-20", "timeZone": "Europe/London"}],
+    }
+    with patch("connectors.generic._open", return_value=_response({})) as send:
+        assert "HTTP 200" in bound["add_to_calendar_pro_request"][1](
+            {"method": "POST", "path": "/event", "body": body}
+        )
+    req = send.call_args.args[0]
+    assert req.full_url == "https://api.add-to-calendar-pro.com/v1/event"
+    assert req.get_header("Authorization") == "fixture-key"
     assert json.loads(req.data) == body

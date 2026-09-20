@@ -3,11 +3,11 @@
 Scope: implement the 144 catalogue connectors identified with missing REST hosts.
 This is an implementation ledger, not a claim of live-account verification.
 
-Ninety routes now have offline request-contract coverage through the real connector
+Ninety-one routes now have offline request-contract coverage through the real connector
 registry and credential store. Tests assert the outbound origin, version prefix,
 credential header, query and JSON body. Credentials are never followed through
 HTTP redirects. Production authenticated reads and writes remain unverified for these
-ninety routes. The remaining 54 connectors still need provider research and code.
+ninety-one routes. The remaining 53 connectors still need provider research and code.
 
 ## Implemented routes
 
@@ -164,7 +164,7 @@ Live evidence for the third batch:
 | `active_trail` | Route and offline request tests added; live verification pending |
 | `acumbamail` | Implemented; request contracts pass; authenticated account verification pending |
 | `acymailing` | Pending provider research and implementation |
-| `add_to_calendar_pro` | Pending provider research and implementation |
+| `add_to_calendar_pro` | Implemented REST route; event read/create contracts pass; live invalid key rejected; authenticated acceptance open |
 | `adhook` | Pending provider research and implementation |
 | `adrapid` | Implemented; request contracts pass; invalid token rejected live, account acceptance pending |
 | `adroll` | Implemented PAT route with scalar multipart writes; tests pass; invalid application key rejected live; account acceptance and binary uploads pending |
@@ -853,3 +853,10 @@ A disposable connector-store probe of GET /people/all?limit=1 returned HTTP 401,
 The [official reference](https://developers.aimtell.com/api-reference/introduction) and [website OpenAPI specification](https://developers.aimtell.com/api-reference/sites-openapi.json) document the /prod base and X-Authorization-Api-Key header. Added website-list GET and JSON website-update PUT contracts. GET /sites/ supports limit/skip pagination; PUT /site/ID takes name and optional icon.
 
 A disposable connector-store request to GET /sites/?limit=1 returned HTTP 403 with Invalid API Key. No accepted write or push notification was attempted. Real-account acceptance remains open. Focused suite: 375 passed; Ruff clean.
+
+
+## Add to Calendar PRO REST route
+
+The [official API overview](https://docs.add-to-calendar-pro.com/api/introduction), [authentication guide](https://docs.add-to-calendar-pro.com/api/auth), and [event reference](https://docs.add-to-calendar-pro.com/api/events) establish the v1 host, raw Authorization key, and JSON event format. Added GET /event/all and nested dates POST /event contracts. Organization keys have scopes and optional expiry. Event creation publishes immediately and some updates consume credits; no live write was attempted. Separate ICS download hosts are not part of this JSON route.
+
+A disposable connector-store GET /event/all?page=1 returned HTTP 401, Not authenticated. Authenticated acceptance remains open. Focused suite: 377 passed; Ruff clean.

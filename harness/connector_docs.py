@@ -59,9 +59,9 @@ _ROWS: list[tuple[str, str, str, str]] = [
     ),
     (
         "add_to_calendar_pro",
-        "none",
-        "https://add-to-calendar-pro.com/",
-        "WP/JS plugin. No MCP.",
+        "official",
+        "https://docs.add-to-calendar-pro.com/api/introduction",
+        "Organization API key in Authorization without a prefix. Read/write scopes and expiry apply. GET /event/all supports page; POST /event takes event_group (or new_event_group_name) and dates. Creation publishes immediately; updates may consume event credits. PATCH /event/PROKEY updates fields. Binary ICS downloads use a separate host.",
     ),
     ("adhook", "none", "", "No public docs surfaced."),
     (
