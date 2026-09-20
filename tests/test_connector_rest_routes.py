@@ -15,6 +15,14 @@ from harness.paths import HarnessPaths
 # Literal expected requests intentionally independent of catalogue metadata.
 CASES = [
     (
+        "dripcel",
+        {},
+        "/balance",
+        "https://api.dripcel.com/balance",
+        "Authorization",
+        "Bearer fixture-key",
+    ),
+    (
         "asters",
         {},
         "/workspaces",
@@ -2414,3 +2422,23 @@ def test_lahar_conversion_json_token(tmp_path):
     assert req.get_header("Content-type") == "application/json"
     assert json.loads(req.data) == {**body, "token_api_lahar": "fixture&token"}
     assert "token_api_lahar" not in body
+
+
+def test_dripcel_contact_search_json(tmp_path):
+    paths = HarnessPaths(home=tmp_path)
+    record = Connectors(paths).add("dripcel", "Dripcel", secret="fixture-key")
+    bound = tools_for_bot(paths, "atlas", record_ids={record["id"]})
+    body = {
+        "find": {"tag_ids": {"$in": ["fixture-tag"]}},
+        "projection": {"cell": 1},
+        "options": {"skip": 0, "limit": 1},
+    }
+    with patch("connectors.generic._open", return_value=_response({"ok": True})) as send:
+        result = bound["dripcel_request"][1](
+            {"method": "POST", "path": "/contacts/search", "body": body}
+        )
+    assert "HTTP 200" in result
+    req = send.call_args.args[0]
+    assert req.full_url == "https://api.dripcel.com/contacts/search"
+    assert req.get_header("Authorization") == "Bearer fixture-key"
+    assert json.loads(req.data) == body

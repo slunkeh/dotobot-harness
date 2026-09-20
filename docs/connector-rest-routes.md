@@ -3,11 +3,11 @@
 Scope: implement the 144 catalogue connectors identified with missing REST hosts.
 This is an implementation ledger, not a claim of live-account verification.
 
-One hundred and seven routes now have offline request-contract coverage through the real connector
+One hundred and eight routes now have offline request-contract coverage through the real connector
 registry and credential store. Tests assert the outbound origin, version prefix,
 credential header, query and JSON body. Credentials are never followed through
 HTTP redirects. Production authenticated reads and writes remain unverified for these
-one hundred and seven routes. The remaining 37 connectors still need provider research and code.
+one hundred and eight routes. The remaining 36 connectors still need provider research and code.
 
 ## Implemented routes
 
@@ -214,7 +214,7 @@ Live evidence for the third batch:
 | `doppler` | Route and offline request tests added; live verification pending |
 | `dribbble` | Implemented stored-token route; request contracts pass; authenticated account testing pending |
 | `drip` | Route and offline request tests added; live verification pending |
-| `dripcel` | Pending provider research and implementation |
+| `dripcel` | Implemented MarTech REST route; request contracts pass; live invalid key rejected; authenticated acceptance open |
 | `dropcontact` | Route and offline request tests added; live verification pending |
 | `dux_soup` | Implemented HMAC REST route; URL/body signing and envelope tests pass; live invalid token rejected; authenticated acceptance open |
 | `dynamic_content_snippet` | Pending provider research and implementation |
@@ -982,3 +982,9 @@ A disposable-store read request using synthetic invalid credentials returned HTT
 The [vendor-hosted Lahar site](https://mkt.lahar.com.br/) identifies the product as Ramper Marketing. The [Ramper Pipeline published request](https://www.postman.com/ramperpipeline/ramper-marketing-exemplo/documentation/byfyu4g/cadastro-atualizao-de-contato) uses app.lahar.com.br/api/conversions with JSON token_api_lahar, nome_formulario and email_contato. Added that route and a bound request contract verifying the stored token is injected without mutating caller data. The older [Lahar SDK repository](https://github.com/LAHAR-APP/Lahar-Communication-Api) corroborates conversion integration but was not used to substitute its older encoding for the current JSON example.
 
 A disposable-store POST containing only an invalid token, without any contact details, returned HTTP 200 with status erro and code 552 for missing required fields. This proves endpoint reachability, not authentication. No contact conversion was created. Production credentials and conversion acceptance remain open. Focused suite: 442 passed; Ruff clean.
+
+## Dripcel MarTech API
+
+The [official overview](https://dripcel.getoutline.com/s/2849f729-5450-4aa3-8cc9-50d29f9f2c74/doc/overview-FaM3SkQan1) specifies api.dripcel.com and Bearer API keys. Added bound GET /balance and nested JSON POST /contacts/search coverage. The [contact reference](https://dripcel.getoutline.com/s/2849f729-5450-4aa3-8cc9-50d29f9f2c74/doc/contacts-OmgWadaH8T) identifies search as a paid operation requiring contact.read.pii; it was tested offline only.
+
+A disposable-store GET /balance with an invalid key returned HTTP 401, ok false and Invalid key. No paid search or message send was attempted. Real account acceptance remains open. Focused suite: 444 passed; Ruff clean.

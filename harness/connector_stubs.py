@@ -697,6 +697,8 @@ STUBS: list[dict] = [
     },
     {
         "type": "dripcel",
+        "api_base": "https://api.dripcel.com",
+        "auth_style": "bearer",
         "name": "Dripcel",
         "auth": "api_key",
         "fields": [],

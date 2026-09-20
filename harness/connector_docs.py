@@ -438,9 +438,9 @@ _ROWS: list[tuple[str, str, str, str]] = [
     ),
     (
         "dripcel",
-        "aggregator",
-        "https://docs.composio.dev/toolkits/dripcel",
-        "Composio toolkit.",
+        "official",
+        "https://dripcel.getoutline.com/s/2849f729-5450-4aa3-8cc9-50d29f9f2c74/doc/overview-FaM3SkQan1",
+        "Generate a key under Profile > API Keys; sent as Bearer. GET /balance reads credits. POST /contacts/search accepts nested find, projection and options; requires contact.read.pii and costs 10 credits per request. Check the response ok field. Keys have permissions; approximately 50 requests per minute per organisation. Sending and campaign endpoints may deliver messages.",
     ),
     (
         "dropbox",
