@@ -274,7 +274,7 @@ Live evidence for the third batch:
 | `hyperise` | Pending: official API support pages currently fail TLS certificate validation; host and authentication still require verification |
 | `icontact` | Implemented standard API; three-header and JSON-array contracts pass; live invalid username rejected; authenticated acceptance open |
 | `impression` | Pending provider research and implementation |
-| `indiefunnels` | Pending provider research and implementation |
+| `indiefunnels` | Pending: Website API reference recovered; confirm IndieFunnels account exposes this API and customer domain |
 | `infusionsoft` | Implemented; request-contract tests pass; production account verification pending |
 | `inksprout` | Pending provider research and implementation |
 | `instabot` | Implemented master-key REST route; read/query contracts pass; live API key rejected; authenticated acceptance open |
@@ -1056,3 +1056,10 @@ Disposable-store GET /ping rejected invalid credentials with HTTP 401 Authorizat
 The [published API Blueprint](https://jsapi.apiary.io/apis/campaignhq.apib) behind the [provider reference](https://campaignhq.docs.apiary.io/) specifies api.campaignhq.co/api/v1 and Bearer API keys. Added GET /lists and JSON POST /lists request contracts. Keys come from Settings > Integrations > API keys. List creation takes name and optional partner_entity_id; responses include pagination metadata. Contact or campaign actions may trigger communication and require account acceptance.
 
 A disposable-store GET /lists with an invalid key returned HTTP 401 unauthorized, Access denied. No lists or contacts were created. Real account access and writes remain unverified. Focused suite: 472 passed; Ruff clean.
+
+
+## IndieFunnels Website API investigation
+
+The former websitebuilder Apiary reference now publishes a [move notice](https://jsapi.apiary.io/apis/websitebuilder.apib) pointing to [Website API](https://websitebuilder.app-sources.com/). The current reference specifies https://{domain}/api/site, Bearer keys from Website Settings > Applications, an identifying User-Agent, GET /contacts and JSON POST /contacts. This resolves the inaccessible-reference issue and identifies a concrete customer-host contract to verify.
+
+The IndieFunnels public website serves app-sources.com assets, consistent with the platform, but that alone does not prove account API availability or that its customer domains expose the documented API. Direct local fetching of the IndieFunnels homepage returned HTTP 403 while the browser search reader could retrieve it. No customer host or token was guessed. Account-level API settings confirmation remains the next step; IndieFunnels stays pending and the implemented count remains 116.
