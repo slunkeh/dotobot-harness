@@ -53,9 +53,9 @@ _ROWS: list[tuple[str, str, str, str]] = [
     ),
     (
         "acymailing",
-        "aggregator",
-        "https://mcp.pipedream.com/app/acymailing",
-        "Pipedream-generated actions.",
+        "official",
+        "https://docs.acymailing.com/rest-api",
+        "AcyMailing 9.2.0+ Essential or higher on Joomla/WordPress; enable REST API in Security settings. Configure api_domain as the website hostname, store its license key (Api-Key header). Call /index.php?page=acymailing_front&option=com_acym&ctrl=api&task=getUsers; include any installation subdirectory in the path. POST operations use JSON. Subscription operations default to sending emails and triggering automations unless disabled in their body. Endpoint docs specify Api-Key despite the overview describing Basic authentication.",
     ),
     (
         "add_to_calendar_pro",

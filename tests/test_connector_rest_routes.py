@@ -15,6 +15,14 @@ from harness.paths import HarnessPaths
 # Literal expected requests intentionally independent of catalogue metadata.
 CASES = [
     (
+        "acymailing",
+        {"api_domain": "fixture.example.com"},
+        "/index.php?page=acymailing_front&option=com_acym&ctrl=api&task=getUsers",
+        "https://fixture.example.com/index.php?page=acymailing_front&option=com_acym&ctrl=api&task=getUsers",
+        "Api-key",
+        "fixture-key",
+    ),
+    (
         "emailchef",
         {},
         "/lists",
@@ -581,7 +589,8 @@ def test_bound_connector_read_and_write_contract(tmp_path, type_, config, path, 
             result = bound[name][1](args)
         assert "HTTP 200" in result
         request = send.call_args.args[0]
-        assert request.full_url == url + ("?limit=2" if method == "GET" else "")
+        query_suffix = ("&limit=2" if "?" in url else "?limit=2") if method == "GET" else ""
+        assert request.full_url == url + query_suffix
         assert request.method == method
         assert request.get_header(header) == value
         if header != "Authorization":
@@ -1905,3 +1914,41 @@ def test_emailchef_list_json(tmp_path):
     assert req.full_url == "https://app.emailchef.com/apps/api/v1/lists"
     assert req.get_header("Authkey") == "fixture-key"
     assert json.loads(req.data) == body
+
+
+def test_acymailing_subscription_json(tmp_path):
+    paths = HarnessPaths(home=tmp_path)
+    record = Connectors(paths).add(
+        "acymailing",
+        "AcyMailing",
+        config={"api_domain": "fixture.example.com"},
+        secret="fixture-key",
+    )
+    bound = tools_for_bot(paths, "atlas", record_ids={record["id"]})
+    body = {
+        "emails": ["fixture@example.com"],
+        "listIds": ["1"],
+        "sendWelcomeEmail": False,
+        "trigger": False,
+    }
+    path = "/blog/index.php?page=acymailing_front&option=com_acym&ctrl=api&task=subscribeUsers"
+    with patch("connectors.generic._open", return_value=_response({})) as send:
+        assert "HTTP 200" in bound["acymailing_request"][1](
+            {"method": "POST", "path": path, "body": body}
+        )
+    req = send.call_args.args[0]
+    assert req.full_url == "https://fixture.example.com" + path
+    assert req.get_header("Api-key") == "fixture-key"
+    assert json.loads(req.data) == body
+
+
+@pytest.mark.parametrize("domain", ["", "https://example.com", "x/evil", "x?evil", "x@evil"])
+def test_acymailing_invalid_host(tmp_path, domain):
+    paths = HarnessPaths(home=tmp_path)
+    record = Connectors(paths).add(
+        "acymailing", "AcyMailing", config={"api_domain": domain}, secret="fixture-key"
+    )
+    bound = tools_for_bot(paths, "atlas", record_ids={record["id"]})
+    with patch("connectors.generic._open") as send:
+        assert "error:" in bound["acymailing_get"][1]({"path": "/index.php"})
+    send.assert_not_called()

@@ -3,11 +3,11 @@
 Scope: implement the 144 catalogue connectors identified with missing REST hosts.
 This is an implementation ledger, not a claim of live-account verification.
 
-Ninety-three routes now have offline request-contract coverage through the real connector
+Ninety-four routes now have offline request-contract coverage through the real connector
 registry and credential store. Tests assert the outbound origin, version prefix,
 credential header, query and JSON body. Credentials are never followed through
 HTTP redirects. Production authenticated reads and writes remain unverified for these
-ninety-three routes. The remaining 51 connectors still need provider research and code.
+ninety-four routes. The remaining 50 connectors still need provider research and code.
 
 ## Implemented routes
 
@@ -163,7 +163,7 @@ Live evidence for the third batch:
 | `activecampaign` | Route and offline request tests added; live verification pending |
 | `active_trail` | Route and offline request tests added; live verification pending |
 | `acumbamail` | Implemented; request contracts pass; authenticated account verification pending |
-| `acymailing` | Pending provider research and implementation |
+| `acymailing` | Implemented customer-host REST route; request contracts pass; real installation and license key needed for live acceptance |
 | `add_to_calendar_pro` | Implemented REST route; event read/create contracts pass; live invalid key rejected; authenticated acceptance open |
 | `adhook` | Pending provider research and implementation |
 | `adrapid` | Implemented; request contracts pass; invalid token rejected live, account acceptance pending |
@@ -881,3 +881,10 @@ A disposable connector-store GET /lists?limit=1 returned HTTP 401 with unauthori
 The [official webhook guide](https://help.heysummit.com/en/articles/11403933-how-to-set-up-webhooks-for-event-actions) documents POST /api/v2/webhooks/ and directs developers to API v2 documentation. Both https://api-v2.heysummit.com and https://api-docs.heysummit.com returned HTTP 403 during this pass. The API root returns an Event not found page. No REST route was guessed from older third-party examples.
 
 The [official MCP guide](https://help.heysummit.com/en/articles/15921700-connect-an-ai-assistant-to-heysummit-with-mcp) confirms a separate MCP endpoint, OAuth or Token-header authentication, and paid-plan access. That does not establish the full REST contract. HeySummit remains in the 51 pending connectors. KingSumo research likewise did not locate an authoritative REST contract in this pass.
+
+
+## AcyMailing customer-host REST route
+
+The [official overview](https://docs.acymailing.com/rest-api) requires version 9.2.0+ and Essential or higher, with REST enabled in Security settings. The [users](https://docs.acymailing.com/rest-api/users) and [subscription](https://docs.acymailing.com/rest-api/subscription) endpoint references explicitly specify Api-Key with the license key and JSON writes; this conflicts with the overview authentication page calling the method Basic. This implementation follows the endpoint references.
+
+Configure api_domain with the installation hostname. Include /index.php and the page, option, ctrl and task query parameters in the tool path; installations in a subdirectory can include it before index.php. Read pagination is appended correctly to that existing query. Subscription JSON coverage preserves arrays and false values for sendWelcomeEmail and trigger. Five malformed-host cases block transport. No live installation/key is available, so authenticated acceptance and confirmation of the documentation discrepancy remain open. Focused suite: 388 passed; Ruff clean.
