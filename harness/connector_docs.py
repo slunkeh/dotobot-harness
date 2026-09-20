@@ -282,8 +282,8 @@ _ROWS: list[tuple[str, str, str, str]] = [
     (
         "clickfunnels",
         "official",
-        "https://support.myclickfunnels.com/docs/clickfunnels-mcp-server-beta-1",
-        "Vendor MCP beta.",
+        "https://developers.myclickfunnels.com/docs/getting-started",
+        "Store a ClickFunnels 2.0 platform application API access token, used as Bearer. Set subdomain to accounts for GET /teams and /teams/TEAM_ID/workspaces; use the actual workspace subdomain for /workspaces/WORKSPACE_ID/contacts and workspace writes. Enter only the subdomain, without scheme or .myclickfunnels.com. Use separate connector records if both scopes are needed. JSON bodies are supported and Dotobot supplies the required User-Agent. Tokens are team-wide. OAuth consent and refresh are not handled here.",
     ),
     (
         "clickup",

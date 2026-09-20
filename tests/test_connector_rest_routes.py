@@ -15,6 +15,22 @@ from harness.paths import HarnessPaths
 # Literal expected requests intentionally independent of catalogue metadata.
 CASES = [
     (
+        "clickfunnels",
+        {"subdomain": "accounts"},
+        "/teams",
+        "https://accounts.myclickfunnels.com/api/v2/teams",
+        "Authorization",
+        "Bearer fixture-key",
+    ),
+    (
+        "clickfunnels",
+        {"subdomain": "fixture"},
+        "/workspaces/42/contacts",
+        "https://fixture.myclickfunnels.com/api/v2/workspaces/42/contacts",
+        "Authorization",
+        "Bearer fixture-key",
+    ),
+    (
         "adtraction",
         {},
         "/v2/partner/markets/",
@@ -415,6 +431,7 @@ def test_bound_connector_read_and_write_contract(tmp_path, type_, config, path, 
             assert request.get_header("Content-type") == (
                 "text/json" if type_ == "cardly" else "application/json"
             )
+        assert request.get_header("User-agent").startswith("dotobot/")
         assert "fixture-key" not in request.full_url
 
 
@@ -429,7 +446,12 @@ def test_bound_connector_read_and_write_contract(tmp_path, type_, config, path, 
     ],
 )
 @pytest.mark.parametrize(
-    "type_,field", [("activecampaign", "api_domain"), ("acelle_mail", "instance_domain")]
+    "type_,field",
+    [
+        ("activecampaign", "api_domain"),
+        ("acelle_mail", "instance_domain"),
+        ("clickfunnels", "subdomain"),
+    ],
 )
 def test_template_requires_host_only_configuration(tmp_path, domain, type_, field):
     paths = HarnessPaths(home=tmp_path)

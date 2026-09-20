@@ -3,11 +3,11 @@
 Scope: implement the 144 catalogue connectors identified with missing REST hosts.
 This is an implementation ledger, not a claim of live-account verification.
 
-Fifty-six routes now have offline request-contract coverage through the real connector
+Fifty-seven routes now have offline request-contract coverage through the real connector
 registry and credential store. Tests assert the outbound origin, version prefix,
 credential header, query and JSON body. Credentials are never followed through
 HTTP redirects. Production authenticated reads and writes remain unverified for these
-fifty-six routes. The remaining 88 connectors still need provider research and code.
+fifty-seven routes. The remaining 87 connectors still need provider research and code.
 
 ## Implemented routes
 
@@ -19,6 +19,7 @@ CloudConvert currently uses its production automatic-region API, not its sandbox
 
 | Connector | Provider reference | Setup |
 |---|---|---|
+| `clickfunnels` | [Provider documentation](https://developers.myclickfunnels.com/docs/getting-started) | Store a ClickFunnels 2.0 platform application API access token, used as Bearer. Set subdomain to accounts for GET /teams and /teams/TEAM_ID/workspaces; use the actual workspace subdomain for /workspaces/WORKSPACE_ID/contacts and workspace writes. Enter only the subdomain, without scheme or .myclickfunnels.com. Use separate connector records if both scopes are needed. JSON bodies are supported and Dotobot supplies the required User-Agent. Tokens are team-wide. OAuth consent and refresh are not handled here. |
 | `adtraction` | [Provider documentation](https://apidocs.adtraction.net/nextgen/) | Store the API token from Adtraction Account > Settings > API. Uses X-Token authentication and JSON bodies. Include the API version in each path: GET /v2/partner/markets/ or POST /v3/partner/programs/ with market in the JSON body. Both v2 and v3 share the configured host; prefer v3 replacements for deprecated v2 endpoints. Keep documented trailing slashes. Pagination starts at page 0. |
 | `easypromos` | [Provider documentation](https://easypromos-apiref.redoc.ly/) | Store an access token from the Easypromos account Utilities menu. Uses Bearer authentication; White Label or Corporate plan required. GET /promotions lists promotions; use paging.next_cursor for further pages. POST requests use JSON. Some participation operations also require a participant login token in the body. Legacy v1 endpoints are retired. |
 | `botconversa` | [Provider documentation](https://backend.botconversa.com.br/swagger/) | Store a BotConversa API key. Authentication uses API-KEY. Keep endpoint trailing slashes, for example GET /tags/ or /flows/. JSON writes are supported. POST /subscriber/ requires has_opt_in_whatsapp=true and actual contact consent. Messaging and flow endpoints can contact subscribers; adding the route does not authorize outreach. |
@@ -171,7 +172,7 @@ Live evidence for the third batch:
 | `chatrace` | Pending provider research and implementation |
 | `cleverreach` | Implemented; request-contract tests pass; production account verification pending |
 | `clevertap` | Pending provider research and implementation |
-| `clickfunnels` | Pending provider research and implementation |
+| `clickfunnels` | Implemented; request contracts pass; authenticated account verification pending |
 | `cloud_convert` | Route and offline request tests added; live verification pending |
 | `cometly` | Implemented; request contracts pass; authenticated account verification pending |
 | `constant_contact` | Implemented; request-contract tests pass; production account verification pending |
@@ -507,3 +508,16 @@ Bound calls using an invalid token returned HTTP 401 Unauthorized access for
 both GET /v2/partner/markets/ and POST /v3/partner/programs/ with market=SE.
 The latter is a documented retrieval operation despite using POST. No account
 data was changed. Authenticated provider access remains unverified.
+
+## ClickFunnels validation
+
+The [current getting-started guide](https://developers.myclickfunnels.com/docs/getting-started)
+requires accounts.myclickfunnels.com for team queries and each workspace's
+subdomain for workspace data. Both configurations now pass request contracts,
+which failed before the route was added. Five malformed configuration cases
+remain blocked before network access. Tests also check Dotobot's User-Agent.
+The focused suite passes 269 tests; Ruff passes.
+
+A bound GET /teams on the documented accounts subdomain using a disposable store
+and invalid token returned HTTP 401 API key missing or invalid. No actual
+workspace subdomain or authenticated account was tested. No writes were made.
