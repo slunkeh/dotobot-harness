@@ -15,6 +15,14 @@ from harness.paths import HarnessPaths
 # Literal expected requests intentionally independent of catalogue metadata.
 CASES = [
     (
+        "chatrace",
+        {},
+        "/accounts/flows",
+        "https://api.chatrace.com/accounts/flows",
+        "X-access-token",
+        "fixture-key",
+    ),
+    (
         "acymailing",
         {"api_domain": "fixture.example.com"},
         "/index.php?page=acymailing_front&option=com_acym&ctrl=api&task=getUsers",
@@ -1981,3 +1989,31 @@ def test_easysendy_json_api_key(tmp_path, path, body):
     assert req.get_header("Content-type") == "application/json"
     assert json.loads(req.data) == {**body, "api_key": "fixture-key"}
     assert "api_key" not in body
+
+
+@pytest.mark.parametrize(
+    "path, body, expected",
+    [
+        ("/accounts/tags", {"name": "Fixture tag"}, b"name=Fixture+tag"),
+        ("/contacts/123/send/456", {"value": "fixture"}, b"value=fixture"),
+        ("/contacts/123/send/text", {"text": "Fixture"}, None),
+        ("/contacts", {"phone": "+441234567890", "first_name": "Fixture"}, None),
+    ],
+)
+def test_chatrace_body_encoding(tmp_path, path, body, expected):
+    paths = HarnessPaths(home=tmp_path)
+    record = Connectors(paths).add("chatrace", "Chatrace", secret="fixture-key")
+    bound = tools_for_bot(paths, "atlas", record_ids={record["id"]})
+    with patch("connectors.generic._open", return_value=_response({})) as send:
+        assert "HTTP 200" in bound["chatrace_request"][1](
+            {"method": "POST", "path": path, "body": body}
+        )
+    req = send.call_args.args[0]
+    assert req.full_url == "https://api.chatrace.com" + path
+    assert req.get_header("X-access-token") == "fixture-key"
+    if expected is None:
+        assert req.get_header("Content-type") == "application/json"
+        assert json.loads(req.data) == body
+    else:
+        assert req.get_header("Content-type") == "application/x-www-form-urlencoded"
+        assert req.data == expected

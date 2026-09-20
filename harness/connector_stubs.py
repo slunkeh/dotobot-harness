@@ -431,6 +431,17 @@ STUBS: list[dict] = [
     },
     {
         "type": "chatrace",
+        "api_base": "https://api.chatrace.com",
+        "auth_style": "header",
+        "auth_header": "X-ACCESS-TOKEN",
+        "form_body_paths": [
+            r"/accounts/tags",
+            r"/accounts/bot_fields/[^/]+",
+            r"/contacts/[^/]+/custom_fields/[^/]+",
+            r"/contacts/[^/]+/send/[0-9]+",
+            r"/contacts/[^/]+/pay/[^/]+",
+            r"/contacts/[^/]+/cart/[^/]+",
+        ],
         "name": "ChatRace",
         "auth": "api_key",
         "fields": [],

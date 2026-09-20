@@ -273,9 +273,9 @@ _ROWS: list[tuple[str, str, str, str]] = [
     ),
     (
         "chatrace",
-        "none",
-        "https://chatrace.com/",
-        "Only automation listings, no genuine MCP.",
+        "official",
+        "https://api.chatrace.com/swagger/",
+        "Bot account API key in X-ACCESS-TOKEN. GET /accounts/tags reads tags. POST /accounts/tags takes form name; contacts and message bodies use JSON. Dotobot selects form encoding for documented tag, bot-field, contact-field, numeric flow-send, payment and cart paths. Messages and flows contact users; payment/cart operations change orders. Whitelabel partner API is separate.",
     ),
     (
         "cleverreach",

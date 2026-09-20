@@ -3,11 +3,11 @@
 Scope: implement the 144 catalogue connectors identified with missing REST hosts.
 This is an implementation ledger, not a claim of live-account verification.
 
-Ninety-five routes now have offline request-contract coverage through the real connector
+Ninety-six routes now have offline request-contract coverage through the real connector
 registry and credential store. Tests assert the outbound origin, version prefix,
 credential header, query and JSON body. Credentials are never followed through
 HTTP redirects. Production authenticated reads and writes remain unverified for these
-ninety-five routes. The remaining 49 connectors still need provider research and code.
+ninety-six routes. The remaining 48 connectors still need provider research and code.
 
 ## Implemented routes
 
@@ -193,7 +193,7 @@ Live evidence for the third batch:
 | `campayn` | Implemented; request contracts pass; authenticated account verification pending |
 | `cardly` | Route and offline request tests added; live verification pending |
 | `catch_all_verifier` | Implemented REST route; credits GET and verification JSON contracts pass; live invalid key rejected; authenticated acceptance open |
-| `chatrace` | Pending provider research and implementation |
+| `chatrace` | Implemented bot-account REST route; mixed form/JSON contracts pass; live invalid key rejected; authenticated acceptance open |
 | `cleverreach` | Implemented; request-contract tests pass; production account verification pending |
 | `clevertap` | Pending provider research and implementation |
 | `clickfunnels` | Implemented; request contracts pass; authenticated account verification pending |
@@ -895,3 +895,10 @@ Configure api_domain with the installation hostname. Include /index.php and the 
 The [official subscriber management reference](https://easysendy.com/email-campaigns/subscriber-management-api/) documents /rest JSON endpoints with api_key in the POST body, including POST reads. Its examples use HTTP; the configured HTTPS equivalent was verified with normal TLS validation. Added POST list retrieval and nested bulk-subscriber JSON contracts. Older /ver4 form endpoints are outside this route. Subscription writes may send confirmation emails.
 
 A disposable connector-store POST /subscribers_list/lists with an invalid key returned HTTP 200 and {"status":"OK","count":0}, matching a direct HTTPS request. This proves host reachability only; it does not validate authentication or account data access. No subscribers were submitted. Focused suite: 390 passed; Ruff clean. Leadoku and GoZen Growth research in this pass did not establish authoritative REST host contracts; both remain pending.
+
+
+## Chatrace bot-account REST route
+
+The [official API guide](https://docs.chatrace.com/kb/chatrace-api-documentation/) links the [Swagger reference](https://api.chatrace.com/swagger/), whose swagger.json documents api.chatrace.com and X-ACCESS-TOKEN. Added mixed encoding: form for tag creation, bot fields, contact fields, numeric flow sends, payment and cart paths; JSON elsewhere. Tests cover read binding, form tags, numeric flow encoding and JSON text/contact requests. Whitelabel partner administration is separate.
+
+A disposable connector-store GET /accounts/tags returned HTTP 401, No valid API key provided. No contacts, messages or orders were changed. Authenticated acceptance remains open. Focused suite: 395 passed; Ruff clean.
