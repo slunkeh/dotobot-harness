@@ -253,7 +253,7 @@ Live evidence for the third batch:
 | `giantcampaign` | Implemented; request contracts pass; authenticated account verification pending |
 | `gist` | Implemented; request contracts pass; authenticated account verification pending |
 | `gitter` | Matrix route implemented from provider discovery; advertised host fails local DNS; live acceptance blocked |
-| `gobio_link` | Pending provider research and implementation |
+| `gobio_link` | Pending: public homepage reachable; API reference and login probes return 403; authentication unverified |
 | `goodbits` | Pending: website, API and support hosts fail DNS resolution; official API contract unavailable |
 | `google_ad_manager` | Implemented REST route; authenticated account acceptance pending |
 | `google_ads` | Implemented REST route; authenticated account acceptance pending |
@@ -1142,3 +1142,8 @@ A disposable-store GET /profiles with an invalid token returned HTTP 401, error_
 Rechecked the delivery product's published Zendesk API category at https://getswift.zendesk.com/hc/en-us/categories/201155647-API: HTTP 403. The historically referenced delivery application app.getswift.co fails local DNS resolution; getswift.co fails TLS hostname verification. No certificate bypass or credential transmission was attempted. These observations do not establish permanent shutdown or a current authentication contract.
 
 The similarly named getswift.cloud storage uploader is a different product and must not replace this delivery integration. GetSwift remains pending until its current delivery API host and authentication can be verified. No delivery was booked.
+
+
+## GoBio Link documentation access
+
+The public https://gobio.link/ homepage redirects to https://join.gobio.link/ and identifies the bio-link product. Its linked login at https://gobio.link/login returns HTTP 403 from this environment. Read-only checks of /api-documentation and /api also return 403; those guessed paths are not evidence of an API contract. No account was created and no credentials were sent. The marketing page and its published assets expose no verified API host/authentication instructions. GoBio remains pending; browser or account documentation is the next avenue.
