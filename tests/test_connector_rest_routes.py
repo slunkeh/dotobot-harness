@@ -1094,3 +1094,27 @@ def test_emailverify_parameter_authentication(tmp_path, method):
         with patch("connectors.generic._open") as send:
             assert "secret store" in bound[name][1]({**args, "body": {"key": "override"}})
         send.assert_not_called()
+
+
+@pytest.mark.parametrize("method", ["GET", "PUT"])
+def test_dribbble_documented_encoding(tmp_path, method):
+    paths = HarnessPaths(home=tmp_path)
+    record = Connectors(paths).add("dribbble", "Dribbble", secret="fixture-token")
+    bound = tools_for_bot(paths, "atlas", record_ids={record["id"]})
+    path = "/user" if method == "GET" else "/shots/123"
+    args = {"path": path, "method": method}
+    if method == "PUT":
+        args["body"] = {"title": "Fixture"}
+    name = "dribbble_get" if method == "GET" else "dribbble_request"
+    with patch("connectors.generic._open", return_value=_response({})) as send:
+        assert "HTTP 200" in bound[name][1](args)
+    req = send.call_args.args[0]
+    assert req.full_url == "https://api.dribbble.com/v2" + path
+    assert req.method == method
+    assert req.get_header("Authorization") == "Bearer fixture-token"
+    # The official v2 overview specifies JSON with this unusual media type.
+    assert req.get_header("Content-type") == "application/x-www-form-urlencoded"
+    if method == "PUT":
+        assert json.loads(req.data) == {"title": "Fixture"}
+    else:
+        assert req.data is None

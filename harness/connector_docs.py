@@ -401,9 +401,9 @@ _ROWS: list[tuple[str, str, str, str]] = [
     ),
     (
         "dribbble",
-        "aggregator",
-        "https://zapier.com/mcp/dribbble",
-        "Also unofficial Apify scrapers.",
+        "official",
+        "https://developer.dribbble.com/v2/",
+        "Store an OAuth access token, sent as Bearer. GET /user reads the current user; /user/shots lists shots. PUT /shots/ID updates metadata with upload scope. The v2 overview specifies JSON bodies with application/x-www-form-urlencoded Content-Type. OAuth consent and refresh, multipart uploads and binary responses are not implemented here.",
     ),
     (
         "drip",

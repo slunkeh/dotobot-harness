@@ -3,11 +3,11 @@
 Scope: implement the 144 catalogue connectors identified with missing REST hosts.
 This is an implementation ledger, not a claim of live-account verification.
 
-Sixty-three routes now have offline request-contract coverage through the real connector
+Sixty-four routes now have offline request-contract coverage through the real connector
 registry and credential store. Tests assert the outbound origin, version prefix,
 credential header, query and JSON body. Credentials are never followed through
 HTTP redirects. Production authenticated reads and writes remain unverified for these
-sixty-three routes. The remaining 81 connectors still need provider research and code.
+sixty-four routes. The remaining 80 connectors still need provider research and code.
 
 ## Implemented routes
 
@@ -19,6 +19,7 @@ CloudConvert currently uses its production automatic-region API, not its sandbox
 
 | Connector | Provider reference | Setup |
 |---|---|---|
+| `dribbble` | [Provider documentation](https://developer.dribbble.com/v2/) | Store an OAuth access token, used as Bearer. GET /user or /user/shots reads account data. PUT /shots/ID updates metadata with upload scope. The documented JSON body uses application/x-www-form-urlencoded Content-Type. OAuth lifecycle, multipart uploads and binary responses are unsupported here. |
 | `apexverify` | [Provider documentation](https://documentation.apexverify.com/api-reference/api-authentication) | Store the API key, sent in X-Api-Key. GET /account/credits reads the balance. POST /unit accepts JSON type (email or phone), target_country and unit. Verification consumes credits; review use_global_cache before submitting data. Multipart uploads and binary exports are unsupported by the generic JSON tool. |
 | `emailverify_io` | [Provider documentation](https://www.emailverify.io/api/docs) | Store the account API key. GET /v2/check-account-balance reads credits. POST /v1/validate-batch takes title and email_batch containing address objects, up to 5000. The stored key is inserted in GET queries or POST JSON; never pass it in tool arguments. Poll /v1/get-result-bulk-verification-task/ with task_id. Verification consumes credits. |
 | `acumbamail` | [Provider documentation](https://acumbamail.com/apidoc/) | Store the auth token from My account > Preferences. Dotobot inserts auth_token into GET queries or POST form data from the secret store. Use function paths with trailing slashes, such as /getLists/. JSON is the default response format. Pass POST parameters as a body object; nested fields are form-encoded with bracket notation. Some GET functions can modify data too: select functions carefully. Do not include auth_token in tool arguments. |
@@ -193,7 +194,7 @@ Live evidence for the third batch:
 | `discourse` | Pending provider research and implementation |
 | `docupost` | Pending provider research and implementation |
 | `doppler` | Route and offline request tests added; live verification pending |
-| `dribbble` | Pending provider research and implementation |
+| `dribbble` | Implemented stored-token route; request contracts pass; authenticated account testing pending |
 | `drip` | Route and offline request tests added; live verification pending |
 | `dripcel` | Pending provider research and implementation |
 | `dropcontact` | Route and offline request tests added; live verification pending |
@@ -595,3 +596,12 @@ and JSON unit verification schema. Both new contract tests failed before the rou
 was added and pass afterward. The focused suite passes 289 tests; Ruff passes.
 A disposable bound GET /account/credits rejected an invalid key with HTTP 401
 Unauthorized. No verification was submitted; authenticated acceptance remains open.
+
+## Dribbble validation
+
+The official v2 overview specifies the host, bearer token and unusual JSON body
+with form Content-Type; the shots reference confirms PUT and upload scope.
+Two new tests failed before implementation and pass afterward. The focused suite
+passes 291 tests; Ruff passes. A disposable bound GET /user rejected an invalid
+token with HTTP 401 Bad credentials. No account writes or uploads were attempted;
+authenticated acceptance and provider acceptance of write encoding remain open.
