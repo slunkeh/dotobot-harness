@@ -3,11 +3,11 @@
 Scope: implement the 144 catalogue connectors identified with missing REST hosts.
 This is an implementation ledger, not a claim of live-account verification.
 
-Eighty routes now have offline request-contract coverage through the real connector
+Eighty-one routes now have offline request-contract coverage through the real connector
 registry and credential store. Tests assert the outbound origin, version prefix,
 credential header, query and JSON body. Credentials are never followed through
 HTTP redirects. Production authenticated reads and writes remain unverified for these
-eighty routes. The remaining 64 connectors still need provider research and code.
+eighty-one routes. The remaining 63 connectors still need provider research and code.
 
 ## Implemented routes
 
@@ -19,6 +19,7 @@ CloudConvert currently uses its production automatic-region API, not its sandbox
 
 | Connector | Provider reference | Setup |
 |---|---|---|
+| `everwebinar` | [API reference](https://support.webinarjam.com/en/collections/19655442-everwebinar-api) | Store the approved account API key. All operations use POST. /webinars takes an empty body; /webinar takes webinar_id and optional timezone. Dotobot adds api_key in the form body. Use API-returned schedule IDs for registration. |
 | `gosquared` | [Authentication](https://www.gosquared.com/docs/configuration/) | Store the API Access key; Dotobot adds api_key to the query. Supply site_token for project endpoints, in GET query or POST path query. Include the API/version prefix. GET /now/v3/overview; POST /tracking/v1/event with JSON event. Key scopes apply. Use a test project for tracking. |
 | `google_analytics` | [Data API reference](https://developers.google.com/analytics/devguides/reporting/data/v1/rest) | Store a current OAuth access token with analytics.readonly or analytics scope and property access. Enable the Data API. Include /v1beta or /v1alpha in paths. GET /v1beta/properties/ID/metadata; POST /v1beta/properties/ID:runReport with dimensions, metrics and dateRanges. Use limit and offset to constrain responses. Token creation/refresh, Admin API and Measurement Protocol are not implemented by this route. |
 | `enginemailer` | [Campaign API reference](https://enginemailer.zendesk.com/hc/en-us/articles/360003129972-Campaign-REST-API-GETTING-STARTED) | Store the profile API key, sent in APIKey. Campaign API requires a paid plan. Paths omit /restapi. GET /campaign/emcampaign/GetCategoryList; POST /Campaign/EMCampaign/CreateCampaign with JSON. Check Result.Status and Result.StatusCode even when HTTP is 200. |
@@ -237,7 +238,7 @@ Live evidence for the third batch:
 | `enormail` | Implemented; request contracts pass; authenticated account verification pending |
 | `esputnik` | Implemented; request-contract tests pass; production account verification pending |
 | `eventbrite` | Implemented; request-contract tests pass; production account verification pending |
-| `everwebinar` | Pending provider research and implementation |
+| `everwebinar` | Implemented; form POST read contracts pass; invalid key rejected live; account acceptance pending |
 | `exact_mails` | Pending provider research and implementation |
 | `facebook` | Pending provider research and implementation |
 | `feedblitz` | Pending provider research and implementation |
@@ -774,3 +775,9 @@ All 334 focused tests and Ruff pass. The ledger contains 79 implemented and 65 p
 Added query-key authentication at api.gosquared.com, preserving API/version paths and project site_token. Request tests cover the documented [overview read](https://www.gosquared.com/docs/now/overview/) and [JSON event tracking](https://www.gosquared.com/docs/tracking/event/).
 
 The bound overview call with the documented public demo key and site token returned HTTP 200 with visitor, page and summary metrics. The same read with an invalid key returned HTTP 401, API key not authorised. No tracking request was sent. Production acceptance remains open. All 336 focused tests and Ruff pass; 80 routes are implemented and 64 remain pending. The midpoint full suite predates this addition.
+
+## EverWebinar
+
+The current official API uses api.webinarjam.com/everwebinar. [Webinar listing](https://support.webinarjam.com/en/articles/15370154-retrieve-a-full-list-of-all-webinars-published-in-your-account-everwebinar-api) and [webinar details](https://support.webinarjam.com/en/articles/15370155-get-details-about-one-particular-webinar-from-your-account-everwebinar-api) both require form POST. Tests cover key escaping, body preservation, paths and timezone encoding.
+
+A bound disposable-store POST /webinars with an invalid key returned HTTP 401 with a valid-key-required error. No registration or subscription change was attempted. All 338 focused tests and Ruff pass. There are 81 implemented routes and 63 pending; the midpoint full suite predates this addition.

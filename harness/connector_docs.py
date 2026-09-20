@@ -565,9 +565,9 @@ _ROWS: list[tuple[str, str, str, str]] = [
     ),
     (
         "everwebinar",
-        "aggregator",
-        "https://zapier.com/mcp/webinarjam",
-        "Listed jointly with WebinarJam.",
+        "official",
+        "https://support.webinarjam.com/en/collections/19655442-everwebinar-api",
+        "Store the approved account-wide API key. All documented operations use POST, including reads: /webinars with an empty body or /webinar with webinar_id and optional timezone. Dotobot adds api_key and form-encodes the body. Paths omit /everwebinar. Use API-returned schedule IDs for registrations, not dashboard IDs. Registration may send messages; obtain attendee consent. Inspect response status. API access requires provider approval; limit is 20 calls per second per user.",
     ),
     ("exact_mails", "none", "https://exactmails.com/", "No dedicated MCP."),
     (

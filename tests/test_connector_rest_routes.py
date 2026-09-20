@@ -1504,3 +1504,28 @@ def test_gosquared_query_key_and_project(tmp_path, method, path):
         assert json.loads(req.data) == body
     else:
         assert req.data is None
+
+
+@pytest.mark.parametrize(
+    "path,body", [("/webinars", {}), ("/webinar", {"webinar_id": 6, "timezone": "GMT+4:30"})]
+)
+def test_everwebinar_form_read(tmp_path, path, body):
+    from urllib.parse import parse_qs
+
+    paths = HarnessPaths(home=tmp_path)
+    record = Connectors(paths).add("everwebinar", "EverWebinar", secret="key&= +?")
+    bound = tools_for_bot(paths, "atlas", record_ids={record["id"]})
+    original = dict(body)
+    with patch("connectors.generic._open", return_value=_response({"status": "success"})) as send:
+        result = bound["everwebinar_request"][1]({"method": "POST", "path": path, "body": body})
+    assert "HTTP 200" in result
+    req = send.call_args.args[0]
+    assert req.full_url == "https://api.webinarjam.com/everwebinar" + path
+    assert req.method == "POST"
+    assert req.get_header("Authorization") is None
+    assert req.get_header("Content-type") == "application/x-www-form-urlencoded"
+    assert parse_qs(req.data.decode()) == {
+        "api_key": ["key&= +?"],
+        **{k: [str(v)] for k, v in body.items()},
+    }
+    assert body == original
