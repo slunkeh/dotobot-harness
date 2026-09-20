@@ -3013,3 +3013,26 @@ def test_automizy_vendor_sdk_contract(tmp_path, method):
         assert req.get_header("Content-type") == "application/json"
     else:
         assert req.data is None
+
+
+def test_lead_identity_check_documented_headers_and_payload(tmp_path):
+    paths = HarnessPaths(home=tmp_path)
+    record = Connectors(paths).add(
+        "lead_identity_check", "LIC", secret='["fixture-key", "fixture-filter"]'
+    )
+    bound = tools_for_bot(paths, "atlas", record_ids={record["id"]})
+    body = {"Firstname": "Fixture", "Lastname": "Test", "Phone": "2025550100"}
+    with patch(
+        "connectors.generic._open", return_value=_response({"Master Response": "Fail"})
+    ) as send:
+        result = bound["lead_identity_check_request"][1](
+            {"method": "POST", "path": "/main/lic/v1", "body": body}
+        )
+    assert "HTTP 200" in result and "Fail" in result
+    req = send.call_args.args[0]
+    assert req.full_url == "https://leadidentitycheck-node.vercel.app/main/lic/v1"
+    assert req.get_header("X-lic-key") == "fixture-key"
+    assert req.get_header("Filterkey") == "fixture-filter"
+    assert req.get_header("Authorization") is None
+    assert req.get_header("Content-type") == "application/json"
+    assert json.loads(req.data) == body

@@ -1603,6 +1603,9 @@ STUBS: list[dict] = [
     },
     {
         "type": "lead_identity_check",
+        "api_base": "https://leadidentitycheck-node.vercel.app",
+        "auth_style": "header_pair",
+        "auth_headers": ["X-LIC-KEY", "Filterkey"],
         "name": "Lead Identity Check",
         "auth": "api_key",
         "fields": [],

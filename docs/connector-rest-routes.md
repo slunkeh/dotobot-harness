@@ -3,11 +3,11 @@
 Scope: implement the 144 catalogue connectors identified with missing REST hosts.
 This is an implementation ledger, not a claim of live-account verification.
 
-One hundred and thirty routes now have offline request-contract coverage through the real connector
+One hundred and thirty-one routes now have offline request-contract coverage through the real connector
 registry and credential store. Tests assert the outbound origin, version prefix,
 credential header, query and JSON body. Credentials are never followed through
 HTTP redirects. Production authenticated reads and writes remain unverified for these
-one hundred and thirty routes. The remaining 14 connectors still need provider research and code.
+one hundred and thirty-one routes. The remaining 13 connectors still need provider research and code.
 
 ## Implemented routes
 
@@ -292,7 +292,7 @@ Live evidence for the third batch:
 | `lahar` | Implemented Ramper Marketing conversion route; JSON contract passes; incomplete live request rejected; authenticated acceptance open |
 | `laposta` | Implemented; documented sandbox list read HTTP 200 (truncated); production verification pending |
 | `lawmatics` | Implemented; request-contract tests pass; production account verification pending |
-| `lead_identity_check` | Pending provider research and implementation |
+| `lead_identity_check` | Implemented: official host, two secret headers and JSON verification request; invalid filter returns 400. Account acceptance open. |
 | `leaddyno` | Implemented; request contracts pass; authenticated account verification pending |
 | `leadoku` | Pending: Growth-X identity suggested by integrations; help.growth-x.com fails browser DNS; provider contract unverified |
 | `leadpops` | Pending provider research and implementation |
@@ -1233,3 +1233,10 @@ A [GoZen founder-team answer dated June 27, 2024](https://appsumo.com/products/g
 ## Kyvio official support portal blocker
 
 The [provider support page](https://kyvio.com/support) links https://support.kvsocial.com/. Browser navigation redirects to /portal/en/home and displays a Zoho Desk error saying the requested URL was not found. This confirms the help portal is currently unusable beyond the earlier command-line 403. The public KVSocial repositories inspected do not provide a Kyvio REST contract. Legacy Smart Mailer integration examples and the separate Mailvio SDK are insufficient to establish current Kyvio compatibility. Updated the catalogue pointer and limitation; host remains pending. No trial, key or subscriber was created.
+
+
+## Lead Identity Check official contract recovered
+
+The provider homepage loaded in the browser despite command-line HTTP 403 and linked [official documentation](https://leadidentitycheck.com/documentation/). It explicitly specifies POST https://leadidentitycheck-node.vercel.app/main/lic/v1, X-LIC-KEY and Filterkey headers, and required Firstname, Lastname and Phone JSON fields. Added a two-secret-header route and a bound request contract. HTTP 200 can contain Master Response Fail and must not be interpreted as a matching identity. No public read endpoint is documented.
+
+A bound request from a disposable local secret store using invalid credentials and synthetic fixture details returned HTTP 400 Invalid filter key. No real personal data was submitted. Valid account acceptance and successful verification remain open. Focused suite: 497 passed; Ruff clean. Configured hosts: 131 of 144; 13 pending. The full suite started before this change and is tracked separately as the 130-host checkpoint.

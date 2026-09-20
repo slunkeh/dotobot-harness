@@ -1019,9 +1019,9 @@ _ROWS: list[tuple[str, str, str, str]] = [
     ),
     (
         "lead_identity_check",
-        "aggregator",
-        "https://zapier.com/mcp/lead-identity-check",
-        "Phone/address/email-to-name verification.",
+        "official",
+        "https://leadidentitycheck.com/documentation/",
+        "Store a JSON array [apiKey, filterKey] as the secret. Sends X-LIC-KEY and Filterkey headers. POST /main/lic/v1 accepts JSON Firstname, Lastname and Phone (all required), with optional Email and Address. Inspect Master Response and individual verification results; HTTP 200 alone is not a successful match. Requests may consume checks. No public read endpoint is documented; valid account acceptance remains unverified.",
     ),
     (
         "leaddyno",
