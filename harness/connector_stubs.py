@@ -327,6 +327,8 @@ STUBS: list[dict] = [
     },
     {
         "type": "builderall_mailingboss",
+        "api_base": "https://member.mailingboss.com/integration/index.php",
+        "auth_style": "path_suffix",
         "name": "Builderall MailingBoss",
         "auth": "api_key",
         "fields": [],

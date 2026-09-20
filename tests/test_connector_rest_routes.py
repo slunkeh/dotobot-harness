@@ -2289,3 +2289,42 @@ def test_autoklose_query_token_and_json(tmp_path, method):
         assert req.get_header("Content-type") == "application/json"
     else:
         assert req.data is None
+
+
+@pytest.mark.parametrize("method", ["GET", "POST"])
+def test_mailingboss_path_token(tmp_path, method):
+    paths = HarnessPaths(home=tmp_path)
+    record = Connectors(paths).add("builderall_mailingboss", "MailingBoss", secret="key/+ ?&")
+    bound = tools_for_bot(paths, "atlas", record_ids={record["id"]})
+    path = "/lists" if method == "GET" else "/lists/fields"
+    args = {"path": path + "?page=1", "method": method}
+    if method == "POST":
+        args["body"] = {"list_uid": "fixture-list"}
+    with patch("connectors.generic._open", return_value=_response({})) as send:
+        result = bound[
+            "builderall_mailingboss_get" if method == "GET" else "builderall_mailingboss_request"
+        ][1](args)
+    assert "HTTP 200" in result
+    req = send.call_args.args[0]
+    assert (
+        req.full_url
+        == "https://member.mailingboss.com/integration/index.php"
+        + path
+        + "/key%2F%2B%20%3F%26?page=1"
+    )
+    assert req.get_header("Authorization") is None
+    if method == "POST":
+        assert json.loads(req.data) == {"list_uid": "fixture-list"}
+    else:
+        assert req.data is None
+
+
+def test_mailingboss_transport_error_omits_token(tmp_path):
+    import urllib.error
+
+    paths = HarnessPaths(home=tmp_path)
+    record = Connectors(paths).add("builderall_mailingboss", "MailingBoss", secret="fixture-secret")
+    bound = tools_for_bot(paths, "atlas", record_ids={record["id"]})
+    with patch("connectors.generic._open", side_effect=urllib.error.URLError("fixture-secret")):
+        result = bound["builderall_mailingboss_get"][1]({"path": "/lists"})
+    assert result == "error: could not reach API"

@@ -43,6 +43,7 @@ _STYLES = (
     "4dem",
     "query",
     "header_pair",
+    "path_suffix",
     "dux",
 )
 
@@ -247,7 +248,7 @@ def _headers(ctx: ConnectorContext, secret: str) -> dict[str, str]:
             for name, prefix, value in zip(cat["auth_headers"], prefixes, pair, strict=True)
         )
         return hdrs
-    if style in {"query", "dux"}:
+    if style in {"query", "dux", "path_suffix"}:
         return hdrs
     if style == "header":
         from harness.connectors import _CATALOG_TYPES
@@ -340,6 +341,11 @@ def _http(
         url = _join(base, path)
         if not url:
             return "error: path must stay on the connector's API host"
+    if style == "path_suffix":
+        parts = urllib.parse.urlsplit(url)
+        url = urllib.parse.urlunsplit(
+            parts._replace(path=parts.path.rstrip("/") + "/" + urllib.parse.quote(key, safe=""))
+        )
     if query:
         qs = urllib.parse.urlencode(
             {str(k): v for k, v in query.items() if v is not None}, doseq=True
@@ -499,7 +505,7 @@ def _http(
     except (urllib.error.URLError, TimeoutError, OSError) as exc:
         return (
             "error: could not reach API"
-            if style == "query"
+            if style in {"query", "path_suffix"}
             else f"error: could not reach API: {exc}"
         )
     if len(raw) > _MAX_RESULT:

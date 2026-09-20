@@ -3,11 +3,11 @@
 Scope: implement the 144 catalogue connectors identified with missing REST hosts.
 This is an implementation ledger, not a claim of live-account verification.
 
-One hundred and three routes now have offline request-contract coverage through the real connector
+One hundred and four routes now have offline request-contract coverage through the real connector
 registry and credential store. Tests assert the outbound origin, version prefix,
 credential header, query and JSON body. Credentials are never followed through
 HTTP redirects. Production authenticated reads and writes remain unverified for these
-one hundred and three routes. The remaining 41 connectors still need provider research and code.
+one hundred and four routes. The remaining 40 connectors still need provider research and code.
 
 ## Implemented routes
 
@@ -183,7 +183,7 @@ Live evidence for the third batch:
 | `bigmailer` | Route and offline request tests added; live verification pending |
 | `botconversa` | Implemented; request contracts pass; authenticated account verification pending |
 | `brandmentions` | Implemented; request contracts pass; live Python request blocked by certificate-chain validation |
-| `builderall_mailingboss` | Pending provider research and implementation |
+| `builderall_mailingboss` | Implemented documented route; request contracts pass; invalid-key live read returns 404; authenticated acceptance open |
 | `buysellads` | Pending provider research and implementation |
 | `callpage` | Implemented; request contracts pass; invalid key rejected live, account acceptance pending |
 | `callrail` | Route and offline request tests added; live verification pending |
@@ -958,3 +958,9 @@ Read-only probes with an invalid credential returned: /v1/subtenants HTTP 404, /
 The [published API reference](https://www.postman.com/cloudy-space-2757/autoklose-s-public-workspace/documentation/twa9gic/autoklose-api) documents api.autoklose.com/api, an api_token URL query credential, and JSON request bodies. Added encoded token coverage for GET with repeated expand[] parameters and POST with a base64 attachment object. Binary downloads and multipart uploads remain unsupported. The [Integrations guide](https://help.autoklose.com/hc/en-us/articles/38723199985435-Integrations) explains generating and revoking API keys.
 
 A disposable-store GET /me with an invalid key returned HTTP 401 with an explicit invalid API key error. No email or contact was created. Authenticated account acceptance remains open. Focused suite: 428 passed; Ruff clean.
+
+## MailingBoss 5.0 REST route
+
+The [official integration guide](https://knowledgebase.builderall.com/docs/mailingboss-5-0-api-integration/) documents member.mailingboss.com/integration/index.php with the Integration Key appended after the endpoint path. Added path_suffix authentication with percent encoding before query parameters, no Authorization header, and generic connection errors that omit credential-bearing URLs. GET /lists and POST /lists/fields with a JSON list_uid are covered through the connector registry.
+
+A disposable-store GET /lists with an invalid token returned HTTP 404 and an empty message. This is reachability evidence only, not successful authentication or explicit credential rejection. No subscribers were created or updated. Focused suite: 431 passed; Ruff clean.
