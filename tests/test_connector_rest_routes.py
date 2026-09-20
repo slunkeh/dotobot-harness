@@ -2017,3 +2017,41 @@ def test_chatrace_body_encoding(tmp_path, path, body, expected):
     else:
         assert req.get_header("Content-type") == "application/x-www-form-urlencoded"
         assert req.data == expected
+
+
+@pytest.mark.parametrize(
+    "method, path, body",
+    [
+        ("GET", "/directory", None),
+        ("POST", "/directory/123/users", {"email": "fixture@example.com", "first_name": "Fixture"}),
+    ],
+)
+def test_coupontools_header_pair(tmp_path, method, path, body):
+    paths = HarnessPaths(home=tmp_path)
+    record = Connectors(paths).add(
+        "coupontools", "Coupontools", secret='["fixture-key", "fixture-secret"]'
+    )
+    bound = tools_for_bot(paths, "atlas", record_ids={record["id"]})
+    name = "coupontools_get" if method == "GET" else "coupontools_request"
+    args = {"path": path} if method == "GET" else {"method": method, "path": path, "body": body}
+    with patch("connectors.generic._open", return_value=_response({})) as send:
+        assert "HTTP 200" in bound[name][1](args)
+    req = send.call_args.args[0]
+    assert req.full_url == "https://api.coupontools.com/v4" + path
+    assert req.get_header("X-api-key") == "fixture-key"
+    assert req.get_header("X-api-secret") == "fixture-secret"
+    assert req.get_header("Authorization") is None
+    if body is not None:
+        assert json.loads(req.data) == body
+
+
+@pytest.mark.parametrize(
+    "secret", ["plain", "{}", '["one"]', '["key", ""]', '["key", 3]', '["key", "bad\\r\\nheader"]']
+)
+def test_coupontools_invalid_pair(tmp_path, secret):
+    paths = HarnessPaths(home=tmp_path)
+    record = Connectors(paths).add("coupontools", "Coupontools", secret=secret)
+    bound = tools_for_bot(paths, "atlas", record_ids={record["id"]})
+    with patch("connectors.generic._open") as send:
+        assert "error: store the credential" in bound["coupontools_get"][1]({"path": "/directory"})
+    send.assert_not_called()

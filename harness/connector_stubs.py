@@ -550,6 +550,9 @@ STUBS: list[dict] = [
     },
     {
         "type": "coupontools",
+        "api_base": "https://api.coupontools.com/v4",
+        "auth_style": "header_pair",
+        "auth_headers": ["x-api-key", "x-api-secret"],
         "name": "CouponTools",
         "auth": "api_key",
         "fields": [],

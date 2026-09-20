@@ -34,7 +34,7 @@ KNOWN_BASES: dict[str, tuple[str, str]] = {
     "telegram": ("https://api.telegram.org", "telegram"),
 }
 
-_STYLES = ("bearer", "basic", "telegram", "header", "basic_key", "4dem", "query")
+_STYLES = ("bearer", "basic", "telegram", "header", "basic_key", "4dem", "query", "header_pair")
 
 
 def tool_names(type_: str) -> list[str]:
@@ -215,6 +215,24 @@ def _headers(ctx: ConnectorContext, secret: str) -> dict[str, str]:
         "Accept": str(cat.get("accept", "application/json")),
         "User-Agent": "dotobot/0.2.9",
     }
+    if style == "header_pair":
+        try:
+            pair = json.loads(secret)
+        except (ValueError, TypeError):
+            pair = None
+        if (
+            not isinstance(pair, list)
+            or len(pair) != 2
+            or any(
+                not isinstance(v, str) or not v or any(ord(c) < 32 or ord(c) > 126 for c in v)
+                for v in pair
+            )
+        ):
+            raise ValueError(
+                "store the credential as a JSON array of two nonempty printable ASCII strings"
+            )
+        hdrs.update(zip(cat["auth_headers"], pair, strict=True))
+        return hdrs
     if style == "query":
         return hdrs
     if style == "header":
@@ -360,7 +378,10 @@ def _http(
             return f"error: {exc}"
     else:
         auth_key = key
-    hdrs = _headers(ctx, auth_key)
+    try:
+        hdrs = _headers(ctx, auth_key)
+    except ValueError as exc:
+        return f"error: {exc}"
     if ctx.record.get("type") == "discourse":
         username = str((ctx.record.get("config") or {}).get("api_username") or "")
         if not re.fullmatch(r"[A-Za-z0-9_.-]+", username):

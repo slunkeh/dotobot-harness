@@ -345,9 +345,9 @@ _ROWS: list[tuple[str, str, str, str]] = [
     ),
     (
         "coupontools",
-        "none",
-        "https://docs.coupontools.com/",
-        "REST API, no MCP.",
+        "official",
+        "https://docs.coupontools.com/api/v4/directory",
+        'Modern v4 directory and wallet loyalty API. Store credentials as a JSON array ["API_KEY", "API_SECRET"]; sent in x-api-key and x-api-secret. GET /directory lists directories; POST /directory/ID/users uses JSON email and optional profile fields. Legacy coupon/v3 X-Client-Id and X-Client-Secret authentication is not supported by this route.',
     ),
     (
         "crowdpower",

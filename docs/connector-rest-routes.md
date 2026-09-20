@@ -3,11 +3,11 @@
 Scope: implement the 144 catalogue connectors identified with missing REST hosts.
 This is an implementation ledger, not a claim of live-account verification.
 
-Ninety-six routes now have offline request-contract coverage through the real connector
+Ninety-seven routes now have offline request-contract coverage through the real connector
 registry and credential store. Tests assert the outbound origin, version prefix,
 credential header, query and JSON body. Credentials are never followed through
 HTTP redirects. Production authenticated reads and writes remain unverified for these
-ninety-six routes. The remaining 48 connectors still need provider research and code.
+ninety-seven routes. The remaining 47 connectors still need provider research and code.
 
 ## Implemented routes
 
@@ -203,7 +203,7 @@ Live evidence for the third batch:
 | `contentdrips` | Implemented; request contracts pass; queue GET returns 200 with invalid token, authenticated acceptance pending |
 | `convertkit` | Implemented; request-contract tests pass; production account verification pending |
 | `copicake` | Implemented; request-contract tests pass; production account verification pending |
-| `coupontools` | Pending provider research and implementation |
+| `coupontools` | Implemented modern v4 route with secret header pair; request contracts pass; invalid pair rejected live; legacy API remains unsupported |
 | `crowdpower` | Implemented; request contracts pass; authenticated account verification pending |
 | `curated` | Implemented; request contracts pass; invalid-key probe returns 404 Record not found, authenticated acceptance pending |
 | `cyberimpact` | Implemented; request-contract tests pass; production account verification pending |
@@ -902,3 +902,10 @@ A disposable connector-store POST /subscribers_list/lists with an invalid key re
 The [official API guide](https://docs.chatrace.com/kb/chatrace-api-documentation/) links the [Swagger reference](https://api.chatrace.com/swagger/), whose swagger.json documents api.chatrace.com and X-ACCESS-TOKEN. Added mixed encoding: form for tag creation, bot fields, contact fields, numeric flow sends, payment and cart paths; JSON elsewhere. Tests cover read binding, form tags, numeric flow encoding and JSON text/contact requests. Whitelabel partner administration is separate.
 
 A disposable connector-store GET /accounts/tags returned HTTP 401, No valid API key provided. No contacts, messages or orders were changed. Authenticated acceptance remains open. Focused suite: 395 passed; Ruff clean.
+
+
+## Coupontools modern v4 route
+
+The [official authentication overview](https://docs.coupontools.com/api/overview) distinguishes legacy client headers from modern x-api-key/x-api-secret headers. The [v4 directory reference](https://docs.coupontools.com/api/v4/directory) documents the modern host and JSON requests. Store the key and secret together as a JSON array in the connector secret store. Added a header-pair authentication style with malformed/empty/control-character validation before transport.
+
+GET /directory and POST /directory/ID/users request contracts pass. A disposable-store live directory read with invalid credentials returned HTTP 401 Unauthorized. No users were created. This route covers modern directory/wallet APIs; legacy coupon/v3 client-header authentication is still unsupported and must not be treated as verified. Focused suite: 403 passed.
