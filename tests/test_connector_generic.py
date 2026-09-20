@@ -28,7 +28,8 @@ def test_stubs_are_api_key_and_implemented():
     for stub in STUBS:
         rec = by_type[stub["type"]]
         assert rec["mcp"] is False, stub["type"]
-        assert rec["auth"] == "api_key", stub["type"]
+        expected = "oauth" if rec.get("oauth_supported") else "api_key"
+        assert rec["auth"] == expected, stub["type"]
         assert rec["implemented"] is True, stub["type"]
         assert f"{stub['type']}_get" in rec["tools"]
         assert f"{stub['type']}_request" in rec["tools"]

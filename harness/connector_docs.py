@@ -732,8 +732,8 @@ _ROWS: list[tuple[str, str, str, str]] = [
     (
         "gmail",
         "official",
-        "https://myaccount.google.com/apppasswords",
-        "Signs in with a Google app password over IMAP and SMTP — no Google Cloud project, OAuth client, or consent screen. 1. Turn on 2-Step Verification for the Google account (Google Account → Security). 2. Open the app passwords page (link below), enter a name such as Harness, and tap Create. 3. Paste the Gmail address and the 16-character password shown here. Bots search and read mail and attachments (PDF text extraction included), draft, and send. Each inbox is its own account: Add another account for a second address.",
+        "https://developers.google.com/workspace/gmail/imap/xoauth2-protocol",
+        "Connect your Google account to grant Gmail access. OAuth signs in to IMAP and SMTP and refreshes access automatically. Each inbox has its own connection. Bots search, read mail and attachments, draft, and send. App passwords are not supported.",
     ),
     (
         "gobio_link",
@@ -765,19 +765,19 @@ _ROWS: list[tuple[str, str, str, str]] = [
         "google_calendar",
         "official",
         "https://developers.google.com/workspace/calendar/api/v3/reference",
-        "Store a current OAuth access token as the connector secret, not an API key, refresh token or client secret. Authentication uses Bearer. This route does not run OAuth consent or refresh expired tokens; replace the stored access token when it expires. GET /users/me/calendarList lists calendars; use a token with calendar.calendarlist.readonly or another scope allowed by that endpoint. Writes need the corresponding calendar scope. Paths omit /calendar/v3.",
+        "Connect your Google account to grant access. OAuth refreshes access automatically; pasted tokens are not supported. GET /users/me/calendarList lists calendars; use a token with calendar.calendarlist.readonly or another scope allowed by that endpoint. Writes need the corresponding calendar scope. Paths omit /calendar/v3.",
     ),
     (
         "google_drive",
         "official",
         "https://developers.google.com/workspace/drive/api/reference/rest/v3",
-        "Store a current OAuth access token as the connector secret, not an API key, refresh token or client secret. Authentication uses Bearer. This route does not run OAuth consent or refresh expired tokens; replace the stored access token when it expires. GET /files lists file metadata; drive.metadata.readonly is sufficient for that read. JSON metadata writes need an appropriate write scope. Paths omit /drive/v3. Binary and multipart uploads or downloads are not supported by these text tools.",
+        "Connect your Google account to grant access. OAuth refreshes access automatically; pasted tokens are not supported. GET /files lists file metadata; drive.metadata.readonly is sufficient for that read. JSON metadata writes need an appropriate write scope. Paths omit /drive/v3. Binary and multipart uploads or downloads are not supported by these text tools.",
     ),
     (
         "google_sheets",
         "official",
         "https://developers.google.com/workspace/sheets/api/reference/rest/v4/spreadsheets/get",
-        "Store a current OAuth access token as the connector secret, not an API key, refresh token or client secret. Authentication uses Bearer. This route does not run OAuth consent or refresh expired tokens; replace the stored access token when it expires. GET /spreadsheets/SPREADSHEET_ID reads a spreadsheet; spreadsheets.readonly is sufficient for reads. Writes require spreadsheets or another supported write scope. Paths omit /v4. Use fields and ranges to limit large responses.",
+        "Connect your Google account to grant access. OAuth refreshes access automatically; pasted tokens are not supported. GET /spreadsheets/SPREADSHEET_ID reads a spreadsheet; spreadsheets.readonly is sufficient for reads. Writes require spreadsheets or another supported write scope. Paths omit /v4. Use fields and ranges to limit large responses.",
     ),
     (
         "gosquared",
@@ -1068,19 +1068,19 @@ _ROWS: list[tuple[str, str, str, str]] = [
         "microsoft_excel",
         "official",
         "https://learn.microsoft.com/en-us/graph/api/workbook-list-worksheets?view=graph-rest-1.0",
-        "Store a current OAuth access token as the connector secret, not an API key, refresh token or client secret. Authentication uses Bearer. This route does not run OAuth consent or refresh expired tokens; replace the stored access token when it expires. GET /me/drive/items/ITEM_ID/workbook/worksheets lists worksheets. Use a delegated Graph token with Files.ReadWrite; application-only tokens are unsupported for this method. Calls are sessionless: workbook changes persist. Workbook-Session-Id and file uploads are not supported. Uses the global Graph cloud; paths omit /v1.0.",
+        "Connect your Google account to grant access. OAuth refreshes access automatically; pasted tokens are not supported. GET /me/drive/items/ITEM_ID/workbook/worksheets lists worksheets. Use a delegated Graph token with Files.ReadWrite; application-only tokens are unsupported for this method. Calls are sessionless: workbook changes persist. Workbook-Session-Id and file uploads are not supported. Uses the global Graph cloud; paths omit /v1.0.",
     ),
     (
         "microsoft_outlook",
         "official",
         "https://learn.microsoft.com/en-us/graph/api/user-list-messages?view=graph-rest-1.0",
-        "Store a current OAuth access token as the connector secret, not an API key, refresh token or client secret. Authentication uses Bearer. This route does not run OAuth consent or refresh expired tokens; replace the stored access token when it expires. GET /me/messages lists messages with delegated Mail.ReadBasic for basic properties; bodies need Mail.Read. Application tokens use /users/USER_ID/messages with application permissions. Mail writes need corresponding permissions. Uses the global Graph cloud; paths omit /v1.0.",
+        "Connect your Google account to grant access. OAuth refreshes access automatically; pasted tokens are not supported. GET /me/messages lists messages with delegated Mail.ReadBasic for basic properties; bodies need Mail.Read. Application tokens use /users/USER_ID/messages with application permissions. Mail writes need corresponding permissions. Uses the global Graph cloud; paths omit /v1.0.",
     ),
     (
         "microsoft_teams",
         "official",
         "https://learn.microsoft.com/en-us/graph/api/user-list-joinedteams?view=graph-rest-1.0",
-        "Store a current OAuth access token as the connector secret, not an API key, refresh token or client secret. Authentication uses Bearer. This route does not run OAuth consent or refresh expired tokens; replace the stored access token when it expires. GET /me/joinedTeams requires delegated Team.ReadBasic.All with a work or school account. Personal accounts are unsupported. Application tokens use /users/USER_ID/joinedTeams. Other operations require their own permissions. Uses the global Graph cloud; paths omit /v1.0.",
+        "Connect your Google account to grant access. OAuth refreshes access automatically; pasted tokens are not supported. GET /me/joinedTeams requires delegated Team.ReadBasic.All with a work or school account. Personal accounts are unsupported. Application tokens use /users/USER_ID/joinedTeams. Other operations require their own permissions. Uses the global Graph cloud; paths omit /v1.0.",
     ),
     (
         "monday",

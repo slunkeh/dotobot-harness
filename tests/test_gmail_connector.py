@@ -1,4 +1,4 @@
-"""Gmail over IMAP/SMTP with an app password: one record per inbox, no OAuth.
+"""Gmail over IMAP/SMTP with OAuth: one grant per inbox.
 
 The fakes below speak imaplib's response shapes (SPECIAL-USE LIST rows,
 `(meta, literal)` FETCH tuples with X-GM-* ids, APPENDUID, the literal
@@ -35,6 +35,9 @@ def paths(tmp_path):
 @pytest.fixture
 def gmail_ctx(paths):
     record = Connectors(paths).add("gmail", "Gmail", {"email": ADDRESS}, secret=APP_PASSWORD)
+    from harness.mcp_oauth import save_tokens
+
+    save_tokens(paths, record["id"], {"access_token": "test-access-token"})
     return ConnectorContext(paths=paths, bot="atlas", record=record)
 
 
@@ -260,27 +263,19 @@ def no_network(monkeypatch):
 # -- credentials ---------------------------------------------------------------
 
 
-def test_app_password_whitespace_is_dropped():
-    assert gmail.normalize_app_password("abcd efgh ijkl mnop") == "abcdefghijklmnop"
-    assert gmail.normalize_app_password(" abcd\tefgh\n") == "abcdefgh"
-
-
-def test_login_uses_the_address_and_the_bare_app_password(gmail_ctx, imap):
+def test_login_uses_the_address_and_oauth_token(gmail_ctx, imap):
     gmail._list_labels(gmail_ctx, {})
-    assert imap.logins == [(ADDRESS, "abcdefghijklmnop")]
+    assert imap.logins == [(ADDRESS, "test-access-token")]
     assert imap.logged_out is True
 
 
-def test_missing_app_password_tells_the_bot_to_ask(paths, no_network):
+def test_missing_oauth_asks_to_connect(paths, no_network):
     record = Connectors(paths).add("gmail", "Gmail", {"email": ADDRESS})
     ctx = ConnectorContext(paths=paths, bot="atlas", record=record)
     out = gmail._list_labels(ctx, {})
     assert out.startswith("error:")
-    assert "request_secret" in out
-    assert f"connector_{record['id']}" in out
-    assert "2-Step Verification" in out
-    assert gmail.APP_PASSWORDS_URL in out  # the bot can send the user straight there
-    assert ADDRESS in out
+    assert "Connect this Google account" in out
+    assert "request_secret" not in out
 
 
 def test_missing_address_names_the_field(paths, no_network):
@@ -291,23 +286,25 @@ def test_missing_address_names_the_field(paths, no_network):
     assert "address" in out.lower()
 
 
-def test_headless_fallback_secret_name(paths, monkeypatch, imap):
-    """`GMAIL_APP_PASSWORD` in the credentials store works without the UI."""
+def test_old_app_password_is_not_used(paths, imap):
     from harness.secrets import set_secret
 
-    set_secret("GMAIL_APP_PASSWORD", "abcdefghijklmnop", paths)
-    record = Connectors(paths).add("gmail", "Gmail", {"email": ADDRESS})
+    set_secret("GMAIL_APP_PASSWORD", "old-password", paths)
+    record = Connectors(paths).add("gmail", "Gmail", {"email": ADDRESS}, secret="old-password")
     ctx = ConnectorContext(paths=paths, bot="atlas", record=record)
-    assert not gmail._list_labels(ctx, {}).startswith("error:")
-    assert imap.logins == [(ADDRESS, "abcdefghijklmnop")]
+    assert "Connect this Google account" in gmail._list_labels(ctx, {})
+    assert imap.logins == []
 
 
-def test_imap_auth_failure_explains_app_passwords(monkeypatch):
+def test_imap_auth_failure_asks_to_reconnect(monkeypatch):
     class Rejecting:
         def __init__(self, host, port, timeout=None):
             assert (host, port) == (gmail.IMAP_HOST, gmail.IMAP_PORT)
 
-        def login(self, user, password):
+        def authenticate(self, mechanism, callback):
+            assert mechanism == "XOAUTH2"
+            assert callback(b"") == b"user=ada@example.com\x01auth=Bearer wrong\x01\x01"
+            assert callback(b"challenge") == b""
             raise imaplib.IMAP4.error(b"[AUTHENTICATIONFAILED] Invalid credentials (Failure)")
 
         def logout(self):
@@ -317,19 +314,19 @@ def test_imap_auth_failure_explains_app_passwords(monkeypatch):
     with pytest.raises(gmail.GmailError) as exc:
         gmail._connect_imap(ADDRESS, "wrong")
     text = str(exc.value)
-    assert ADDRESS in text
-    assert "2-Step Verification" in text
-    assert gmail.APP_PASSWORDS_URL in text
-    assert "not the account password" in text
-    assert "Invalid credentials" in text
+    assert "reconnect this Gmail account" in text
+    assert "wrong" not in text
 
 
-def test_smtp_auth_failure_explains_app_passwords(monkeypatch):
+def test_smtp_auth_failure_asks_to_reconnect(monkeypatch):
     class Rejecting:
         def __init__(self, host, port, timeout=None):
             assert (host, port) == (gmail.SMTP_HOST, gmail.SMTP_PORT)
 
-        def login(self, user, password):
+        def auth(self, mechanism, callback):
+            assert mechanism == "XOAUTH2"
+            assert callback() == "user=ada@example.com\x01auth=Bearer wrong\x01\x01"
+            assert callback(b"challenge") == ""
             raise smtplib.SMTPAuthenticationError(535, b"5.7.8 Username and Password not accepted")
 
         def quit(self):
@@ -338,7 +335,7 @@ def test_smtp_auth_failure_explains_app_passwords(monkeypatch):
     monkeypatch.setattr(smtplib, "SMTP_SSL", Rejecting)
     with pytest.raises(gmail.GmailError) as exc:
         gmail._connect_smtp(ADDRESS, "wrong")
-    assert "2-Step Verification" in str(exc.value)
+    assert "reconnect this Gmail account" in str(exc.value)
 
 
 def test_unreachable_imap_is_a_tool_error_not_a_crash(gmail_ctx, monkeypatch):
@@ -631,7 +628,7 @@ def test_send_delivers_over_smtp_from_the_account(gmail_ctx, smtp, monkeypatch):
     monkeypatch.setattr(gmail, "_connect_imap", lambda *a: pytest.fail("send needs no IMAP"))
     out = gmail._send(gmail_ctx, {"to": "bob@example.com", "subject": "Hi", "body": "Hello"})
     assert out.startswith("ok: sent to bob@example.com from ada@example.com")
-    assert smtp.logins == [(ADDRESS, "abcdefghijklmnop")]
+    assert smtp.logins == [(ADDRESS, "test-access-token")]
     assert smtp.quit_called is True
     ((from_addr, msg),) = smtp.sent
     assert from_addr == ADDRESS
@@ -792,8 +789,12 @@ def test_one_inbox_keeps_the_plain_prefix_and_description(paths):
 
 def test_each_inbox_tool_uses_its_own_credentials(paths, monkeypatch):
     store = Connectors(paths)
-    store.add("gmail", "Gmail", {"email": "ada@example.com"}, secret="aaaa aaaa aaaa aaaa")
-    store.add("gmail", "Work", {"email": "ada@work.example"}, secret="bbbb bbbb bbbb bbbb")
+    from harness.mcp_oauth import save_tokens
+
+    first = store.add("gmail", "Gmail", {"email": "ada@example.com"})
+    second = store.add("gmail", "Work", {"email": "ada@work.example"})
+    save_tokens(paths, first["id"], {"access_token": "aaaaaaaaaaaaaaaa"})
+    save_tokens(paths, second["id"], {"access_token": "bbbbbbbbbbbbbbbb"})
     logins = []
 
     def connect(address, password):
