@@ -1507,6 +1507,10 @@ STUBS: list[dict] = [
     },
     {
         "type": "lahar",
+        "api_base": "https://app.lahar.com.br/api",
+        "auth_style": "query",
+        "auth_query": "token_api_lahar",
+        "auth_in_json": True,
         "name": "Lahar",
         "auth": "api_key",
         "fields": [],

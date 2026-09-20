@@ -947,7 +947,12 @@ _ROWS: list[tuple[str, str, str, str]] = [
         "https://documenter.getpostman.com/view/32966764/2sBXqFM2Vv",
         "Store the API key from Settings > API; uses Bearer authentication. GET /members tests access. Paths are relative to /flow. Bodies use JSON except /audiences, /leads/status and /campaigns/ID/settings or status, which use form encoding. Pass body as an object. POST /audiences/create takes name. Campaign and inbox operations can trigger outreach.",
     ),
-    ("lahar", "none", "", "No vendor API docs surfaced."),
+    (
+        "lahar",
+        "official",
+        "https://www.postman.com/ramperpipeline/ramper-marketing-exemplo/documentation/byfyu4g/cadastro-atualizao-de-contato",
+        "Lahar is now Ramper Marketing. Store the integration token; injected as token_api_lahar in JSON writes. The documented POST /conversions takes nome_formulario and email_contato and creates or updates a contact conversion. This can trigger marketing automation. The current example establishes this POST operation, not authenticated GET behavior.",
+    ),
     (
         "laposta",
         "official",

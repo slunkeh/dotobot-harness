@@ -2398,3 +2398,19 @@ def test_kartra_rejects_wrong_request_shape(tmp_path, method, path, body):
         result = bound["kartra_request"][1]({"method": method, "path": path, "body": body})
     assert "error:" in result
     send.assert_not_called()
+
+
+def test_lahar_conversion_json_token(tmp_path):
+    paths = HarnessPaths(home=tmp_path)
+    record = Connectors(paths).add("lahar", "Lahar", secret="fixture&token")
+    bound = tools_for_bot(paths, "atlas", record_ids={record["id"]})
+    body = {"nome_formulario": "Dotobot fixture", "email_contato": "fixture@example.com"}
+    with patch("connectors.generic._open", return_value=_response({})) as send:
+        result = bound["lahar_request"][1]({"method": "POST", "path": "/conversions", "body": body})
+    assert "HTTP 200" in result
+    req = send.call_args.args[0]
+    assert req.full_url == "https://app.lahar.com.br/api/conversions"
+    assert req.get_header("Authorization") is None
+    assert req.get_header("Content-type") == "application/json"
+    assert json.loads(req.data) == {**body, "token_api_lahar": "fixture&token"}
+    assert "token_api_lahar" not in body

@@ -3,11 +3,11 @@
 Scope: implement the 144 catalogue connectors identified with missing REST hosts.
 This is an implementation ledger, not a claim of live-account verification.
 
-One hundred and six routes now have offline request-contract coverage through the real connector
+One hundred and seven routes now have offline request-contract coverage through the real connector
 registry and credential store. Tests assert the outbound origin, version prefix,
 credential header, query and JSON body. Credentials are never followed through
 HTTP redirects. Production authenticated reads and writes remain unverified for these
-one hundred and six routes. The remaining 38 connectors still need provider research and code.
+one hundred and seven routes. The remaining 37 connectors still need provider research and code.
 
 ## Implemented routes
 
@@ -289,7 +289,7 @@ Live evidence for the third batch:
 | `klenty` | Implemented; request contracts pass; authenticated account verification pending |
 | `kyvio` | Pending provider research and implementation |
 | `lagrowthmachine` | Implemented; request contracts pass; invalid key rejected live, account acceptance pending |
-| `lahar` | Pending provider research and implementation |
+| `lahar` | Implemented Ramper Marketing conversion route; JSON contract passes; incomplete live request rejected; authenticated acceptance open |
 | `laposta` | Implemented; documented sandbox list read HTTP 200 (truncated); production verification pending |
 | `lawmatics` | Implemented; request-contract tests pass; production account verification pending |
 | `lead_identity_check` | Pending provider research and implementation |
@@ -976,3 +976,9 @@ Disposable-store GET /lineitems for September 2020 returned HTTP 400 with respon
 The [connection guide](https://support.kartra.com/en/articles/15369013-connecting-to-the-api) requires POST to app.kartra.com/api with app_id, api_key and api_password. The [official read sample](https://support.kartra.com/en/articles/15369051-php-sample-retrieving-data-for-a-specific-lead) uses form encoding with nested get_lead fields. Added a credential JSON object stored as one secret and injected into the form body, with credential overrides, query parameters, other paths and GET rejected. Call the request tool with path / and POST.
 
 A disposable-store read request using synthetic invalid credentials returned HTTP 200 with status Error, type 239, and an invalid/inactive App Id message. HTTP success alone is not API success. No lead was created or changed. Real account credentials and a configured Kartra app are needed for acceptance. Focused suite: 441 passed; Ruff clean.
+
+## Lahar / Ramper Marketing
+
+The [vendor-hosted Lahar site](https://mkt.lahar.com.br/) identifies the product as Ramper Marketing. The [Ramper Pipeline published request](https://www.postman.com/ramperpipeline/ramper-marketing-exemplo/documentation/byfyu4g/cadastro-atualizao-de-contato) uses app.lahar.com.br/api/conversions with JSON token_api_lahar, nome_formulario and email_contato. Added that route and a bound request contract verifying the stored token is injected without mutating caller data. The older [Lahar SDK repository](https://github.com/LAHAR-APP/Lahar-Communication-Api) corroborates conversion integration but was not used to substitute its older encoding for the current JSON example.
+
+A disposable-store POST containing only an invalid token, without any contact details, returned HTTP 200 with status erro and code 552 for missing required fields. This proves endpoint reachability, not authentication. No contact conversion was created. Production credentials and conversion acceptance remain open. Focused suite: 442 passed; Ruff clean.
