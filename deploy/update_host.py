@@ -25,6 +25,36 @@ from harness.paths import HarnessPaths  # noqa: E402
 from harness.runtime_identity import identity  # noqa: E402
 
 
+class AppReleasePoller:
+    """Refresh client pins independently of owner-requested runtime upgrades."""
+
+    def __init__(self, config):
+        self.config = config
+        self.next_check = 0.0
+
+    def poll(self, *, now=None):
+        now = time.monotonic() if now is None else now
+        if now < self.next_check:
+            return
+        # Back off on failures too; do not hammer an unavailable release feed.
+        self.next_check = now + 300
+        try:
+            manifest = updater.load_manifest(self.config["manifest_url"])
+            latest = manifest.get("latest_app_version")
+            if latest is None:
+                return  # Runtime-only feeds do not erase existing app pins.
+            updater.parse_version(latest)
+            if not updater.https_only(manifest.get("app_download_url")) or not updater._hex_digest(
+                manifest.get("app_sha256")
+            ):
+                raise ValueError("App release requires an HTTPS download and SHA-256")
+            updater.write_app_release(Path(self.config["home"]), manifest)
+        except Exception as exc:
+            from harness.redaction import scrub
+
+            print(f"App release check failed: {scrub(str(exc))}", file=sys.stderr)
+
+
 def run(args):
     return subprocess.run(args, check=True, capture_output=True, text=True)
 
@@ -227,8 +257,10 @@ def main():
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError:
             return
+        app_releases = AppReleasePoller(config)
         while True:
             apply(config)
+            app_releases.poll()
             if not args.watch:
                 break
             time.sleep(15)
