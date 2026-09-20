@@ -249,7 +249,7 @@ Live evidence for the third batch:
 | `funnelcockpit` | Implemented; request contracts pass; invalid-key request rejected live, account acceptance pending |
 | `getemails` | REST host and header authentication implemented; file upload workflows and real account acceptance pending |
 | `getresponse` | Route and offline request tests added; live verification pending |
-| `getswift` | Pending provider research and implementation |
+| `getswift` | Pending: delivery API docs return 403, app.getswift.co fails DNS, getswift.co certificate hostname mismatch |
 | `giantcampaign` | Implemented; request contracts pass; authenticated account verification pending |
 | `gist` | Implemented; request contracts pass; authenticated account verification pending |
 | `gitter` | Matrix route implemented from provider discovery; advertised host fails local DNS; live acceptance blocked |
@@ -1135,3 +1135,10 @@ A disposable-store GET /contacts with an invalid key returned HTTP 401 Unauthent
 The provider website links its [official API collection](https://api.grade.us/). Its published collection defines https://grade.us/api/v4, raw Authorization tokens and JSON writes. Added bound GET /profiles and PATCH /users/{id} contracts. The earlier catalogue link to gradeus.com was replaced with this verified documentation source. Recipient creation can initiate outreach and was not used for a live probe.
 
 A disposable-store GET /profiles with an invalid token returned HTTP 401, error_code 1000, explicitly rejecting the token. No users, recipients or campaigns were changed. Authenticated workflows remain open. Focused suite: 487 passed; Ruff clean. Host count: 125 of 144, with 19 pending.
+
+
+## GetSwift delivery API availability investigation
+
+Rechecked the delivery product's published Zendesk API category at https://getswift.zendesk.com/hc/en-us/categories/201155647-API: HTTP 403. The historically referenced delivery application app.getswift.co fails local DNS resolution; getswift.co fails TLS hostname verification. No certificate bypass or credential transmission was attempted. These observations do not establish permanent shutdown or a current authentication contract.
+
+The similarly named getswift.cloud storage uploader is a different product and must not replace this delivery integration. GetSwift remains pending until its current delivery API host and authentication can be verified. No delivery was booked.
