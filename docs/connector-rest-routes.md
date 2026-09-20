@@ -3,11 +3,11 @@
 Scope: implement the 144 catalogue connectors identified with missing REST hosts.
 This is an implementation ledger, not a claim of live-account verification.
 
-Ninety-seven routes now have offline request-contract coverage through the real connector
+Ninety-eight routes now have offline request-contract coverage through the real connector
 registry and credential store. Tests assert the outbound origin, version prefix,
 credential header, query and JSON body. Credentials are never followed through
 HTTP redirects. Production authenticated reads and writes remain unverified for these
-ninety-seven routes. The remaining 47 connectors still need provider research and code.
+ninety-eight routes. The remaining 46 connectors still need provider research and code.
 
 ## Implemented routes
 
@@ -195,7 +195,7 @@ Live evidence for the third batch:
 | `catch_all_verifier` | Implemented REST route; credits GET and verification JSON contracts pass; live invalid key rejected; authenticated acceptance open |
 | `chatrace` | Implemented bot-account REST route; mixed form/JSON contracts pass; live invalid key rejected; authenticated acceptance open |
 | `cleverreach` | Implemented; request-contract tests pass; production account verification pending |
-| `clevertap` | Pending provider research and implementation |
+| `clevertap` | Implemented regional host and header pair route; six-host request coverage passes; invalid-credential live read returns generic 400; authenticated acceptance open |
 | `clickfunnels` | Implemented; request contracts pass; authenticated account verification pending |
 | `cloud_convert` | Route and offline request tests added; live verification pending |
 | `cometly` | Implemented; request contracts pass; authenticated account verification pending |
@@ -909,3 +909,10 @@ A disposable connector-store GET /accounts/tags returned HTTP 401, No valid API 
 The [official authentication overview](https://docs.coupontools.com/api/overview) distinguishes legacy client headers from modern x-api-key/x-api-secret headers. The [v4 directory reference](https://docs.coupontools.com/api/v4/directory) documents the modern host and JSON requests. Store the key and secret together as a JSON array in the connector secret store. Added a header-pair authentication style with malformed/empty/control-character validation before transport.
 
 GET /directory and POST /directory/ID/users request contracts pass. A disposable-store live directory read with invalid credentials returned HTTP 401 Unauthorized. No users were created. This route covers modern directory/wallet APIs; legacy coupon/v3 client-header authentication is still unsupported and must not be treated as verified. Focused suite: 403 passed.
+
+
+## CleverTap regional REST route
+
+The [common API components](https://developer.clevertap.com/docs/common-api-components) document six regional hosts and the account ID/passcode header pair. Configure api_domain to match the account region and store both credentials as a JSON array. Tests cover all six hosts, [profile reads](https://developer.clevertap.com/docs/get-user-profiles-api) without Content-Type, and nested [profile upload](https://developer.clevertap.com/docs/upload-user-profiles-api) JSON with dryRun=1. The common region table uses api.clevertap.com for Europe while the profile page also lists eu1.api.clevertap.com; the hostname configuration permits either when appropriate for the account.
+
+A disposable-store European profile GET with invalid credentials returned HTTP 400, Failed to process request. This is reachability evidence, not explicit authentication validation. Other regions have offline coverage only. No profiles were uploaded. Endpoints requiring an additional token, encrypted payloads, files or GET Content-Type (some catalogue APIs) remain unsupported by this route. Focused suite: 410 passed; Ruff clean.

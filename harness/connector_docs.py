@@ -285,9 +285,9 @@ _ROWS: list[tuple[str, str, str, str]] = [
     ),
     (
         "clevertap",
-        "community",
-        "https://github.com/ralphcorleone/clevertap-mcp",
-        "Also Zapier/Pipedream.",
+        "official",
+        "https://developer.clevertap.com/docs/common-api-components",
+        'Set api_domain to the account region: api.clevertap.com (Europe), in1.api.clevertap.com, sg1.api.clevertap.com, us1.api.clevertap.com, aps3.api.clevertap.com, or mec1.api.clevertap.com. Store ["ACCOUNT_ID", "PASSCODE"] as the secret JSON array. GET /1/profile.json?identity=ID reads a profile. POST /1/upload?dryRun=1 validates JSON d profile records without saving; omit dryRun only for intended writes. Inspect status and unprocessed records. APIs requiring a third token, encryption or file uploads are unsupported.',
     ),
     (
         "clickfunnels",

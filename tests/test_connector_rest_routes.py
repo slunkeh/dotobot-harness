@@ -2055,3 +2055,55 @@ def test_coupontools_invalid_pair(tmp_path, secret):
     with patch("connectors.generic._open") as send:
         assert "error: store the credential" in bound["coupontools_get"][1]({"path": "/directory"})
     send.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "domain",
+    [
+        "api.clevertap.com",
+        "in1.api.clevertap.com",
+        "sg1.api.clevertap.com",
+        "us1.api.clevertap.com",
+        "aps3.api.clevertap.com",
+        "mec1.api.clevertap.com",
+    ],
+)
+def test_clevertap_region_read(tmp_path, domain):
+    paths = HarnessPaths(home=tmp_path)
+    record = Connectors(paths).add(
+        "clevertap",
+        "CleverTap",
+        config={"api_domain": domain},
+        secret='["fixture-id", "fixture-passcode"]',
+    )
+    bound = tools_for_bot(paths, "atlas", record_ids={record["id"]})
+    with patch("connectors.generic._open", return_value=_response({})) as send:
+        assert "HTTP 200" in bound["clevertap_get"][1](
+            {"path": "/1/profile.json", "query": {"identity": "fixture"}}
+        )
+    req = send.call_args.args[0]
+    assert req.full_url == "https://" + domain + "/1/profile.json?identity=fixture"
+    assert req.get_header("X-clevertap-account-id") == "fixture-id"
+    assert req.get_header("X-clevertap-passcode") == "fixture-passcode"
+    assert req.get_header("Content-type") is None
+
+
+def test_clevertap_profile_dry_run_json(tmp_path):
+    paths = HarnessPaths(home=tmp_path)
+    record = Connectors(paths).add(
+        "clevertap",
+        "CleverTap",
+        config={"api_domain": "in1.api.clevertap.com"},
+        secret='["fixture-id", "fixture-passcode"]',
+    )
+    bound = tools_for_bot(paths, "atlas", record_ids={record["id"]})
+    body = {"d": [{"identity": "fixture", "type": "profile", "profileData": {"Name": "Fixture"}}]}
+    with patch("connectors.generic._open", return_value=_response({})) as send:
+        assert "HTTP 200" in bound["clevertap_request"][1](
+            {"method": "POST", "path": "/1/upload?dryRun=1", "body": body}
+        )
+    req = send.call_args.args[0]
+    assert req.full_url == "https://in1.api.clevertap.com/1/upload?dryRun=1"
+    assert req.get_header("X-clevertap-account-id") == "fixture-id"
+    assert req.get_header("X-clevertap-passcode") == "fixture-passcode"
+    assert json.loads(req.data) == body
