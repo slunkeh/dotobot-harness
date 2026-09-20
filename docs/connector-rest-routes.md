@@ -3,11 +3,11 @@
 Scope: implement the 144 catalogue connectors identified with missing REST hosts.
 This is an implementation ledger, not a claim of live-account verification.
 
-One hundred and twenty routes now have offline request-contract coverage through the real connector
+One hundred and twenty-one routes now have offline request-contract coverage through the real connector
 registry and credential store. Tests assert the outbound origin, version prefix,
 credential header, query and JSON body. Credentials are never followed through
 HTTP redirects. Production authenticated reads and writes remain unverified for these
-one hundred and twenty routes. The remaining 24 connectors still need provider research and code.
+one hundred and twenty-one routes. The remaining 23 connectors still need provider research and code.
 
 ## Implemented routes
 
@@ -230,7 +230,7 @@ Live evidence for the third batch:
 | `emaillistverify` | Implemented; request contracts pass; authenticated account verification pending |
 | `emailoctopus` | Implemented; request-contract tests pass; production account verification pending |
 | `emailverify_io` | Implemented; request contracts pass; invalid key rejected live, authenticated account acceptance pending |
-| `emelia` | Pending provider research and implementation |
+| `emelia` | Current REST route implemented; authenticated operations pending |
 | `encharge` | Implemented own-account REST route; request contracts pass; live invalid key rejected; authenticated acceptance open |
 | `endorsal` | Implemented REST route; authenticated account acceptance pending |
 | `engage` | Pending provider research and implementation |
@@ -1098,3 +1098,10 @@ The disposable-store live whoami probe could not resolve gitter.ems.host locally
 A fresh fetch of [Automizy's website](https://automizy.com/) succeeds and its published page still advertises REST API integration. The referenced developers.automizy.com HTTPS endpoint timed out after 20 seconds. Current evidence does not establish an operational API host or authentication contract.
 
 Removed the catalogue's unsupported assertion that Automizy was discontinued or absorbed into GetResponse, replacing it with the verified documentation limitation. Website availability alone does not prove API availability, and the old catalogue assertion is not evidence of an acquisition. Automizy remains pending; no credentials were transmitted and no host was guessed.
+
+
+## Emelia current REST API
+
+The [current introduction](https://docs.emelia.io/docs/emelia/emelia) confirms REST support and explicitly separates the old GraphQL documentation. It specifies api.emelia.io for Lists and the raw API key in Authorization. Added the host and a bound [GET /lists/list](https://docs.emelia.io/docs/emelia/list-all-lists) contract. Page and limit are optional; unpaginated reads return an array. New integrations should use current Campaigns and Lists; campaign actions can initiate outreach.
+
+A disposable-store GET /lists/list with an invalid key returned HTTP 401 Authentication required. No campaigns, contacts or enrichment jobs were created. Real account access and write acceptance remain unverified. Focused suite: 479 passed; Ruff clean.

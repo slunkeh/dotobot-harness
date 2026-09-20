@@ -553,8 +553,8 @@ _ROWS: list[tuple[str, str, str, str]] = [
     (
         "emelia",
         "aggregator",
-        "https://composio.dev/toolkits/emelia",
-        "Composio toolkit only.",
+        "https://docs.emelia.io/docs/emelia/emelia",
+        "Current REST API. Store the API key directly in Authorization without a Bearer prefix. GET /lists/list supports page and limit. New integrations should use Campaigns and Lists rather than legacy email-only endpoints. Campaign actions can initiate outreach; authenticated writes remain unverified.",
     ),
     (
         "encharge",

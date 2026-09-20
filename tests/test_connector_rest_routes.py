@@ -15,6 +15,14 @@ from harness.paths import HarnessPaths
 # Literal expected requests intentionally independent of catalogue metadata.
 CASES = [
     (
+        "emelia",
+        {},
+        "/lists/list",
+        "https://api.emelia.io/lists/list",
+        "Authorization",
+        "fixture-key",
+    ),
+    (
         "gitter",
         {},
         "/account/whoami",

@@ -882,6 +882,9 @@ STUBS: list[dict] = [
     },
     {
         "type": "emelia",
+        "api_base": "https://api.emelia.io",
+        "auth_style": "header",
+        "auth_header": "Authorization",
         "name": "Emelia",
         "auth": "api_key",
         "fields": [],
