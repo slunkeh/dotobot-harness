@@ -884,7 +884,12 @@ _ROWS: list[tuple[str, str, str, str]] = [
         "https://developers.klaviyo.com/en/docs/klaviyo_mcp_server",
         "Dotobot uses mcp.klaviyo.com/mcp.",
     ),
-    ("klenty", "none", "https://www.klenty.com/", "No dedicated MCP found."),
+    (
+        "klenty",
+        "official",
+        "https://support.klenty.com/en/articles/3197537-getting-started-with-klenty-api",
+        "Store the API key from Klenty Settings > Integrations. Authentication uses x-API-key. Paths include the account email, URL-encoded as a path segment: GET /user/ACCOUNT_EMAIL/lists. POST /user/ACCOUNT_EMAIL/prospects accepts a JSON object with Email and FirstName. Inspect response status for operation success. This route supports individual JSON objects; bulk prospect arrays are not supported. Starting cadences can send outreach.",
+    ),
     (
         "kyvio",
         "none",

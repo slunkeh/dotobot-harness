@@ -3,11 +3,11 @@
 Scope: implement the 144 catalogue connectors identified with missing REST hosts.
 This is an implementation ledger, not a claim of live-account verification.
 
-Fifty-one routes now have offline request-contract coverage through the real connector
+Fifty-two routes now have offline request-contract coverage through the real connector
 registry and credential store. Tests assert the outbound origin, version prefix,
 credential header, query and JSON body. Credentials are never followed through
 HTTP redirects. Production authenticated reads and writes remain unverified for these
-fifty-one routes. The remaining 93 connectors still need provider research and code.
+fifty-two routes. The remaining 92 connectors still need provider research and code.
 
 ## Implemented routes
 
@@ -19,6 +19,7 @@ CloudConvert currently uses its production automatic-region API, not its sandbox
 
 | Connector | Provider reference | Setup |
 |---|---|---|
+| `klenty` | [Provider documentation](https://support.klenty.com/en/articles/3197537-getting-started-with-klenty-api) | Store the API key from Klenty Settings > Integrations. Authentication uses x-API-key. Paths include the account email, URL-encoded as a path segment: GET /user/ACCOUNT_EMAIL/lists. POST /user/ACCOUNT_EMAIL/prospects accepts a JSON object with Email and FirstName. Inspect response status for operation success. This route supports individual JSON objects; bulk prospect arrays are not supported. Starting cadences can send outreach. |
 | `humanitix` | [Provider documentation](https://api.humanitix.com/v1/documentation/json) | Store the public API key from Humanitix Account > Advanced. Authentication uses x-api-key. Production paths are relative to /v1, for example GET /events with query page=1, or /tags. The current API reference also lists bodyless POST /events/EVENT_ID/tickets/TICKET_ID/check-in and check-out. Event creation, event updates and ticket transfers require additional provider permission. Old console API keys do not work. Staging and optional location override headers are not configured. |
 | `campayn` | [Provider documentation](https://github.com/nebojsac/Campayn-API) | Store an API key from the Campayn Account section. Authentication uses Authorization: TRUEREST apikey=KEY. GET /lists.json reads lists. JSON writes such as POST /lists/LIST_ID/contacts.json add contacts; inspect success in the response. Keep the .json endpoint suffix. |
 | `campaign_cleaner` | [Provider documentation](https://docs.campaigncleaner.com/api-reference/endpoint/get-credits) | Store a Campaign Cleaner API key. Authentication uses X-CC-API-Key. GET /get_credits reads the credit balance. POST /send_campaign accepts a send_campaign object with campaign_html and campaign_name; this submits analysis and consumes credits. Poll the campaign status before retrieving results. JSON endpoints are supported; binary PDF responses are not. |
@@ -256,7 +257,7 @@ Live evidence for the third batch:
 | `kartra` | Pending provider research and implementation |
 | `kickofflabs` | Pending provider research and implementation |
 | `kingsumo` | Pending provider research and implementation |
-| `klenty` | Pending provider research and implementation |
+| `klenty` | Implemented; request contracts pass; authenticated account verification pending |
 | `kyvio` | Pending provider research and implementation |
 | `lagrowthmachine` | Pending provider research and implementation |
 | `lahar` | Pending provider research and implementation |
@@ -452,3 +453,16 @@ page=1 returned HTTP 400 Invalid api key format provided for the deliberately
 invalid key. This proves endpoint validation, not authenticated account access.
 Three new cases pass, including two that failed before the route was added.
 The focused suite passes 251 tests and Ruff passes.
+
+## Klenty validation
+
+Klenty's official [GET reference](https://support.klenty.com/en/articles/8193357-klenty-s-get-api-s)
+and [POST reference](https://support.klenty.com/en/articles/8193937-klenty-s-post-apis)
+confirm account-email path segments and JSON prospect objects. Two new request
+cases failed before implementation and pass afterward, checking the encoded
+account path, header and case-sensitive prospect fields. The focused suite passes
+253 tests; Ruff passes. Bulk arrays remain unsupported by the generic request tool.
+
+A bound GET /user/fixture%40example.com/lists using a disposable credential store
+and invalid key returned HTTP 401 with reason invalidAPIKey. No prospects were
+created and no cadences started. Authenticated account verification remains pending.
