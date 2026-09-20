@@ -15,6 +15,38 @@ from harness.paths import HarnessPaths
 # Literal expected requests intentionally independent of catalogue metadata.
 CASES = [
     (
+        "cleverreach",
+        {},
+        "/groups",
+        "https://rest.cleverreach.com/v3/groups",
+        "Authorization",
+        "Bearer fixture-key",
+    ),
+    (
+        "constant_contact",
+        {},
+        "/contacts",
+        "https://api.cc.email/v3/contacts",
+        "Authorization",
+        "Bearer fixture-key",
+    ),
+    (
+        "lawmatics",
+        {},
+        "/users/me",
+        "https://api.lawmatics.com/v1/users/me",
+        "Authorization",
+        "Bearer fixture-key",
+    ),
+    (
+        "infusionsoft",
+        {},
+        "/contacts",
+        "https://api.infusionsoft.com/crm/rest/v1/contacts",
+        "X-keap-api-key",
+        "fixture-key",
+    ),
+    (
         "google_calendar",
         {},
         "/users/me/calendarList",

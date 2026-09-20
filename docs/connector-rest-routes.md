@@ -3,11 +3,11 @@
 Scope: implement the 144 catalogue connectors identified with missing REST hosts.
 This is an implementation ledger, not a claim of live-account verification.
 
-Thirty-eight routes now have offline request-contract coverage through the real connector
+Forty-two routes now have offline request-contract coverage through the real connector
 registry and credential store. Tests assert the outbound origin, version prefix,
 credential header, query and JSON body. Credentials are never followed through
 HTTP redirects. Production authenticated reads and writes remain unverified for these
-thirty-eight routes. The remaining 106 connectors still need provider research and code.
+forty-two routes. The remaining 102 connectors still need provider research and code.
 
 ## Implemented routes
 
@@ -57,6 +57,10 @@ CloudConvert currently uses its production automatic-region API, not its sandbox
 | `microsoft_excel` | [Provider documentation](https://learn.microsoft.com/en-us/graph/api/workbook-list-worksheets?view=graph-rest-1.0) | Store a current OAuth access token as the connector secret, not an API key, refresh token or client secret. Authentication uses Bearer. This route does not run OAuth consent or refresh expired tokens; replace the stored access token when it expires. GET /me/drive/items/ITEM_ID/workbook/worksheets lists worksheets. Use a delegated Graph token with Files.ReadWrite; application-only tokens are unsupported for this method. Calls are sessionless: workbook changes persist. Workbook-Session-Id and file uploads are not supported. Uses the global Graph cloud; paths omit /v1.0. |
 | `microsoft_outlook` | [Provider documentation](https://learn.microsoft.com/en-us/graph/api/user-list-messages?view=graph-rest-1.0) | Store a current OAuth access token as the connector secret, not an API key, refresh token or client secret. Authentication uses Bearer. This route does not run OAuth consent or refresh expired tokens; replace the stored access token when it expires. GET /me/messages lists messages with delegated Mail.ReadBasic for basic properties; bodies need Mail.Read. Application tokens use /users/USER_ID/messages with application permissions. Mail writes need corresponding permissions. Uses the global Graph cloud; paths omit /v1.0. |
 | `microsoft_teams` | [Provider documentation](https://learn.microsoft.com/en-us/graph/api/user-list-joinedteams?view=graph-rest-1.0) | Store a current OAuth access token as the connector secret, not an API key, refresh token or client secret. Authentication uses Bearer. This route does not run OAuth consent or refresh expired tokens; replace the stored access token when it expires. GET /me/joinedTeams requires delegated Team.ReadBasic.All with a work or school account. Personal accounts are unsupported. Application tokens use /users/USER_ID/joinedTeams. Other operations require their own permissions. Uses the global Graph cloud; paths omit /v1.0. |
+| `cleverreach` | [Provider documentation](https://developers.cleverreach.com/docs/api-categories/introduction/) | Store a current CleverReach OAuth access token, not the client secret. Authentication uses Bearer. Paths are relative to /v3, for example GET /groups or POST /groups with a JSON name field. OAuth consent and expired-token refresh are not performed by this stored-token route. |
+| `constant_contact` | [Provider documentation](https://developer.constantcontact.com/api_guide/getting-started/v3-technical-overview) | Store a current Constant Contact V3 OAuth access token. Authentication uses Bearer; paths are relative to /v3, for example GET /contacts. Writes use JSON and require corresponding scopes. OAuth consent and expired-token refresh are not performed by this stored-token route. |
+| `lawmatics` | [Provider documentation](https://help.lawmatics.com/en/articles/15939403-api-authentication-oauth2-setup-guide) | Store a Lawmatics OAuth access token obtained through a developer app. Authentication uses Bearer; paths are relative to /v1, for example GET /users/me. Lawmatics documents non-expiring tokens with no scopes and full account CRUD access; revoke through integration settings. This route does not perform OAuth consent. JSON bodies are supported, not multipart uploads. |
+| `infusionsoft` | [Provider documentation](https://developer.infusionsoft.com/postman-quick-start/) | Infusionsoft is now Keap. Store a Personal Access Token or Service Account Key. Authentication uses X-Keap-API-Key. Paths are relative to /crm/rest/v1, for example GET /contacts; JSON bodies follow the REST v1 schema. This route does not use legacy XML-RPC keys or OAuth bearer tokens. REST v2 is not covered by this v1 base. |
 
 ActiveCampaign host selection: [official base URL guidance](https://developers.activecampaign.com/reference/url).
 
@@ -151,12 +155,12 @@ Live evidence for the third batch:
 | `cardly` | Route and offline request tests added; live verification pending |
 | `catch_all_verifier` | Pending provider research and implementation |
 | `chatrace` | Pending provider research and implementation |
-| `cleverreach` | Pending provider research and implementation |
+| `cleverreach` | Implemented; request-contract tests pass; production account verification pending |
 | `clevertap` | Pending provider research and implementation |
 | `clickfunnels` | Pending provider research and implementation |
 | `cloud_convert` | Route and offline request tests added; live verification pending |
 | `cometly` | Pending provider research and implementation |
-| `constant_contact` | Pending provider research and implementation |
+| `constant_contact` | Implemented; request-contract tests pass; production account verification pending |
 | `contentdrips` | Pending provider research and implementation |
 | `convertkit` | Implemented; request-contract tests pass; production account verification pending |
 | `copicake` | Implemented; request-contract tests pass; production account verification pending |
@@ -232,7 +236,7 @@ Live evidence for the third batch:
 | `icontact` | Pending provider research and implementation |
 | `impression` | Pending provider research and implementation |
 | `indiefunnels` | Pending provider research and implementation |
-| `infusionsoft` | Pending provider research and implementation |
+| `infusionsoft` | Implemented; request-contract tests pass; production account verification pending |
 | `inksprout` | Pending provider research and implementation |
 | `instabot` | Pending provider research and implementation |
 | `instagram` | Pending provider research and implementation |
@@ -248,7 +252,7 @@ Live evidence for the third batch:
 | `lagrowthmachine` | Pending provider research and implementation |
 | `lahar` | Pending provider research and implementation |
 | `laposta` | Implemented; documented sandbox list read HTTP 200 (truncated); production verification pending |
-| `lawmatics` | Pending provider research and implementation |
+| `lawmatics` | Implemented; request-contract tests pass; production account verification pending |
 | `lead_identity_check` | Pending provider research and implementation |
 | `leaddyno` | Pending provider research and implementation |
 | `leadoku` | Pending provider research and implementation |
@@ -336,3 +340,20 @@ Write contracts reference provider documentation for
 [Excel worksheet creation](https://learn.microsoft.com/en-us/graph/api/worksheetcollection-add?view=graph-rest-1.0),
 [Outlook folder creation](https://learn.microsoft.com/en-us/graph/api/user-post-mailfolders?view=graph-rest-1.0),
 and [Teams channel creation](https://learn.microsoft.com/en-us/graph/api/channel-post?view=graph-rest-1.0).
+
+### Ninth batch: CleverReach, Constant Contact, Lawmatics and Keap
+
+2026-09-20: four route-contract cases failed before implementation and pass
+afterward. 234 focused tests pass; Ruff passes. Sequential invalid-credential
+reads through the bound connector returned HTTP 401 from all four providers.
+CleverReach and Constant Contact reported Unauthorized, Lawmatics returned an
+empty response, and Keap reported Invalid Access Token. These are reachability
+checks only; account reads, writes and OAuth lifecycle behavior remain unverified.
+Keap uses PAT/SAK header authentication on REST v1; the other three use stored
+OAuth access tokens. Lawmatics documents non-expiring tokens, unlike the expiring
+tokens used by CleverReach and Constant Contact.
+
+Additional schema evidence: CleverReach publishes its JSON request schemas at
+[the v3 OpenAPI endpoint](https://rest.cleverreach.com/v3/explorer/swagger.json).
+Lawmatics documents its resource paths in
+[Core Objects and Endpoints](https://help.lawmatics.com/en/articles/15939438-core-objects-endpoints-reference).

@@ -269,9 +269,9 @@ _ROWS: list[tuple[str, str, str, str]] = [
     ),
     (
         "cleverreach",
-        "aggregator",
-        "https://zapier.com/mcp/cleverreach",
-        "Official API: developers.cleverreach.com.",
+        "official",
+        "https://developers.cleverreach.com/docs/api-categories/introduction/",
+        "Store a current CleverReach OAuth access token, not the client secret. Authentication uses Bearer. Paths are relative to /v3, for example GET /groups or POST /groups with a JSON name field. OAuth consent and expired-token refresh are not performed by this stored-token route.",
     ),
     (
         "clevertap",
@@ -305,9 +305,9 @@ _ROWS: list[tuple[str, str, str, str]] = [
     ),
     (
         "constant_contact",
-        "community",
-        "https://github.com/BusyBee3333/constant-contact-mcp-2026-complete",
-        "Also Zapier/Pipedream.",
+        "official",
+        "https://developer.constantcontact.com/api_guide/getting-started/v3-technical-overview",
+        "Store a current Constant Contact V3 OAuth access token. Authentication uses Bearer; paths are relative to /v3, for example GET /contacts. Writes use JSON and require corresponding scopes. OAuth consent and expired-token refresh are not performed by this stored-token route.",
     ),
     (
         "contentdrips",
@@ -806,9 +806,9 @@ _ROWS: list[tuple[str, str, str, str]] = [
     ),
     (
         "infusionsoft",
-        "community",
-        "https://github.com/saxyguy81/mcp-keap",
-        "No official Keap-published MCP.",
+        "official",
+        "https://developer.infusionsoft.com/postman-quick-start/",
+        "Infusionsoft is now Keap. Store a Personal Access Token or Service Account Key. Authentication uses X-Keap-API-Key. Paths are relative to /crm/rest/v1, for example GET /contacts; JSON bodies follow the REST v1 schema. This route does not use legacy XML-RPC keys or OAuth bearer tokens. REST v2 is not covered by this v1 base.",
     ),
     (
         "inksprout",
@@ -901,9 +901,9 @@ _ROWS: list[tuple[str, str, str, str]] = [
     ),
     (
         "lawmatics",
-        "none",
-        "https://help.lawmatics.com/en/articles/10699986-lawmatics-zapier-app-overview",
-        "Only classic Zapier zaps.",
+        "official",
+        "https://help.lawmatics.com/en/articles/15939403-api-authentication-oauth2-setup-guide",
+        "Store a Lawmatics OAuth access token obtained through a developer app. Authentication uses Bearer; paths are relative to /v1, for example GET /users/me. Lawmatics documents non-expiring tokens with no scopes and full account CRUD access; revoke through integration settings. This route does not perform OAuth consent. JSON bodies are supported, not multipart uploads.",
     ),
     (
         "lead_identity_check",
