@@ -43,6 +43,7 @@ _STYLES = (
     "4dem",
     "query",
     "header_pair",
+    "header_values",
     "path_suffix",
     "kartra",
     "dux",
@@ -58,6 +59,9 @@ def tool_names(type_: str) -> list[str]:
 
 def tools(type_: str) -> list[ConnectorTool]:
     t = str(type_ or "").strip() or "connector"
+    from harness.connectors import _CATALOG_TYPES
+
+    array_body = bool((_CATALOG_TYPES.get(t) or {}).get("json_array_body"))
     return [
         ConnectorTool(
             ToolSpec(
@@ -99,7 +103,7 @@ def tools(type_: str) -> list[ConnectorTool]:
                         },
                         "path": {"type": "string"},
                         "body": {
-                            "type": "object",
+                            "type": ["object", "array"] if array_body else "object",
                             "description": "Body object, encoded as required by the provider",
                         },
                     },
@@ -227,23 +231,25 @@ def _headers(ctx: ConnectorContext, secret: str) -> dict[str, str]:
         "Accept": str(cat.get("accept", "application/json")),
         "User-Agent": "dotobot/0.2.9",
     }
-    if style == "header_pair":
+    hdrs.update(cat.get("fixed_headers", {}))
+    if style in {"header_pair", "header_values"}:
+        count = len(cat["auth_headers"])
         try:
             pair = json.loads(secret)
         except (ValueError, TypeError):
             pair = None
         if (
             not isinstance(pair, list)
-            or len(pair) != 2
+            or len(pair) != count
             or any(
                 not isinstance(v, str) or not v or any(ord(c) < 32 or ord(c) > 126 for c in v)
                 for v in pair
             )
         ):
             raise ValueError(
-                "store the credential as a JSON array of two nonempty printable ASCII strings"
+                f"store the credential as a JSON array of {count} nonempty printable ASCII strings"
             )
-        prefixes = cat.get("auth_header_prefixes", ["", ""])
+        prefixes = cat.get("auth_header_prefixes", [""] * count)
         hdrs.update(
             (name, prefix + value)
             for name, prefix, value in zip(cat["auth_headers"], prefixes, pair, strict=True)
@@ -569,6 +575,10 @@ def _request(ctx: ConnectorContext, args: dict[str, Any]) -> str:
     if not path:
         return "error: needs 'path'"
     body = args.get("body")
-    if body is not None and not isinstance(body, dict):
+    from harness.connectors import _CATALOG_TYPES
+
+    cat = _CATALOG_TYPES[str(ctx.record["type"])]
+    allowed = (dict, list) if cat.get("json_array_body") else (dict,)
+    if body is not None and not isinstance(body, allowed):
         return "error: body must be a JSON object"
     return _http(ctx, method, path, body=body)

@@ -1325,6 +1325,12 @@ STUBS: list[dict] = [
     },
     {
         "type": "icontact",
+        "api_base": "https://app.icontact.com/icp",
+        "auth_style": "header_values",
+        "auth_headers": ["Api-AppId", "Api-Username", "Api-Password"],
+        "fixed_headers": {"Api-Version": "2.2"},
+        "content_type": "application/json",
+        "json_array_body": True,
         "name": "iContact",
         "auth": "api_key",
         "fields": [],

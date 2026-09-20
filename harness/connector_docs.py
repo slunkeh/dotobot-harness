@@ -836,7 +836,12 @@ _ROWS: list[tuple[str, str, str, str]] = [
         "https://composio.dev/toolkits/hyperise",
         "No dedicated vendor server.",
     ),
-    ("icontact", "none", "https://www.icontact.com/", "No API/MCP docs surfaced."),
+    (
+        "icontact",
+        "official",
+        "https://github.com/icontact/icontact-api-php",
+        "Store a JSON array [appId, apiUsername, apiPassword] from the API integration, not your login password. Sends three credential headers and Api-Version 2.2. GET /a/ discovers accounts; GET /a/ACCOUNT/c/ discovers folders. Resource paths include /a/ACCOUNT/c/FOLDER. Writes accept JSON arrays as documented by the vendor SDK. This route targets standard iContact, not Pro or Pro Select.",
+    ),
     (
         "impression",
         "none",

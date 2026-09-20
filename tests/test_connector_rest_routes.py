@@ -2442,3 +2442,42 @@ def test_dripcel_contact_search_json(tmp_path):
     assert req.full_url == "https://api.dripcel.com/contacts/search"
     assert req.get_header("Authorization") == "Bearer fixture-key"
     assert json.loads(req.data) == body
+
+
+@pytest.mark.parametrize("method", ["GET", "POST"])
+def test_icontact_headers_and_array_write(tmp_path, method):
+    paths = HarnessPaths(home=tmp_path)
+    record = Connectors(paths).add(
+        "icontact", "iContact", secret=json.dumps(["app", "user", "password"])
+    )
+    bound = tools_for_bot(paths, "atlas", record_ids={record["id"]})
+    body = [
+        {
+            "name": "Fixture",
+            "welcomeMessageId": 0,
+            "emailOwnerOnChange": 0,
+            "welcomeOnManualAdd": 0,
+            "welcomeOnSignupAdd": 0,
+        }
+    ]
+    args = (
+        {"path": "/a/"}
+        if method == "GET"
+        else {"method": method, "path": "/a/1/c/2/lists", "body": body}
+    )
+    with patch("connectors.generic._open", return_value=_response({})) as send:
+        result = bound["icontact_get" if method == "GET" else "icontact_request"][1](args)
+    assert "HTTP 200" in result
+    req = send.call_args.args[0]
+    assert req.full_url == "https://app.icontact.com/icp" + args["path"]
+    for header, value in [
+        ("Api-appid", "app"),
+        ("Api-username", "user"),
+        ("Api-password", "password"),
+        ("Api-version", "2.2"),
+        ("Content-type", "application/json"),
+    ]:
+        assert req.get_header(header) == value
+    assert req.get_header("Authorization") is None
+    if method == "POST":
+        assert json.loads(req.data) == body

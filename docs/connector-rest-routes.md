@@ -3,11 +3,11 @@
 Scope: implement the 144 catalogue connectors identified with missing REST hosts.
 This is an implementation ledger, not a claim of live-account verification.
 
-One hundred and eight routes now have offline request-contract coverage through the real connector
+One hundred and nine routes now have offline request-contract coverage through the real connector
 registry and credential store. Tests assert the outbound origin, version prefix,
 credential header, query and JSON body. Credentials are never followed through
 HTTP redirects. Production authenticated reads and writes remain unverified for these
-one hundred and eight routes. The remaining 36 connectors still need provider research and code.
+one hundred and nine routes. The remaining 35 connectors still need provider research and code.
 
 ## Implemented routes
 
@@ -272,7 +272,7 @@ Live evidence for the third batch:
 | `humanitix` | Implemented; request contracts pass; authenticated account verification pending |
 | `hypeauditor` | Implemented; request contracts pass; invalid credentials rejected live, account acceptance pending |
 | `hyperise` | Pending: official API support pages currently fail TLS certificate validation; host and authentication still require verification |
-| `icontact` | Pending provider research and implementation |
+| `icontact` | Implemented standard API; three-header and JSON-array contracts pass; live invalid username rejected; authenticated acceptance open |
 | `impression` | Pending provider research and implementation |
 | `indiefunnels` | Pending provider research and implementation |
 | `infusionsoft` | Implemented; request-contract tests pass; production account verification pending |
@@ -988,3 +988,9 @@ A disposable-store POST containing only an invalid token, without any contact de
 The [official overview](https://dripcel.getoutline.com/s/2849f729-5450-4aa3-8cc9-50d29f9f2c74/doc/overview-FaM3SkQan1) specifies api.dripcel.com and Bearer API keys. Added bound GET /balance and nested JSON POST /contacts/search coverage. The [contact reference](https://dripcel.getoutline.com/s/2849f729-5450-4aa3-8cc9-50d29f9f2c74/doc/contacts-OmgWadaH8T) identifies search as a paid operation requiring contact.read.pii; it was tested offline only.
 
 A disposable-store GET /balance with an invalid key returned HTTP 401, ok false and Invalid key. No paid search or message send was attempted. Real account acceptance remains open. Focused suite: 444 passed; Ruff clean.
+
+## iContact standard API
+
+The [vendor PHP SDK](https://github.com/icontact/icontact-api-php/blob/master/lib/iContactApi.php) specifies app.icontact.com/icp, three credential headers, Api-Version 2.2 and JSON Content-Type on reads and writes. Added a stored three-value JSON credential array and opt-in JSON array request bodies, including the tool schema. Tests cover account discovery and array-based list creation without sending a live write. Pro and Pro Select use separate APIs and are not this connector.
+
+A disposable-store GET /a/ with three invalid credential values returned HTTP 401 with Api username invalid. Account authentication and real writes remain open. Focused suite: 446 passed; Ruff clean.
