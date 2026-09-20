@@ -1652,3 +1652,46 @@ def test_adroll_rejects_unsupported_multipart(tmp_path, body):
             {"method": "POST", "path": "/api/v1/ad/create?apikey=fixture", "body": body}
         )
     send.assert_not_called()
+
+
+@pytest.mark.parametrize("path", ["/me/videos/list", "/me/video/988"])
+def test_hippo_video_query_auth(tmp_path, path):
+    from urllib.parse import parse_qs, urlsplit
+
+    paths = HarnessPaths(home=tmp_path)
+    record = Connectors(paths).add("hippo_video", "Hippo Video", secret="key&= +?")
+    bound = tools_for_bot(paths, "atlas", record_ids={record["id"]})
+    with patch("connectors.generic._open", return_value=_response({"code": 200})) as send:
+        assert "HTTP 200" in bound["hippo_video_get"][1](
+            {"path": path, "query": {"email": "fixture@example.com", "page": 1}}
+        )
+    req = send.call_args.args[0]
+    parts = urlsplit(req.full_url)
+    assert parts.netloc == "www.hippovideo.io"
+    assert parts.path == "/api/v1" + path
+    assert parse_qs(parts.query) == {
+        "email": ["fixture@example.com"],
+        "page": ["1"],
+        "authentication_token": ["key&= +?"],
+    }
+    assert req.get_header("Authorization") is None
+
+
+def test_hippo_video_personalization_json(tmp_path):
+    paths = HarnessPaths(home=tmp_path)
+    record = Connectors(paths).add("hippo_video", "Hippo Video", secret="fixture-key")
+    bound = tools_for_bot(paths, "atlas", record_ids={record["id"]})
+    body = {
+        "email": "fixture@example.com",
+        "video_id": 988,
+        "merge_fields": [{"first_name": "Fixture"}],
+    }
+    with patch("connectors.generic._open", return_value=_response({})) as send:
+        assert "HTTP 200" in bound["hippo_video_request"][1](
+            {"method": "POST", "path": "/me/video/personalize", "body": body}
+        )
+    req = send.call_args.args[0]
+    assert req.full_url == "https://www.hippovideo.io/api/v1/me/video/personalize"
+    assert json.loads(req.data) == {**body, "authentication_token": "fixture-key"}
+    assert "authentication_token" not in body
+    assert req.get_header("Content-type") == "application/json"

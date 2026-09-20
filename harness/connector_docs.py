@@ -772,9 +772,9 @@ _ROWS: list[tuple[str, str, str, str]] = [
     ),
     (
         "hippo_video",
-        "none",
-        "https://help.hippovideo.io/",
-        "No API/MCP docs surfaced.",
+        "official",
+        "https://help.hippovideo.io/support/solutions/articles/19000095981-video-library-api",
+        "Store an authentication_token, not the profile API key. GET /me/videos/list requires email and page in query and returns 20 videos per page; /me/video/VIDEO_ID reads details. Dotobot adds authentication_token to GET query or non-GET JSON body. Include email in the body for JSON personalization requests. Paths omit /api/v1. Token generation/refresh is not automatic: requesting another token revokes the previous one; default expiry is one month. File imports and bulk spreadsheet uploads are not verified by this route.",
     ),
     (
         "hubspot",

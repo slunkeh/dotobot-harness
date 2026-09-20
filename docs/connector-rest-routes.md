@@ -3,11 +3,11 @@
 Scope: implement the 144 catalogue connectors identified with missing REST hosts.
 This is an implementation ledger, not a claim of live-account verification.
 
-Eighty-four routes now have offline request-contract coverage through the real connector
+Eighty-five routes now have offline request-contract coverage through the real connector
 registry and credential store. Tests assert the outbound origin, version prefix,
 credential header, query and JSON body. Credentials are never followed through
 HTTP redirects. Production authenticated reads and writes remain unverified for these
-eighty-four routes. The remaining 60 connectors still need provider research and code.
+eighty-five routes. The remaining 59 connectors still need provider research and code.
 
 ## Implemented routes
 
@@ -268,7 +268,7 @@ Live evidence for the third batch:
 | `growsurf` | Route and offline request tests added; live verification pending |
 | `herobot` | Pending provider research and implementation |
 | `heysummit` | Pending provider research and implementation |
-| `hippo_video` | Pending provider research and implementation |
+| `hippo_video` | Implemented stored authentication-token route; contracts pass; invalid token/email rejected live; account acceptance pending |
 | `humanitix` | Implemented; request contracts pass; authenticated account verification pending |
 | `hypeauditor` | Implemented; request contracts pass; invalid credentials rejected live, account acceptance pending |
 | `hyperise` | Pending: official API support pages currently fail TLS certificate validation; host and authentication still require verification |
@@ -811,3 +811,9 @@ A bound GET /api/v1/organization/get_advertisables with invalid personal token a
 Added uapi.demandbase.com using current JWT Bearer access tokens and JSON. [API key-set guidance](https://support.demandbase.com/hc/en-us/articles/38999526296603-Generate-and-Manage-API-Key-Sets) explains token generation and the eight-hour lifetime. The connector accepts a stored access token; issuance and refresh are not implemented. [Export-job listing](https://developer.demandbase.com/reference/fetchexportjobsinfo) and [Intent query](https://developer.demandbase.com/reference/companyintent-1) have bound request-contract coverage. Product permissions apply and Intent is beta.
 
 A disposable-store GET /reporting/v1/usage?apiProduct=b2bapi returned HTTP 401 Authentication Failed - Unauthorized with an invalid token. No export or paid data request was submitted. All 353 focused tests and Ruff pass. There are 84 routes and 60 pending. The midpoint full-suite result predates this addition.
+
+## Hippo Video
+
+The [library API](https://help.hippovideo.io/support/solutions/articles/19000095981-video-library-api) and [personalization API](https://help.hippovideo.io/support/solutions/articles/19000095986-generate-personalized-videos-through-api) use authentication_token and user email. The connector stores the generated token, adds it to GET query or write JSON, and preserves the caller body. Library and detail reads plus personalization JSON have offline request coverage. [Token generation](https://help.hippovideo.io/support/solutions/articles/19000095978-api-authorization) revokes an existing token and is not performed automatically.
+
+The bound library GET with an invalid token returned HTTP 403 OAuthException, explicitly reporting a wrong token or email mismatch. No token was generated and no video changed. File/import workflows remain unverified. All 356 focused tests and Ruff pass; 85 routes are present and 59 pending. The midpoint full suite predates this addition.
