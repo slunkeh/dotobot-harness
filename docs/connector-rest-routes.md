@@ -3,11 +3,11 @@
 Scope: implement the 144 catalogue connectors identified with missing REST hosts.
 This is an implementation ledger, not a claim of live-account verification.
 
-Ninety-eight routes now have offline request-contract coverage through the real connector
+Ninety-nine routes now have offline request-contract coverage through the real connector
 registry and credential store. Tests assert the outbound origin, version prefix,
 credential header, query and JSON body. Credentials are never followed through
 HTTP redirects. Production authenticated reads and writes remain unverified for these
-ninety-eight routes. The remaining 46 connectors still need provider research and code.
+ninety-nine routes. The remaining 45 connectors still need provider research and code.
 
 ## Implemented routes
 
@@ -173,7 +173,7 @@ Live evidence for the third batch:
 | `airship` | Implemented regional HTTP/OAuth routes; version/auth contracts pass; invalid tokens rejected live; account acceptance pending |
 | `apexverify` | Implemented; request contracts pass; invalid key rejected live, authenticated account acceptance pending |
 | `appsflyer` | Implemented hq1 API V2 token route; contracts pass; invalid token rejected live; account acceptance pending |
-| `arpoone` | Pending provider research and implementation |
+| `arpoone` | Implemented v1.2 REST route; balance read and short-link JSON contracts pass; live invalid key rejected; authenticated acceptance open |
 | `asters` | Pending provider research and implementation |
 | `attentive` | Route and offline request tests added; live verification pending |
 | `autoklose` | Pending provider research and implementation |
@@ -916,3 +916,10 @@ GET /directory and POST /directory/ID/users request contracts pass. A disposable
 The [common API components](https://developer.clevertap.com/docs/common-api-components) document six regional hosts and the account ID/passcode header pair. Configure api_domain to match the account region and store both credentials as a JSON array. Tests cover all six hosts, [profile reads](https://developer.clevertap.com/docs/get-user-profiles-api) without Content-Type, and nested [profile upload](https://developer.clevertap.com/docs/upload-user-profiles-api) JSON with dryRun=1. The common region table uses api.clevertap.com for Europe while the profile page also lists eu1.api.clevertap.com; the hostname configuration permits either when appropriate for the account.
 
 A disposable-store European profile GET with invalid credentials returned HTTP 400, Failed to process request. This is reachability evidence, not explicit authentication validation. Other regions have offline coverage only. No profiles were uploaded. Endpoints requiring an additional token, encrypted payloads, files or GET Content-Type (some catalogue APIs) remain unsupported by this route. Focused suite: 410 passed; Ruff clean.
+
+
+## Arpoone v1.2 REST route
+
+The [official authentication guide](https://docs.arpoone.com/docs/arpoone-api/getting-started/authentication/) specifies Bearer API keys. The [reference](https://docs.arpoone.com/api-reference/) loads [OpenAPI v1.2](https://docs.arpoone.com/services/Api/api/swagger/v1.2/swagger.json), with api.arpoone.com as server. Some balance code samples contain a .comt typo; the server definition and other official examples use .com. Added POST balance-read and short-link JSON contracts, preserving organization identifiers and nested items.
+
+A disposable-store POST /balance/currentbalance with an invalid key and synthetic organization UUID returned HTTP 401 Unauthorized. No links, messages or balance transfers were created. Authenticated acceptance remains open. Focused suite: 412 passed; Ruff clean.

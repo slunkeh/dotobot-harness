@@ -2107,3 +2107,30 @@ def test_clevertap_profile_dry_run_json(tmp_path):
     assert req.get_header("X-clevertap-account-id") == "fixture-id"
     assert req.get_header("X-clevertap-passcode") == "fixture-passcode"
     assert json.loads(req.data) == body
+
+
+@pytest.mark.parametrize(
+    "path, body",
+    [
+        ("/balance/currentbalance", {"organizationIds": ["00000000-0000-0000-0000-000000000001"]}),
+        (
+            "/shorturl",
+            {
+                "organizationId": "00000000-0000-0000-0000-000000000001",
+                "items": [{"url": "https://example.com"}],
+            },
+        ),
+    ],
+)
+def test_arpoone_json_contract(tmp_path, path, body):
+    paths = HarnessPaths(home=tmp_path)
+    record = Connectors(paths).add("arpoone", "Arpoone", secret="fixture-key")
+    bound = tools_for_bot(paths, "atlas", record_ids={record["id"]})
+    with patch("connectors.generic._open", return_value=_response({})) as send:
+        assert "HTTP 200" in bound["arpoone_request"][1](
+            {"method": "POST", "path": path, "body": body}
+        )
+    req = send.call_args.args[0]
+    assert req.full_url == "https://api.arpoone.com/v1.2" + path
+    assert req.get_header("Authorization") == "Bearer fixture-key"
+    assert json.loads(req.data) == body

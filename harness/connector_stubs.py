@@ -211,6 +211,8 @@ STUBS: list[dict] = [
     },
     {
         "type": "arpoone",
+        "api_base": "https://api.arpoone.com/v1.2",
+        "auth_style": "bearer",
         "name": "Arpoone",
         "auth": "api_key",
         "fields": [],

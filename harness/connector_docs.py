@@ -126,9 +126,9 @@ _ROWS: list[tuple[str, str, str, str]] = [
     ),
     (
         "arpoone",
-        "none",
+        "official",
         "https://docs.arpoone.com/api-reference/",
-        "General API reference. No MCP.",
+        "Store the User Settings API key, sent as Bearer. Paths are relative to /v1.2. POST /balance/currentbalance takes JSON organizationIds; POST /shorturl takes organizationId and items containing url. Organization IDs belong in operation bodies. Audience operations require an audience schema first. Messaging and balance transfers have external effects; inspect response codes and per-item results.",
     ),
     (
         "asana",
