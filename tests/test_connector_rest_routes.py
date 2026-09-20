@@ -15,6 +15,14 @@ from harness.paths import HarnessPaths
 # Literal expected requests intentionally independent of catalogue metadata.
 CASES = [
     (
+        "contentdrips",
+        {},
+        "/queue/stats",
+        "https://generate.contentdrips.com/queue/stats",
+        "Authorization",
+        "Bearer fixture-key",
+    ),
+    (
         "callpage",
         {},
         "/v3/external/calls/history",
@@ -651,6 +659,16 @@ def test_4dem_malformed_auth_response_is_not_forwarded(tmp_path):
 @pytest.mark.parametrize(
     "type_,path,url,body",
     [
+        (
+            "contentdrips",
+            "/render",
+            "https://generate.contentdrips.com/render",
+            {
+                "template_id": "fixture",
+                "output": "png",
+                "content_update": [{"type": "textbox", "label": "title", "value": "Fixture"}],
+            },
+        ),
         (
             "funnelcockpit",
             "/email/tag",

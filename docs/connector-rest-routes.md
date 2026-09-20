@@ -3,11 +3,11 @@
 Scope: implement the 144 catalogue connectors identified with missing REST hosts.
 This is an implementation ledger, not a claim of live-account verification.
 
-Seventy-five routes now have offline request-contract coverage through the real connector
+Seventy-six routes now have offline request-contract coverage through the real connector
 registry and credential store. Tests assert the outbound origin, version prefix,
 credential header, query and JSON body. Credentials are never followed through
 HTTP redirects. Production authenticated reads and writes remain unverified for these
-seventy-five routes. The remaining 69 connectors still need provider research and code.
+seventy-six routes. The remaining 68 connectors still need provider research and code.
 
 ## Implemented routes
 
@@ -19,6 +19,7 @@ CloudConvert currently uses its production automatic-region API, not its sandbox
 
 | Connector | Provider reference | Setup |
 |---|---|---|
+| `contentdrips` | [Provider documentation](https://developer.contentdrips.com/) | Store the API Management key. Uses Bearer and JSON Content-Type. POST /render with template_id, output and content_update queues generation; poll /job/JOB_ID/status then /job/JOB_ID/result. HTTP 202 means queued. Carousel uses /render?tool=carousel-maker. This route targets generation, not the separate Embed SDK API. |
 | `callpage` | [Provider documentation](https://callpage.github.io/documentation-rest/) | Store the dashboard API key, sent directly in Authorization. GET /v3/external/calls/history reads history. PATCH /v1/external/calls/CALL_ID/fields/FIELD_ID takes JSON value. Include the documented version in paths; inspect hasError and data. Token/widget scopes apply. Calling and messaging may contact people. |
 | `brandmentions` | [Provider documentation](https://help.brandmentions.com/en/articles/12814618-how-do-i-authenticate-api-requests-safely) | Store the provider-issued API key. GET /command.php with query command=GetRemainingCredits reads credits; ListProjects lists projects. Dotobot supplies api_key. Commands can also mutate data or spend credits, even through GET. Provider-enabled API access is required. |
 | `discourse` | [Provider documentation](https://docs.discourse.org/) | Store an admin-generated API key. Configure api_domain as a hostname and api_username. Uses Api-Key and Api-Username. GET /categories.json reads categories; POST /posts.json takes JSON title and raw. Key scopes/user permissions apply. Root-host HTTPS and ASCII usernames are supported; subdirectory installations and User API key authorization are not implemented. |
@@ -194,7 +195,7 @@ Live evidence for the third batch:
 | `cloud_convert` | Route and offline request tests added; live verification pending |
 | `cometly` | Implemented; request contracts pass; authenticated account verification pending |
 | `constant_contact` | Implemented; request-contract tests pass; production account verification pending |
-| `contentdrips` | Pending provider research and implementation |
+| `contentdrips` | Implemented; request contracts pass; queue GET returns 200 with invalid token, authenticated acceptance pending |
 | `convertkit` | Implemented; request-contract tests pass; production account verification pending |
 | `copicake` | Implemented; request-contract tests pass; production account verification pending |
 | `coupontools` | Pending provider research and implementation |
@@ -732,3 +733,13 @@ preserves those prefixes and uses the documented raw Authorization key. Two test
 failed before implementation and pass afterward. The focused suite passes 326 tests;
 Ruff passes. A disposable bound v3 history GET returned HTTP 401 access-denied.
 No calls, messages or field updates were submitted; authenticated acceptance remains open.
+
+## ContentDrips validation
+
+Two request tests failed before implementation and pass afterward. The focused suite
+passes 328 tests; Ruff passes. A disposable bound GET /queue/stats returned HTTP 200
+with an invalid token. A nonexistent-job status GET returned HTTP 404 Job not found.
+These establish reachability but do not verify authentication: the observed reads
+do not reject invalid credentials despite the documentation saying all endpoints
+require Bearer authentication. No render was submitted; authenticated generation
+and result retrieval remain unverified.

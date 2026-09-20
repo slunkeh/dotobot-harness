@@ -316,9 +316,9 @@ _ROWS: list[tuple[str, str, str, str]] = [
     ),
     (
         "contentdrips",
-        "none",
+        "official",
         "https://developer.contentdrips.com/",
-        "No dedicated MCP.",
+        "Store the API Management key; uses Bearer and JSON Content-Type. GET /queue/stats reads queue statistics. POST /render with template_id, output and content_update queues a render; HTTP 202 is acceptance, not completion. Poll /job/JOB_ID/status then /job/JOB_ID/result. Carousel requests use /render?tool=carousel-maker. This is the generation API, not the separate Embed SDK API.",
     ),
     (
         "contentful",
