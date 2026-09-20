@@ -3,11 +3,11 @@
 Scope: implement the 144 catalogue connectors identified with missing REST hosts.
 This is an implementation ledger, not a claim of live-account verification.
 
-Seventy-nine routes now have offline request-contract coverage through the real connector
+Eighty routes now have offline request-contract coverage through the real connector
 registry and credential store. Tests assert the outbound origin, version prefix,
 credential header, query and JSON body. Credentials are never followed through
 HTTP redirects. Production authenticated reads and writes remain unverified for these
-seventy-nine routes. The remaining 65 connectors still need provider research and code.
+eighty routes. The remaining 64 connectors still need provider research and code.
 
 ## Implemented routes
 
@@ -19,6 +19,7 @@ CloudConvert currently uses its production automatic-region API, not its sandbox
 
 | Connector | Provider reference | Setup |
 |---|---|---|
+| `gosquared` | [Authentication](https://www.gosquared.com/docs/configuration/) | Store the API Access key; Dotobot adds api_key to the query. Supply site_token for project endpoints, in GET query or POST path query. Include the API/version prefix. GET /now/v3/overview; POST /tracking/v1/event with JSON event. Key scopes apply. Use a test project for tracking. |
 | `google_analytics` | [Data API reference](https://developers.google.com/analytics/devguides/reporting/data/v1/rest) | Store a current OAuth access token with analytics.readonly or analytics scope and property access. Enable the Data API. Include /v1beta or /v1alpha in paths. GET /v1beta/properties/ID/metadata; POST /v1beta/properties/ID:runReport with dimensions, metrics and dateRanges. Use limit and offset to constrain responses. Token creation/refresh, Admin API and Measurement Protocol are not implemented by this route. |
 | `enginemailer` | [Campaign API reference](https://enginemailer.zendesk.com/hc/en-us/articles/360003129972-Campaign-REST-API-GETTING-STARTED) | Store the profile API key, sent in APIKey. Campaign API requires a paid plan. Paths omit /restapi. GET /campaign/emcampaign/GetCategoryList; POST /Campaign/EMCampaign/CreateCampaign with JSON. Check Result.Status and Result.StatusCode even when HTTP is 200. |
 | `adrapid` | [Provider documentation](https://user-api-docs.adrapid.com/) | Store the account API token as Bearer. The linked OpenAPI server uses /v1/api. GET /me reads account data; POST /banners takes JSON templateId and modes. Poll /banners/ID until ready and inspect files. Generation and completed export are separate; binary downloads are unsupported by the JSON tool. |
@@ -206,7 +207,7 @@ Live evidence for the third batch:
 | `curated` | Implemented; request contracts pass; invalid-key probe returns 404 Record not found, authenticated acceptance pending |
 | `cyberimpact` | Implemented; request-contract tests pass; production account verification pending |
 | `demandbase` | Pending provider research and implementation |
-| `demio` | Pending provider research and implementation |
+| `demio` | Pending: public Apiary reference did not expose the contract; blueprint endpoint requires authentication; host and auth contract still need verification |
 | `discourse` | Implemented configurable-host route; request contracts pass; live forum acceptance pending |
 | `docupost` | Implemented; request contracts pass; live missing-data rejection, authenticated acceptance pending |
 | `doppler` | Route and offline request tests added; live verification pending |
@@ -259,7 +260,7 @@ Live evidence for the third batch:
 | `google_calendar` | Implemented stored-token route; request contracts pass; OAuth lifecycle and live account verification pending |
 | `google_drive` | Implemented stored-token route; request contracts pass; OAuth lifecycle and live account verification pending |
 | `google_sheets` | Implemented stored-token route; request contracts pass; OAuth lifecycle and live account verification pending |
-| `gosquared` | Pending provider research and implementation |
+| `gosquared` | Implemented; request contracts pass; official public demo read passes; production account acceptance pending |
 | `gozen_growth` | Pending provider research and implementation |
 | `grade_us` | Pending provider research and implementation |
 | `greenspark` | Implemented; request contracts pass; authenticated account verification pending |
@@ -767,3 +768,9 @@ A disposable-store GET category lookup with an invalid key returned HTTP 200 wit
 The official [Data API reference](https://developers.google.com/analytics/devguides/reporting/data/v1/rest) and [runReport method](https://developers.google.com/analytics/devguides/reporting/data/v1/rest/v1beta/properties/runReport) establish the host, OAuth scopes and report JSON shape. Bound request tests cover metadata GET and colon-suffixed report POST. A disposable-store metadata request with an invalid token returns HTTP 401 UNAUTHENTICATED. No real property data was accessed.
 
 All 334 focused tests and Ruff pass. The ledger contains 79 implemented and 65 pending routes. The midpoint full-suite result predates this addition.
+
+## GoSquared
+
+Added query-key authentication at api.gosquared.com, preserving API/version paths and project site_token. Request tests cover the documented [overview read](https://www.gosquared.com/docs/now/overview/) and [JSON event tracking](https://www.gosquared.com/docs/tracking/event/).
+
+The bound overview call with the documented public demo key and site token returned HTTP 200 with visitor, page and summary metrics. The same read with an invalid key returned HTTP 401, API key not authorised. No tracking request was sent. Production acceptance remains open. All 336 focused tests and Ruff pass; 80 routes are implemented and 64 remain pending. The midpoint full suite predates this addition.

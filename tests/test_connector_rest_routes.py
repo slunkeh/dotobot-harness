@@ -1474,3 +1474,33 @@ def test_callpage_v1_field_update(tmp_path):
     assert req.method == "PATCH"
     assert req.get_header("Authorization") == "fixture-key"
     assert json.loads(req.data) == {"value": 12}
+
+
+@pytest.mark.parametrize(
+    "method,path", [("GET", "/now/v3/overview"), ("POST", "/tracking/v1/event")]
+)
+def test_gosquared_query_key_and_project(tmp_path, method, path):
+    from urllib.parse import parse_qs, urlsplit
+
+    paths = HarnessPaths(home=tmp_path)
+    record = Connectors(paths).add("gosquared", "GoSquared", secret="key&= +?")
+    bound = tools_for_bot(paths, "atlas", record_ids={record["id"]})
+    body = {"event": {"name": "Fixture", "data": {"test": True}}, "visitor_id": "fixture"}
+    args = {"path": path, "query": {"site_token": "GSN-fixture"}}
+    if method == "POST":
+        args = {"method": method, "path": path + "?site_token=GSN-fixture", "body": body}
+    with patch("connectors.generic._open", return_value=_response({})) as send:
+        result = bound["gosquared_get" if method == "GET" else "gosquared_request"][1](args)
+    assert "HTTP 200" in result
+    req = send.call_args.args[0]
+    parts = urlsplit(req.full_url)
+    assert parts.netloc == "api.gosquared.com"
+    assert parts.path == path
+    assert parse_qs(parts.query) == {"api_key": ["key&= +?"], "site_token": ["GSN-fixture"]}
+    assert req.get_header("Authorization") is None
+    assert req.method == method
+    if method == "POST":
+        assert req.get_header("Content-type") == "application/json"
+        assert json.loads(req.data) == body
+    else:
+        assert req.data is None

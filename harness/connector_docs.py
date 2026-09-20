@@ -728,9 +728,9 @@ _ROWS: list[tuple[str, str, str, str]] = [
     ),
     (
         "gosquared",
-        "aggregator",
-        "https://composio.dev/toolkits/gosquared",
-        "No dedicated vendor server.",
+        "official",
+        "https://www.gosquared.com/docs/configuration/",
+        "Store the API Access key; Dotobot supplies api_key in the query string. Pass the project site_token as a query parameter when required; for POST include ?site_token=TOKEN in path. Include the API and version in paths: GET /now/v3/overview or /account/v1/sites; POST /tracking/v1/event takes JSON event and visitor_id or person_id. API key scopes apply. Use a separate test project for tracking because test data cannot be removed from realtime dashboards.",
     ),
     (
         "gozen_growth",
