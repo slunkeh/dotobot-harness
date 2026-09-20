@@ -811,7 +811,14 @@ _ROWS: list[tuple[str, str, str, str]] = [
         "https://mcp.handwrytten.com/",
         "Dotobot uses mcp.handwrytten.com/mcp.",
     ),
-    ("herobot", "none", "https://herobot.app/", "No developer API docs surfaced."),
+    (
+        "herobot",
+        "none",
+        "https://help.herobot.ai/",
+        "herobot.app redirects to herobot.ai; the current application is app.herobot.ai. "
+        "Public help references API operations but does not establish the REST base or "
+        "authentication format. Account-level API documentation is still required.",
+    ),
     (
         "heyreach",
         "community",

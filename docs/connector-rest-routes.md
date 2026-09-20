@@ -266,7 +266,7 @@ Live evidence for the third batch:
 | `grade_us` | Implemented v4 raw Authorization; invalid-key read returned 401; valid account acceptance open |
 | `greenspark` | Implemented; request contracts pass; authenticated account verification pending |
 | `growsurf` | Route and offline request tests added; live verification pending |
-| `herobot` | Pending provider research and implementation |
+| `herobot` | Pending: current HeroBot identity and application verified; account API contract still required |
 | `heysummit` | Implemented v2 Token authentication; invalid-key read returned 401; account acceptance open |
 | `hippo_video` | Implemented stored authentication-token route; contracts pass; invalid token/email rejected live; account acceptance pending |
 | `humanitix` | Implemented; request contracts pass; authenticated account verification pending |
@@ -1168,3 +1168,8 @@ A disposable-store GET /events/ with an invalid token returned HTTP 401 Invalid 
 The integration identity points to app.contentsnip.com. Direct read-only probes of https://app.contentsnip.com/api/mappings establish provider behavior: without a key, HTTP 401 API key is required; with an invalid x-api-key, HTTP 401 Invalid API key. Added this host/header and a bound read contract. The public application root redirects to a 404 page in the browser. Removed the unsupported catalogue assertion that this is merely a feature name.
 
 This is host/auth routing evidence, not successful account access. Public provider write documentation remains unavailable, so mapping update payloads and authenticated acceptance remain open. No mapping or website content was changed. Focused suite: 492 passed; Ruff clean. Host count: 128 of 144, with 16 pending.
+
+
+## HeroBot current identity and documentation
+
+Browser navigation confirms herobot.app redirects to https://herobot.ai/, whose login points to https://app.herobot.ai/en/login. The public help centre is https://help.herobot.ai/. Its integration guides discuss API operations, but the inspected public pages do not specify the HeroBot REST base, credential header or request schema. Public references to WhatsApp Cloud API and nerDigital endpoints are not sufficient evidence to substitute either as HeroBot's API. Updated the catalogue documentation pointer; host remains pending. No account, bot, channel or message was created.
