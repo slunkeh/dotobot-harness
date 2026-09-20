@@ -584,9 +584,9 @@ _ROWS: list[tuple[str, str, str, str]] = [
     ),
     (
         "feedblitz",
-        "none",
-        "https://developer.feedblitz.com/",
-        "REST API, no MCP.",
+        "official",
+        "https://developer.feedblitz.com/docs/rest-api/accessing-the-api/",
+        "Store the REST API key. Dotobot adds key to the URL query and sends the required User-Agent. GET /user returns account XML. Paths omit /f.api. For XML writes pass body as an object with only an xml string containing the complete provider XML document. PUT creates; POST searches or updates. Responses remain XML text. Subscription operations can send activation emails and require provider verification. Separate Simple and Transactional APIs are not covered.",
     ),
     (
         "figma",

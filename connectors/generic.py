@@ -395,6 +395,13 @@ def _http(
             data = urllib.parse.urlencode(_form_fields(json.loads(data))).encode("utf-8")
             hdrs["Content-Type"] = "application/x-www-form-urlencoded"
 
+    if data is not None and cat.get("body_encoding") == "xml":
+        payload = json.loads(data)
+        if set(payload) != {"xml"} or not isinstance(payload["xml"], str):
+            return 'error: XML body must be an object containing only an "xml" string'
+        data = payload["xml"].encode("utf-8")
+        hdrs["Content-Type"] = "application/xml; charset=utf-8"
+
     if data is not None and cat.get("body_encoding") == "multipart":
         import uuid
 

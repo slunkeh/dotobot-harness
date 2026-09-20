@@ -1695,3 +1695,43 @@ def test_hippo_video_personalization_json(tmp_path):
     assert json.loads(req.data) == {**body, "authentication_token": "fixture-key"}
     assert "authentication_token" not in body
     assert req.get_header("Content-type") == "application/json"
+
+
+@pytest.mark.parametrize("method", ["GET", "POST", "PUT"])
+def test_feedblitz_xml_transport(tmp_path, method):
+    from urllib.parse import parse_qs, urlsplit
+
+    paths = HarnessPaths(home=tmp_path)
+    record = Connectors(paths).add("feedblitz", "FeedBlitz", secret="key&= +?")
+    bound = tools_for_bot(paths, "atlas", record_ids={record["id"]})
+    xml = "<fixture><name>Café &amp; test</name></fixture>"
+    args = {"path": "/user"}
+    if method != "GET":
+        args.update(method=method, body={"xml": xml})
+    with patch("connectors.generic._open", return_value=_response({})) as send:
+        assert "HTTP 200" in bound["feedblitz_get" if method == "GET" else "feedblitz_request"][1](
+            args
+        )
+    req = send.call_args.args[0]
+    parts = urlsplit(req.full_url)
+    assert parts.netloc == "app.feedblitz.com"
+    assert parts.path == "/f.api/user"
+    assert parse_qs(parts.query) == {"key": ["key&= +?"]}
+    assert req.get_header("Accept") == "application/xml"
+    assert req.get_header("User-agent")
+    assert req.method == method
+    if method != "GET":
+        assert req.data == xml.encode()
+        assert req.get_header("Content-type") == "application/xml; charset=utf-8"
+
+
+@pytest.mark.parametrize("body", [{"xml": {}}, {"xml": "<x/>", "other": 1}, {}])
+def test_feedblitz_rejects_wrong_body(tmp_path, body):
+    paths = HarnessPaths(home=tmp_path)
+    record = Connectors(paths).add("feedblitz", "FeedBlitz", secret="fixture-key")
+    bound = tools_for_bot(paths, "atlas", record_ids={record["id"]})
+    with patch("connectors.generic._open") as send:
+        assert "error: XML body" in bound["feedblitz_request"][1](
+            {"path": "/user", "method": "POST", "body": body}
+        )
+    send.assert_not_called()

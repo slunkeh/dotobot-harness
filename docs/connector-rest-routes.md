@@ -3,11 +3,11 @@
 Scope: implement the 144 catalogue connectors identified with missing REST hosts.
 This is an implementation ledger, not a claim of live-account verification.
 
-Eighty-five routes now have offline request-contract coverage through the real connector
+Eighty-six routes now have offline request-contract coverage through the real connector
 registry and credential store. Tests assert the outbound origin, version prefix,
 credential header, query and JSON body. Credentials are never followed through
 HTTP redirects. Production authenticated reads and writes remain unverified for these
-eighty-five routes. The remaining 59 connectors still need provider research and code.
+eighty-six routes. The remaining 58 connectors still need provider research and code.
 
 ## Implemented routes
 
@@ -241,7 +241,7 @@ Live evidence for the third batch:
 | `everwebinar` | Implemented; form POST read contracts pass; invalid key rejected live; account acceptance pending |
 | `exact_mails` | Pending provider research and implementation |
 | `facebook` | Pending provider research and implementation |
-| `feedblitz` | Pending provider research and implementation |
+| `feedblitz` | Implemented XML REST route; transport contracts pass; invalid key rejected in HTTP 200 XML; account acceptance pending |
 | `flexmail` | Pending provider research and implementation |
 | `flippingbook` | Implemented Online API; request contracts pass; invalid key rejected live, account acceptance pending |
 | `fomo` | Route and offline request tests added; live verification pending |
@@ -817,3 +817,9 @@ A disposable-store GET /reporting/v1/usage?apiProduct=b2bapi returned HTTP 401 A
 The [library API](https://help.hippovideo.io/support/solutions/articles/19000095981-video-library-api) and [personalization API](https://help.hippovideo.io/support/solutions/articles/19000095986-generate-personalized-videos-through-api) use authentication_token and user email. The connector stores the generated token, adds it to GET query or write JSON, and preserves the caller body. Library and detail reads plus personalization JSON have offline request coverage. [Token generation](https://help.hippovideo.io/support/solutions/articles/19000095978-api-authorization) revokes an existing token and is not performed automatically.
 
 The bound library GET with an invalid token returned HTTP 403 OAuthException, explicitly reporting a wrong token or email mismatch. No token was generated and no video changed. File/import workflows remain unverified. All 356 focused tests and Ruff pass; 85 routes are present and 59 pending. The midpoint full suite predates this addition.
+
+## FeedBlitz XML REST API
+
+The [official access guide](https://developer.feedblitz.com/docs/rest-api/accessing-the-api/) specifies app.feedblitz.com/f.api, query key authentication, required User-Agent and XML write payloads. Added XML encoding through body={"xml": "complete XML document"}; the adapter sends the string as UTF-8 XML. Tests verify transport and escaping with synthetic XML, not accepted business writes. Wrong wrapper shapes fail before transport. Simple and Transactional APIs remain separate.
+
+The bound GET /user with an invalid key returned HTTP 200 containing rsp stat=fail and Invalid API key. Inspect XML response status rather than HTTP alone. No subscription or account write was attempted. All 362 focused tests and Ruff pass; 86 routes are present and 58 pending. The midpoint full suite predates this addition.
