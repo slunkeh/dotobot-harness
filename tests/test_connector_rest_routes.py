@@ -665,6 +665,10 @@ def test_bound_connector_read_and_write_contract(tmp_path, type_, config, path, 
         else "fixture-key"
     )
     record = Connectors(paths).add(type_, type_, config=config, secret=secret)
+    from harness import google_oauth, mcp_oauth
+
+    if google_oauth.supported(record["type"]):
+        mcp_oauth.save_tokens(paths, record["id"], {"access_token": "fixture-key"})
     bound = tools_for_bot(paths, "atlas", record_ids={record["id"]})
     for method, args, name in [
         ("GET", {"path": path, "query": {"limit": 2}}, f"{type_}_get"),
@@ -1066,6 +1070,10 @@ def test_4dem_malformed_auth_response_is_not_forwarded(tmp_path):
 def test_documented_json_write_paths(tmp_path, type_, path, url, body):
     paths = HarnessPaths(home=tmp_path)
     record = Connectors(paths).add(type_, type_, secret="fixture-key")
+    from harness import google_oauth, mcp_oauth
+
+    if google_oauth.supported(record["type"]):
+        mcp_oauth.save_tokens(paths, record["id"], {"access_token": "fixture-key"})
     bound = tools_for_bot(paths, "atlas", record_ids={record["id"]})
     with patch("connectors.generic._open", return_value=_response({"ok": True})) as send:
         result = bound[type_ + "_request"][1]({"method": "POST", "path": path, "body": body})
@@ -1157,6 +1165,10 @@ def test_sheets_repeated_range_query(tmp_path):
 
     paths = HarnessPaths(home=tmp_path)
     record = Connectors(paths).add("google_sheets", "Sheets", secret="fixture-key")
+    from harness import google_oauth, mcp_oauth
+
+    if google_oauth.supported(record["type"]):
+        mcp_oauth.save_tokens(paths, record["id"], {"access_token": "fixture-key"})
     bound = tools_for_bot(paths, "atlas", record_ids={record["id"]})
     with patch("connectors.generic._open", return_value=_response({})) as send:
         result = bound["google_sheets_get"][1](

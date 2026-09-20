@@ -90,7 +90,7 @@ def test_heymarcus_stubs_are_api_key_http():
         rec = by_type[stub["type"]]
         assert rec["mcp"] is False
         assert rec["implemented"] is True
-        assert rec["auth"] == "api_key"
+        assert rec["auth"] == ("oauth" if rec.get("oauth_supported") else "api_key")
 
 
 def test_catalog_linear_has_runtime_tools():

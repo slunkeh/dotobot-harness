@@ -415,6 +415,8 @@ def access_token(
     if not stale:
         return access
     if not refresh:
+        if stale and data.get("token_endpoint") == "https://oauth2.googleapis.com/token":
+            raise OAuthError("Google access expired; reconnect the account")
         return access or None
     t = transport or Transport()
     form = {
@@ -469,6 +471,7 @@ def start_authorize(
     *,
     client_id: str = "",
     client_secret: str = "",
+    google_scopes: list[str] | None = None,
 ) -> dict[str, Any]:
     """Begin the connect flow: discovery + registration + authorize URL.
 
@@ -480,9 +483,20 @@ def start_authorize(
     connector_id = str(record.get("id") or "")
     if not connector_id:
         raise OAuthError("connector record has no id")
-    _require_safe_url(redirect_uri, "redirect_uri")
+    if google_scopes and redirect_uri == "com.dotobot.ios:/oauth/google":
+        pass
+    else:
+        _require_safe_url(redirect_uri, "redirect_uri")
     t = transport or Transport()
-    metadata = discover(mcp_url, t)
+    metadata = (
+        {
+            "authorization_endpoint": "https://accounts.google.com/o/oauth2/v2/auth",
+            "token_endpoint": "https://oauth2.googleapis.com/token",
+            "scopes": " ".join(google_scopes),
+        }
+        if google_scopes
+        else discover(mcp_url, t)
+    )
 
     static = resolve_oauth_client(paths, record, client_id=client_id, client_secret=client_secret)
     # Reuse the client registration from a previous connect when it targeted
@@ -518,6 +532,8 @@ def start_authorize(
         "code_challenge_method": "S256",
         "resource": mcp_url,
     }
+    if google_scopes:
+        params.pop("resource", None)
     if metadata["scopes"]:
         params["scope"] = metadata["scopes"]
     try:
@@ -555,6 +571,7 @@ def start_authorize(
             "client_id": client["client_id"],
             "client_secret": client["client_secret"],
             "resource": mcp_url,
+            "google_scopes": google_scopes,
             "created": now,
         }
     return {
@@ -605,6 +622,8 @@ def exchange(
         "code_verifier": flow["verifier"],
         "resource": flow["resource"],
     }
+    if not flow["resource"]:
+        form.pop("resource", None)
     if flow["client_secret"]:
         form["client_secret"] = flow["client_secret"]
     try:
@@ -618,6 +637,14 @@ def exchange(
         with _lock:
             _errors[connector_id] = f"token exchange failed: {desc}"
         raise OAuthError(f"token exchange failed: {desc}")
+    if flow.get("google_scopes"):
+        granted = set(str(payload.get("scope", " ".join(flow["google_scopes"]))).split())
+        if not set(flow["google_scopes"]).issubset(granted):
+            raise OAuthError(
+                "Google access was not fully granted; reconnect and approve the requested access."
+            )
+        if not str(payload.get("refresh_token") or "").strip():
+            raise OAuthError("Google did not grant offline access; reconnect this account.")
     save_tokens(
         paths,
         connector_id,

@@ -146,7 +146,7 @@ def tool_names(type_: str) -> list[str]:
     cat = next((c for c in CATALOG if c.get("type") == type_), {})
     if cat.get("mcp_url") or cat.get("mcp_url_template"):
         return []
-    if cat.get("auth") == "api_key":
+    if cat.get("auth") == "api_key" or cat.get("oauth_supported"):
         from . import generic
 
         return generic.tool_names(type_)
@@ -231,7 +231,7 @@ def tools_for_bot(
                     bound = [connect_stub(type_, str(record.get("name") or type_))]
             elif maker is not None:
                 bound = _namespace_static(_static_tools(type_), type_, prefix, account)
-            elif wants_oauth and not ctx.secret():
+            elif wants_oauth and not _prefer_static(type_) and not ctx.secret():
                 from .authorize import connect_stub
 
                 bound = [connect_stub(type_, str(record.get("name") or type_))]

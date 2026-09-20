@@ -338,7 +338,12 @@ def _http(
     query: dict[str, Any] | None = None,
     body: dict[str, Any] | None = None,
 ) -> str:
-    key = ctx.secret()
+    from harness.mcp_oauth import OAuthError
+
+    try:
+        key = ctx.secret()
+    except OAuthError as exc:
+        return f"error: {exc}"
     if not key:
         return ctx.missing_secret()
     base = resolve_base(ctx)
