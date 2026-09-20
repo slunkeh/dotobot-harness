@@ -537,7 +537,12 @@ _ROWS: list[tuple[str, str, str, str]] = [
         "https://zapier.com/mcp/encharge",
         "Zapier/viaSocket only.",
     ),
-    ("endorsal", "none", "https://endorsal.io/", "No MCP found."),
+    (
+        "endorsal",
+        "official",
+        "https://developers.endorsal.io/",
+        "Official REST developer center. Generate a property-specific API key in Account > API. Requests use Authorization: Bearer; GET also accepts a key query parameter. The endpoint reference has not yet been retrieved, so no REST host is configured.",
+    ),
     ("engage", "none", "", "Too generic to identify a specific vendor."),
     (
         "enginemailer",

@@ -232,7 +232,7 @@ Live evidence for the third batch:
 | `emailverify_io` | Implemented; request contracts pass; invalid key rejected live, authenticated account acceptance pending |
 | `emelia` | Pending provider research and implementation |
 | `encharge` | Pending provider research and implementation |
-| `endorsal` | Pending provider research and implementation |
+| `endorsal` | Pending: official property-key Bearer authentication verified; endpoint reference and REST host still unresolved |
 | `engage` | Pending provider research and implementation |
 | `enginemailer` | Implemented; request contracts pass; live invalid key rejected in HTTP 200 response body; authenticated acceptance pending |
 | `enormail` | Implemented; request contracts pass; authenticated account verification pending |
@@ -823,3 +823,7 @@ The bound library GET with an invalid token returned HTTP 403 OAuthException, ex
 The [official access guide](https://developer.feedblitz.com/docs/rest-api/accessing-the-api/) specifies app.feedblitz.com/f.api, query key authentication, required User-Agent and XML write payloads. Added XML encoding through body={"xml": "complete XML document"}; the adapter sends the string as UTF-8 XML. Tests verify transport and escaping with synthetic XML, not accepted business writes. Wrong wrapper shapes fail before transport. Simple and Transactional APIs remain separate.
 
 The bound GET /user with an invalid key returned HTTP 200 containing rsp stat=fail and Invalid API key. Inspect XML response status rather than HTTP alone. No subscription or account write was attempted. All 362 focused tests and Ruff pass; 86 routes are present and 58 pending. The midpoint full suite predates this addition.
+
+## Endorsal authentication research
+
+The [official developer center](https://developers.endorsal.io/) confirms property-specific keys generated in Account > API and Authorization: Bearer authentication. GET may alternatively use key in the query. The linked /docs/endorsal/ endpoint reference returned the same developer landing content, without an API host or endpoint specification. Catalogue guidance now points to this verified official source. Host, version and request contracts remain pending; no route or live-account success is claimed.
