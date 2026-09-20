@@ -14,6 +14,23 @@ from harness.paths import HarnessPaths
 
 # Literal expected requests intentionally independent of catalogue metadata.
 CASES = [
+    ("beamer", {}, "/posts", "https://api.getbeamer.com/v0/posts", "Beamer-api-key", "fixture-key"),
+    (
+        "convertkit",
+        {},
+        "/account",
+        "https://api.kit.com/v4/account",
+        "X-kit-api-key",
+        "fixture-key",
+    ),
+    (
+        "esputnik",
+        {},
+        "/v1/account/info",
+        "https://esputnik.com/api/v1/account/info",
+        "Authorization",
+        "Basic dGVzdC11c2VyOnRlc3QtYXBpLXBhc3N3b3Jk",
+    ),
     ("joggai", {}, "/endpoints", "https://api.jogg.ai/v2/endpoints", "X-api-key", "fixture-key"),
     (
         "copicake",
@@ -186,7 +203,9 @@ CASES = [
 def test_bound_connector_read_and_write_contract(tmp_path, type_, config, path, url, header, value):
     paths = HarnessPaths(home=tmp_path)
     secret = (
-        "test-user:test-api-password" if type_ in {"360nrs", "email_on_acid"} else "fixture-key"
+        "test-user:test-api-password"
+        if type_ in {"360nrs", "email_on_acid", "esputnik"}
+        else "fixture-key"
     )
     record = Connectors(paths).add(type_, type_, config=config, secret=secret)
     bound = tools_for_bot(paths, "atlas", record_ids={record["id"]})

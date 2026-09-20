@@ -158,9 +158,9 @@ _ROWS: list[tuple[str, str, str, str]] = [
     ),
     (
         "beamer",
-        "aggregator",
-        "https://composio.dev/toolkits/beamer",
-        "Composio-generated.",
+        "official",
+        "https://www.getbeamer.com/help/how-to-use-single-user-notifications",
+        "Store a Beamer API key from Settings > API. Paths are relative to /v0, for example GET /posts or POST /posts with a JSON body. Authentication uses Beamer-Api-Key. Key permissions control read and write access.",
     ),
     (
         "beehiiv",
@@ -323,9 +323,9 @@ _ROWS: list[tuple[str, str, str, str]] = [
     ),
     (
         "convertkit",
-        "community",
-        "https://github.com/aplaceforallmystuff/mcp-kit",
-        "Rebranded Kit; npm: kit-mcp-server.",
+        "official",
+        "https://developers.kit.com/api-reference/authentication",
+        "ConvertKit is now Kit. Store a V4 API key from Developer settings for personal account automation. Authentication uses X-Kit-Api-Key; paths are relative to /v4, for example GET /account. Legacy V3 keys are incompatible. Some endpoints, including bulk and purchase creation, require OAuth and are not covered by this key route.",
     ),
     (
         "copicake",
@@ -538,9 +538,9 @@ _ROWS: list[tuple[str, str, str, str]] = [
     ),
     (
         "esputnik",
-        "aggregator",
-        "https://zapier.com/mcp/esputnik",
-        "Composio/Zapier/viaSocket.",
+        "official",
+        "https://docs.esputnik.com/reference/getting-started-with-your-api",
+        "Store a secret in username:API_KEY format, using any nonempty username and the API key as the password. HTTP Basic authentication is used. Paths include their version, for example GET /v1/account/info. Most writes are asynchronous: an HTTP success means acceptance, not completed processing.",
     ),
     (
         "eventbrite",
