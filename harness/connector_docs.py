@@ -705,8 +705,8 @@ _ROWS: list[tuple[str, str, str, str]] = [
     (
         "google_analytics",
         "official",
-        "https://developers.google.com/analytics/devguides/MCP",
-        "Official GA4 MCP server.",
+        "https://developers.google.com/analytics/devguides/reporting/data/v1/rest",
+        "GA4 Data API. Store a current OAuth access token, not an API key or service-account JSON. Uses Bearer; consent, token creation and refresh are not implemented. Enable the Data API and grant the token identity property access with analytics.readonly or analytics scope. Include /v1beta or /v1alpha in paths. GET /v1beta/properties/PROPERTY_ID/metadata; POST /v1beta/properties/PROPERTY_ID:runReport with dimensions, metrics and dateRanges JSON. Set a small limit and page with offset to avoid response truncation. Admin API and Measurement Protocol use different hosts and are not routed here.",
     ),
     (
         "google_calendar",

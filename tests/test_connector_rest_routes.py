@@ -15,6 +15,14 @@ from harness.paths import HarnessPaths
 # Literal expected requests intentionally independent of catalogue metadata.
 CASES = [
     (
+        "google_analytics",
+        {},
+        "/v1beta/properties/1234/metadata",
+        "https://analyticsdata.googleapis.com/v1beta/properties/1234/metadata",
+        "Authorization",
+        "Bearer fixture-key",
+    ),
+    (
         "enginemailer",
         {},
         "/campaign/emcampaign/GetCategoryList",
@@ -675,6 +683,17 @@ def test_4dem_malformed_auth_response_is_not_forwarded(tmp_path):
 @pytest.mark.parametrize(
     "type_,path,url,body",
     [
+        (
+            "google_analytics",
+            "/v1beta/properties/1234:runReport",
+            "https://analyticsdata.googleapis.com/v1beta/properties/1234:runReport",
+            {
+                "dimensions": [{"name": "city"}],
+                "metrics": [{"name": "activeUsers"}],
+                "dateRanges": [{"startDate": "7daysAgo", "endDate": "yesterday"}],
+                "limit": "10",
+            },
+        ),
         (
             "enginemailer",
             "/Campaign/EMCampaign/CreateCampaign",

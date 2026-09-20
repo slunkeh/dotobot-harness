@@ -1083,6 +1083,8 @@ STUBS: list[dict] = [
         "name": "Google Analytics",
         "auth": "api_key",
         "fields": [],
+        "api_base": "https://analyticsdata.googleapis.com",
+        "auth_style": "bearer",
         "category": "Analytics",
         "description": "Connect Google Analytics.",
         "icon": "chart.bar.xaxis",

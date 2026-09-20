@@ -3,11 +3,11 @@
 Scope: implement the 144 catalogue connectors identified with missing REST hosts.
 This is an implementation ledger, not a claim of live-account verification.
 
-Seventy-eight routes now have offline request-contract coverage through the real connector
+Seventy-nine routes now have offline request-contract coverage through the real connector
 registry and credential store. Tests assert the outbound origin, version prefix,
 credential header, query and JSON body. Credentials are never followed through
 HTTP redirects. Production authenticated reads and writes remain unverified for these
-seventy-eight routes. The remaining 66 connectors still need provider research and code.
+seventy-nine routes. The remaining 65 connectors still need provider research and code.
 
 ## Implemented routes
 
@@ -19,6 +19,8 @@ CloudConvert currently uses its production automatic-region API, not its sandbox
 
 | Connector | Provider reference | Setup |
 |---|---|---|
+| `google_analytics` | [Data API reference](https://developers.google.com/analytics/devguides/reporting/data/v1/rest) | Store a current OAuth access token with analytics.readonly or analytics scope and property access. Enable the Data API. Include /v1beta or /v1alpha in paths. GET /v1beta/properties/ID/metadata; POST /v1beta/properties/ID:runReport with dimensions, metrics and dateRanges. Use limit and offset to constrain responses. Token creation/refresh, Admin API and Measurement Protocol are not implemented by this route. |
+| `enginemailer` | [Campaign API reference](https://enginemailer.zendesk.com/hc/en-us/articles/360003129972-Campaign-REST-API-GETTING-STARTED) | Store the profile API key, sent in APIKey. Campaign API requires a paid plan. Paths omit /restapi. GET /campaign/emcampaign/GetCategoryList; POST /Campaign/EMCampaign/CreateCampaign with JSON. Check Result.Status and Result.StatusCode even when HTTP is 200. |
 | `adrapid` | [Provider documentation](https://user-api-docs.adrapid.com/) | Store the account API token as Bearer. The linked OpenAPI server uses /v1/api. GET /me reads account data; POST /banners takes JSON templateId and modes. Poll /banners/ID until ready and inspect files. Generation and completed export are separate; binary downloads are unsupported by the JSON tool. |
 | `contentdrips` | [Provider documentation](https://developer.contentdrips.com/) | Store the API Management key. Uses Bearer and JSON Content-Type. POST /render with template_id, output and content_update queues generation; poll /job/JOB_ID/status then /job/JOB_ID/result. HTTP 202 means queued. Carousel uses /render?tool=carousel-maker. This route targets generation, not the separate Embed SDK API. |
 | `callpage` | [Provider documentation](https://callpage.github.io/documentation-rest/) | Store the dashboard API key, sent directly in Authorization. GET /v3/external/calls/history reads history. PATCH /v1/external/calls/CALL_ID/fields/FIELD_ID takes JSON value. Include the documented version in paths; inspect hasError and data. Token/widget scopes apply. Calling and messaging may contact people. |
@@ -253,7 +255,7 @@ Live evidence for the third batch:
 | `goodbits` | Pending provider research and implementation |
 | `google_ad_manager` | Pending provider research and implementation |
 | `google_ads` | Pending provider research and implementation |
-| `google_analytics` | Pending provider research and implementation |
+| `google_analytics` | Implemented; Data API request contracts pass; invalid token rejected live; authenticated account acceptance pending |
 | `google_calendar` | Implemented stored-token route; request contracts pass; OAuth lifecycle and live account verification pending |
 | `google_drive` | Implemented stored-token route; request contracts pass; OAuth lifecycle and live account verification pending |
 | `google_sheets` | Implemented stored-token route; request contracts pass; OAuth lifecycle and live account verification pending |
@@ -759,3 +761,9 @@ access and export completion remain unverified.
 Added the documented /restapi host and APIKey header. [Category lookup](https://enginemailer.zendesk.com/hc/en-us/articles/360003226071-Get-Category-List) and [JSON campaign creation](https://enginemailer.zendesk.com/hc/en-us/articles/360003152791-Create-Campaign) are covered through the bound connector. The campaign API requires a paid plan and a verified sender domain for creation. Check Result.Status and Result.StatusCode rather than HTTP status alone.
 
 A disposable-store GET category lookup with an invalid key returned HTTP 200 with Result.StatusCode 500 and API Key Not Found. This proves reachability and application-level rejection, not authenticated account acceptance. No campaign was created or sent. All 332 focused tests pass; Ruff passes. There are now 78 implemented routes and 66 pending. The midpoint full-suite result predates this addition.
+
+## Google Analytics Data API
+
+The official [Data API reference](https://developers.google.com/analytics/devguides/reporting/data/v1/rest) and [runReport method](https://developers.google.com/analytics/devguides/reporting/data/v1/rest/v1beta/properties/runReport) establish the host, OAuth scopes and report JSON shape. Bound request tests cover metadata GET and colon-suffixed report POST. A disposable-store metadata request with an invalid token returns HTTP 401 UNAUTHENTICATED. No real property data was accessed.
+
+All 334 focused tests and Ruff pass. The ledger contains 79 implemented and 65 pending routes. The midpoint full-suite result predates this addition.
