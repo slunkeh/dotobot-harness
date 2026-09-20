@@ -124,6 +124,8 @@ STUBS: list[dict] = [
         "name": "AdRapid",
         "auth": "api_key",
         "fields": [],
+        "api_base": "https://api.adrapid.com/v1/api",
+        "auth_style": "bearer",
         "category": "Analytics",
         "description": "Connect AdRapid.",
         "icon": "chart.bar.xaxis",

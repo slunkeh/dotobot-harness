@@ -3,11 +3,11 @@
 Scope: implement the 144 catalogue connectors identified with missing REST hosts.
 This is an implementation ledger, not a claim of live-account verification.
 
-Seventy-six routes now have offline request-contract coverage through the real connector
+Seventy-seven routes now have offline request-contract coverage through the real connector
 registry and credential store. Tests assert the outbound origin, version prefix,
 credential header, query and JSON body. Credentials are never followed through
 HTTP redirects. Production authenticated reads and writes remain unverified for these
-seventy-six routes. The remaining 68 connectors still need provider research and code.
+seventy-seven routes. The remaining 67 connectors still need provider research and code.
 
 ## Implemented routes
 
@@ -19,6 +19,7 @@ CloudConvert currently uses its production automatic-region API, not its sandbox
 
 | Connector | Provider reference | Setup |
 |---|---|---|
+| `adrapid` | [Provider documentation](https://user-api-docs.adrapid.com/) | Store the account API token as Bearer. The linked OpenAPI server uses /v1/api. GET /me reads account data; POST /banners takes JSON templateId and modes. Poll /banners/ID until ready and inspect files. Generation and completed export are separate; binary downloads are unsupported by the JSON tool. |
 | `contentdrips` | [Provider documentation](https://developer.contentdrips.com/) | Store the API Management key. Uses Bearer and JSON Content-Type. POST /render with template_id, output and content_update queues generation; poll /job/JOB_ID/status then /job/JOB_ID/result. HTTP 202 means queued. Carousel uses /render?tool=carousel-maker. This route targets generation, not the separate Embed SDK API. |
 | `callpage` | [Provider documentation](https://callpage.github.io/documentation-rest/) | Store the dashboard API key, sent directly in Authorization. GET /v3/external/calls/history reads history. PATCH /v1/external/calls/CALL_ID/fields/FIELD_ID takes JSON value. Include the documented version in paths; inspect hasError and data. Token/widget scopes apply. Calling and messaging may contact people. |
 | `brandmentions` | [Provider documentation](https://help.brandmentions.com/en/articles/12814618-how-do-i-authenticate-api-requests-safely) | Store the provider-issued API key. GET /command.php with query command=GetRemainingCredits reads credits; ListProjects lists projects. Dotobot supplies api_key. Commands can also mutate data or spend credits, even through GET. Provider-enabled API access is required. |
@@ -161,7 +162,7 @@ Live evidence for the third batch:
 | `acymailing` | Pending provider research and implementation |
 | `add_to_calendar_pro` | Pending provider research and implementation |
 | `adhook` | Pending provider research and implementation |
-| `adrapid` | Pending provider research and implementation |
+| `adrapid` | Implemented; request contracts pass; invalid token rejected live, account acceptance pending |
 | `adroll` | Pending provider research and implementation |
 | `adtraction` | Implemented; request contracts pass; authenticated account verification pending |
 | `aimtell` | Pending provider research and implementation |
@@ -743,3 +744,12 @@ These establish reachability but do not verify authentication: the observed read
 do not reject invalid credentials despite the documentation saying all endpoints
 require Bearer authentication. No render was submitted; authenticated generation
 and result retrieval remain unverified.
+
+## AdRapid validation
+
+The official overview links the User API specification, which declares /v1/api as
+its base prefix. This takes precedence over abbreviated overview examples omitting
+that prefix. Two new tests failed before implementation and pass afterward. The
+focused suite passes 330 tests; Ruff passes. A disposable bound GET /me returned
+HTTP 401 JWT web token malformed. No banners were generated; authenticated account
+access and export completion remain unverified.

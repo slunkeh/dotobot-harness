@@ -66,9 +66,9 @@ _ROWS: list[tuple[str, str, str, str]] = [
     ("adhook", "none", "", "No public docs surfaced."),
     (
         "adrapid",
-        "aggregator",
-        "https://mcp.pipedream.com/app/adrapid",
-        "Pipedream-hosted.",
+        "official",
+        "https://user-api-docs.adrapid.com/",
+        "Store the account API token (JWT Bearer). The current OpenAPI server uses /v1/api, unlike abbreviated overview examples. GET /me reads account data. POST /banners takes JSON templateId and modes, such as png=true. Poll /banners/ID until status is ready and inspect files. Banner creation and completed export are separate; binary downloads are not handled by this JSON tool.",
     ),
     (
         "adroll",

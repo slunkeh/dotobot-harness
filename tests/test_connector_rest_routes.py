@@ -15,6 +15,14 @@ from harness.paths import HarnessPaths
 # Literal expected requests intentionally independent of catalogue metadata.
 CASES = [
     (
+        "adrapid",
+        {},
+        "/me",
+        "https://api.adrapid.com/v1/api/me",
+        "Authorization",
+        "Bearer fixture-key",
+    ),
+    (
         "contentdrips",
         {},
         "/queue/stats",
@@ -659,6 +667,12 @@ def test_4dem_malformed_auth_response_is_not_forwarded(tmp_path):
 @pytest.mark.parametrize(
     "type_,path,url,body",
     [
+        (
+            "adrapid",
+            "/banners",
+            "https://api.adrapid.com/v1/api/banners",
+            {"templateId": "fixture", "modes": {"png": True}},
+        ),
         (
             "contentdrips",
             "/render",
