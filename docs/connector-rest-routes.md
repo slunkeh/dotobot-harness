@@ -239,7 +239,7 @@ Live evidence for the third batch:
 | `esputnik` | Implemented; request-contract tests pass; production account verification pending |
 | `eventbrite` | Implemented; request-contract tests pass; production account verification pending |
 | `everwebinar` | Implemented; form POST read contracts pass; invalid key rejected live; account acceptance pending |
-| `exact_mails` | Pending provider research and implementation |
+| `exact_mails` | Pending: current website gates API documentation behind account creation; backend differs from older integration examples |
 | `facebook` | Pending provider research and implementation |
 | `feedblitz` | Implemented XML REST route; transport contracts pass; invalid key rejected in HTTP 200 XML; account acceptance pending |
 | `flexmail` | Pending provider research and implementation |
@@ -998,3 +998,7 @@ A disposable-store GET /a/ with three invalid credential values returned HTTP 40
 ## Goodbits availability investigation
 
 The referenced official documentation URL is https://support.goodbits.io/article/115-goodbit-api. A direct fetch failed with could not resolve host. Independent local resolver checks for goodbits.io, api.goodbits.io and support.goodbits.io all returned name-resolution errors. This is a current availability blocker, not proof of permanent shutdown. No replacement hostname or credential contract was inferred from aggregator integrations. Goodbits remains in the original 144-connector scope and pending until a supported contract and reachable host can be established.
+
+## Exact Mails contract investigation
+
+The current [provider website](https://exactmails.com) states that account creation is needed for detailed API documentation. Its publicly served main.012f70bf.js references exactmails.xyz:8012/api/v1 and links its account dashboard at exactmail-dashboard.vercel.app. Older third-party examples use api.exactmails.com/api/v1. The website asset establishes that these names are provider-published, but not which host is the supported integration API or its authentication contract. No API host was guessed from frontend configuration. Account-level documentation remains needed; this connector remains pending.
