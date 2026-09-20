@@ -1247,3 +1247,8 @@ A bound request from a disposable local secret store using invalid credentials a
 The [official OpenAPI reference](https://app.adhook.io/api-doc/) documents /v1/notifications/count but omits the server prefix and Authorization format. The provider public web client at https://app.adhook.io/next/ supplies both: its published main-KRQK6F7G.js initializes notifications at /api/v1/notifications and adds Authorization: Bearer using the JWT access token. The optional adhookToken header belongs to a separate shared-view mechanism; this route does not support it. No user session or private browser storage was accessed.
 
 Added https://app.adhook.io/api with Bearer authentication and a bound notification-read contract. Direct invalid-token GET /api/v1/notifications/count returned HTTP 401 Unauthorized. Valid account acceptance and token creation/refresh remain open. Updated the missing-host regression to explicitly remove host metadata in its fixture, so it continues testing refusal rather than depending on Adhook remaining unfinished. Focused suite: 498 passed; Ruff clean. Configured hosts: 132 of 144; 12 pending.
+
+
+## Full-suite checkpoint at 130 configured hosts
+
+The full suite started at 6f57136 completed with **3632 passed, 2 skipped, 2 failed, 1 warning in 307.14 seconds**. Failure names and assertions match the unchanged baseline: the CDP listener/profile assertion and machine-supervisor missing-/workspace shutdown assertion. This is not a fully green suite. The run collected the 130-host tests before the Lead Identity Check and Adhook additions; those later changes are covered by the 498-test focused run, not claimed as part of this full-suite checkpoint.
