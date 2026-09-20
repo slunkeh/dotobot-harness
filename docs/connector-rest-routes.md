@@ -3,11 +3,11 @@
 Scope: implement the 144 catalogue connectors identified with missing REST hosts.
 This is an implementation ledger, not a claim of live-account verification.
 
-Ninety-one routes now have offline request-contract coverage through the real connector
+Ninety-two routes now have offline request-contract coverage through the real connector
 registry and credential store. Tests assert the outbound origin, version prefix,
 credential header, query and JSON body. Credentials are never followed through
 HTTP redirects. Production authenticated reads and writes remain unverified for these
-ninety-one routes. The remaining 53 connectors still need provider research and code.
+ninety-two routes. The remaining 52 connectors still need provider research and code.
 
 ## Implemented routes
 
@@ -192,7 +192,7 @@ Live evidence for the third batch:
 | `campaignhq` | Pending provider research and implementation |
 | `campayn` | Implemented; request contracts pass; authenticated account verification pending |
 | `cardly` | Route and offline request tests added; live verification pending |
-| `catch_all_verifier` | Pending provider research and implementation |
+| `catch_all_verifier` | Implemented REST route; credits GET and verification JSON contracts pass; live invalid key rejected; authenticated acceptance open |
 | `chatrace` | Pending provider research and implementation |
 | `cleverreach` | Implemented; request-contract tests pass; production account verification pending |
 | `clevertap` | Pending provider research and implementation |
@@ -860,3 +860,10 @@ A disposable connector-store request to GET /sites/?limit=1 returned HTTP 403 wi
 The [official API overview](https://docs.add-to-calendar-pro.com/api/introduction), [authentication guide](https://docs.add-to-calendar-pro.com/api/auth), and [event reference](https://docs.add-to-calendar-pro.com/api/events) establish the v1 host, raw Authorization key, and JSON event format. Added GET /event/all and nested dates POST /event contracts. Organization keys have scopes and optional expiry. Event creation publishes immediately and some updates consume credits; no live write was attempted. Separate ICS download hosts are not part of this JSON route.
 
 A disposable connector-store GET /event/all?page=1 returned HTTP 401, Not authenticated. Authenticated acceptance remains open. Focused suite: 377 passed; Ruff clean.
+
+
+## Catch-all Verifier REST route
+
+The [official reference](https://catchallverifier.readme.io/reference/post_api-v1-verify-single) embeds the OpenAPI contract for https://app.catchallverifier.com/api/v1. API Settings keys go directly in Authorization. Added credit-balance GET and single-verification JSON POST contracts. Verification creates a paid task; retrieve its result using the returned id. Bulk verification uses /verify/bulk and can return HTTP 202 while processing.
+
+A disposable connector-store GET /credits returned HTTP 401, Authorization information is invalid. No email was submitted or credits spent. Authenticated acceptance remains open. Focused suite: 379 passed; Ruff clean.

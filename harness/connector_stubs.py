@@ -416,6 +416,9 @@ STUBS: list[dict] = [
     },
     {
         "type": "catch_all_verifier",
+        "api_base": "https://app.catchallverifier.com/api/v1",
+        "auth_style": "header",
+        "auth_header": "Authorization",
         "name": "Catch All Verifier",
         "auth": "api_key",
         "fields": [],

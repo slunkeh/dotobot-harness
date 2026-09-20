@@ -265,7 +265,12 @@ _ROWS: list[tuple[str, str, str, str]] = [
         "https://api.card.ly/v2/docs",
         "Store a Cardly test_ or live_ API key; use test_ keys to avoid order mutations while testing. Paths are relative to https://api.card.ly/v2, for example /art. Authentication uses API-Key and bodies use text/json as required by Cardly.",
     ),
-    ("catch_all_verifier", "none", "https://catchallverifier.com/", "No docs found."),
+    (
+        "catch_all_verifier",
+        "official",
+        "https://catchallverifier.readme.io/reference/post_api-v1-verify-single",
+        "API Settings key in Authorization without a prefix. GET /credits reads balance. POST /verify/single takes JSON email and optional webhook, consumes credits and returns task id. GET /verify/single?id=TASK retrieves the result. Bulk requests use /verify/bulk; inspect completion status before using results.",
+    ),
     (
         "chatrace",
         "none",

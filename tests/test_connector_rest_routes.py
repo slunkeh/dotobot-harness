@@ -15,6 +15,14 @@ from harness.paths import HarnessPaths
 # Literal expected requests intentionally independent of catalogue metadata.
 CASES = [
     (
+        "catch_all_verifier",
+        {},
+        "/credits",
+        "https://app.catchallverifier.com/api/v1/credits",
+        "Authorization",
+        "fixture-key",
+    ),
+    (
         "add_to_calendar_pro",
         {},
         "/event/all",
@@ -1857,5 +1865,20 @@ def test_add_to_calendar_pro_event_json(tmp_path):
         )
     req = send.call_args.args[0]
     assert req.full_url == "https://api.add-to-calendar-pro.com/v1/event"
+    assert req.get_header("Authorization") == "fixture-key"
+    assert json.loads(req.data) == body
+
+
+def test_catch_all_verifier_single_json(tmp_path):
+    paths = HarnessPaths(home=tmp_path)
+    record = Connectors(paths).add("catch_all_verifier", "Verifier", secret="fixture-key")
+    bound = tools_for_bot(paths, "atlas", record_ids={record["id"]})
+    body = {"email": "fixture@example.com"}
+    with patch("connectors.generic._open", return_value=_response({})) as send:
+        assert "HTTP 200" in bound["catch_all_verifier_request"][1](
+            {"method": "POST", "path": "/verify/single", "body": body}
+        )
+    req = send.call_args.args[0]
+    assert req.full_url == "https://app.catchallverifier.com/api/v1/verify/single"
     assert req.get_header("Authorization") == "fixture-key"
     assert json.loads(req.data) == body
