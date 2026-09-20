@@ -148,7 +148,12 @@ _ROWS: list[tuple[str, str, str, str]] = [
         "https://docs.attentive.com/docs/authentication",
         "Store the private application API key. Paths are relative to https://api.attentivemobile.com/v1; GET /subscriptions needs an email or phone query. Authentication uses Bearer.",
     ),
-    ("autoklose", "none", "https://autoklose.com/", "No MCP found."),
+    (
+        "autoklose",
+        "official",
+        "https://www.postman.com/cloudy-space-2757/autoklose-s-public-workspace/documentation/twa9gic/autoklose-api",
+        "Generate an API token under Integrations. Sent as the api_token URL query parameter on all methods. JSON request bodies; use page for paginated reads and expand or expand[] for supported related data. Paths are relative to /api. Campaign status updates can start email delivery. Binary attachment downloads and multipart uploads are unsupported.",
+    ),
     (
         "automizy",
         "none",

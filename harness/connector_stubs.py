@@ -245,6 +245,9 @@ STUBS: list[dict] = [
     },
     {
         "type": "autoklose",
+        "api_base": "https://api.autoklose.com/api",
+        "auth_style": "query",
+        "auth_query": "api_token",
         "name": "Autoklose",
         "auth": "api_key",
         "fields": [],

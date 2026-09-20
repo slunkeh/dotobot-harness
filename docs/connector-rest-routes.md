@@ -3,11 +3,11 @@
 Scope: implement the 144 catalogue connectors identified with missing REST hosts.
 This is an implementation ledger, not a claim of live-account verification.
 
-One hundred and two routes now have offline request-contract coverage through the real connector
+One hundred and three routes now have offline request-contract coverage through the real connector
 registry and credential store. Tests assert the outbound origin, version prefix,
 credential header, query and JSON body. Credentials are never followed through
 HTTP redirects. Production authenticated reads and writes remain unverified for these
-one hundred and two routes. The remaining 42 connectors still need provider research and code.
+one hundred and three routes. The remaining 41 connectors still need provider research and code.
 
 ## Implemented routes
 
@@ -176,7 +176,7 @@ Live evidence for the third batch:
 | `arpoone` | Implemented v1.2 REST route; balance read and short-link JSON contracts pass; live invalid key rejected; authenticated acceptance open |
 | `asters` | Implemented documented REST route; request contracts pass; live server names a different auth header; authenticated acceptance unresolved |
 | `attentive` | Route and offline request tests added; live verification pending |
-| `autoklose` | Pending provider research and implementation |
+| `autoklose` | Implemented REST route; request contracts pass; live invalid key explicitly rejected; authenticated acceptance open |
 | `automizy` | Pending provider research and implementation |
 | `beamer` | Implemented; request-contract tests pass; production account verification pending |
 | `benchmark_email` | Implemented; request contracts pass; authenticated account verification pending |
@@ -952,3 +952,9 @@ Tests cover exact signed URL/body bytes for GET, POST, PUT and DELETE, plus six 
 The [official API reference](https://app.adhook.io/api-doc/) loads [OpenAPI](https://app.adhook.io/api/openapi.json). Its schema documents Authorization header parameters and JSON request bodies, including GET /v1/subtenants/read and POST /v1/subtenants. It supplies neither servers nor security schemes, and does not specify the Authorization value format. Some read operations also expose an adhookToken header.
 
 Read-only probes with an invalid credential returned: /v1/subtenants HTTP 404, /api/v1/subtenants HTTP 405, /api/v1/subtenants/read with a Bearer value HTTP 500, and /api/v1/posts with a Bearer value HTTP 400. These establish neither successful authentication nor a complete supported contract. Adhook remains pending rather than assigning a guessed authentication scheme. No account or social content was modified.
+
+## Autoklose REST route
+
+The [published API reference](https://www.postman.com/cloudy-space-2757/autoklose-s-public-workspace/documentation/twa9gic/autoklose-api) documents api.autoklose.com/api, an api_token URL query credential, and JSON request bodies. Added encoded token coverage for GET with repeated expand[] parameters and POST with a base64 attachment object. Binary downloads and multipart uploads remain unsupported. The [Integrations guide](https://help.autoklose.com/hc/en-us/articles/38723199985435-Integrations) explains generating and revoking API keys.
+
+A disposable-store GET /me with an invalid key returned HTTP 401 with an explicit invalid API key error. No email or contact was created. Authenticated account acceptance remains open. Focused suite: 428 passed; Ruff clean.

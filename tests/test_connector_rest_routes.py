@@ -2256,3 +2256,36 @@ def test_dux_invalid_envelope_blocks_transport(tmp_path, userid, body):
         )
     assert "error:" in result
     send.assert_not_called()
+
+
+@pytest.mark.parametrize("method", ["GET", "POST"])
+def test_autoklose_query_token_and_json(tmp_path, method):
+    from urllib.parse import parse_qs, urlsplit
+
+    paths = HarnessPaths(home=tmp_path)
+    record = Connectors(paths).add("autoklose", "Autoklose", secret="key&= +?")
+    bound = tools_for_bot(paths, "atlas", record_ids={record["id"]})
+    body = {"type": "base64", "name": "fixture.txt", "is_inline": False, "attachment": "aGk="}
+    path = "/campaigns/123/emails" if method == "GET" else "/campaigns/123/emails/456/attachment"
+    args = {"path": path}
+    if method == "POST":
+        args.update(method=method, body=body)
+    else:
+        args["query"] = {"expand[]": ["body", "statistics"]}
+    with patch("connectors.generic._open", return_value=_response({})) as send:
+        result = bound["autoklose_get" if method == "GET" else "autoklose_request"][1](args)
+    assert "HTTP 200" in result
+    req = send.call_args.args[0]
+    url = urlsplit(req.full_url)
+    assert url.netloc == "api.autoklose.com"
+    assert url.path == "/api" + path
+    expected = {"api_token": ["key&= +?"]}
+    if method == "GET":
+        expected["expand[]"] = ["body", "statistics"]
+    assert parse_qs(url.query) == expected
+    assert req.get_header("Authorization") is None
+    if method == "POST":
+        assert json.loads(req.data) == body
+        assert req.get_header("Content-type") == "application/json"
+    else:
+        assert req.data is None
