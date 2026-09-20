@@ -477,9 +477,9 @@ _ROWS: list[tuple[str, str, str, str]] = [
     ),
     (
         "easysendy",
-        "aggregator",
-        "https://zapier.com/mcp/easysendy-pro-da35212",
-        "No official vendor MCP.",
+        "official",
+        "https://easysendy.com/email-campaigns/subscriber-management-api/",
+        "EasySendy Pro JSON REST API over HTTPS. Store the API key; Dotobot inserts api_key into POST JSON. Reads also use POST: /subscribers_list/lists with empty body, /subscriber/status with list and EMAIL. POST /subscriber/addMultiple takes list and subscribers array. Subscription writes may send confirmation emails. Older /ver4 form endpoints are outside this route. Empty OK responses do not prove authentication.",
     ),
     (
         "echtpost_postcards",

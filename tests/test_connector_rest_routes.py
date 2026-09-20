@@ -1952,3 +1952,32 @@ def test_acymailing_invalid_host(tmp_path, domain):
     with patch("connectors.generic._open") as send:
         assert "error:" in bound["acymailing_get"][1]({"path": "/index.php"})
     send.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "path, body",
+    [
+        ("/subscribers_list/lists", {}),
+        (
+            "/subscriber/addMultiple",
+            {
+                "list": "fixture-list",
+                "subscribers": [{"EMAIL": "fixture@example.com", "FNAME": "Fixture"}],
+            },
+        ),
+    ],
+)
+def test_easysendy_json_api_key(tmp_path, path, body):
+    paths = HarnessPaths(home=tmp_path)
+    record = Connectors(paths).add("easysendy", "EasySendy", secret="fixture-key")
+    bound = tools_for_bot(paths, "atlas", record_ids={record["id"]})
+    with patch("connectors.generic._open", return_value=_response({})) as send:
+        assert "HTTP 200" in bound["easysendy_request"][1](
+            {"method": "POST", "path": path, "body": body}
+        )
+    req = send.call_args.args[0]
+    assert req.full_url == "https://api.easysendy.com/rest" + path
+    assert req.get_header("Authorization") is None
+    assert req.get_header("Content-type") == "application/json"
+    assert json.loads(req.data) == {**body, "api_key": "fixture-key"}
+    assert "api_key" not in body

@@ -739,6 +739,10 @@ STUBS: list[dict] = [
     },
     {
         "type": "easysendy",
+        "api_base": "https://api.easysendy.com/rest",
+        "auth_style": "query",
+        "auth_query": "api_key",
+        "auth_in_json": True,
         "name": "EasySendy",
         "auth": "api_key",
         "fields": [],

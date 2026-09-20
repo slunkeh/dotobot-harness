@@ -3,11 +3,11 @@
 Scope: implement the 144 catalogue connectors identified with missing REST hosts.
 This is an implementation ledger, not a claim of live-account verification.
 
-Ninety-four routes now have offline request-contract coverage through the real connector
+Ninety-five routes now have offline request-contract coverage through the real connector
 registry and credential store. Tests assert the outbound origin, version prefix,
 credential header, query and JSON body. Credentials are never followed through
 HTTP redirects. Production authenticated reads and writes remain unverified for these
-ninety-four routes. The remaining 50 connectors still need provider research and code.
+ninety-five routes. The remaining 49 connectors still need provider research and code.
 
 ## Implemented routes
 
@@ -221,7 +221,7 @@ Live evidence for the third batch:
 | `dynapictures` | Route and offline request tests added; live verification pending |
 | `egoi` | Route and offline request tests added; live verification pending |
 | `easypromos` | Implemented; request contracts pass; authenticated account verification pending |
-| `easysendy` | Pending provider research and implementation |
+| `easysendy` | Implemented JSON REST route; read/write contracts pass; invalid-key live response is empty OK and does not prove authentication |
 | `echtpost_postcards` | Pending provider research and implementation |
 | `ecologi` | Implemented; request contracts pass; authenticated account verification pending |
 | `email_on_acid` | Route and offline tests added; public sandbox authentication and read passed; production verification pending |
@@ -888,3 +888,10 @@ The [official MCP guide](https://help.heysummit.com/en/articles/15921700-connect
 The [official overview](https://docs.acymailing.com/rest-api) requires version 9.2.0+ and Essential or higher, with REST enabled in Security settings. The [users](https://docs.acymailing.com/rest-api/users) and [subscription](https://docs.acymailing.com/rest-api/subscription) endpoint references explicitly specify Api-Key with the license key and JSON writes; this conflicts with the overview authentication page calling the method Basic. This implementation follows the endpoint references.
 
 Configure api_domain with the installation hostname. Include /index.php and the page, option, ctrl and task query parameters in the tool path; installations in a subdirectory can include it before index.php. Read pagination is appended correctly to that existing query. Subscription JSON coverage preserves arrays and false values for sendWelcomeEmail and trigger. Five malformed-host cases block transport. No live installation/key is available, so authenticated acceptance and confirmation of the documentation discrepancy remain open. Focused suite: 388 passed; Ruff clean.
+
+
+## EasySendy Pro JSON REST route
+
+The [official subscriber management reference](https://easysendy.com/email-campaigns/subscriber-management-api/) documents /rest JSON endpoints with api_key in the POST body, including POST reads. Its examples use HTTP; the configured HTTPS equivalent was verified with normal TLS validation. Added POST list retrieval and nested bulk-subscriber JSON contracts. Older /ver4 form endpoints are outside this route. Subscription writes may send confirmation emails.
+
+A disposable connector-store POST /subscribers_list/lists with an invalid key returned HTTP 200 and {"status":"OK","count":0}, matching a direct HTTPS request. This proves host reachability only; it does not validate authentication or account data access. No subscribers were submitted. Focused suite: 390 passed; Ruff clean. Leadoku and GoZen Growth research in this pass did not establish authoritative REST host contracts; both remain pending.
