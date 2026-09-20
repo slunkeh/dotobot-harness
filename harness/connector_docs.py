@@ -329,9 +329,9 @@ _ROWS: list[tuple[str, str, str, str]] = [
     ),
     (
         "copicake",
-        "none",
-        "https://docs.copicake.com/",
-        "Official API/SDKs, no MCP.",
+        "official",
+        "https://docs.copicake.com/api/v1-image-get",
+        "Store a Copicake API key. Paths are relative to /v1. GET /image/get requires the rendering id query parameter. POST /image/create accepts template_id, changes and options as JSON. Authentication uses Bearer.",
     ),
     (
         "coupontools",
@@ -500,9 +500,9 @@ _ROWS: list[tuple[str, str, str, str]] = [
     ),
     (
         "emailoctopus",
-        "aggregator",
-        "https://composio.dev/toolkits/emailoctopus",
-        "No official vendor server.",
+        "official",
+        "https://emailoctopus.com/api-documentation/v2",
+        "Store an EmailOctopus API key. Uses API v2 with Bearer authentication at https://api.emailoctopus.com, without a /v2 path prefix. GET /lists reads lists. Pass starting_after for cursor pagination. Legacy v1 query-key authentication is not used.",
     ),
     (
         "emailverify_io",
@@ -850,9 +850,9 @@ _ROWS: list[tuple[str, str, str, str]] = [
     ),
     (
         "joggai",
-        "none",
-        "https://docs.jogg.ai/api-reference/QuickStart/GettingStarted",
-        "Documented REST API, no MCP.",
+        "official",
+        "https://docs.jogg.ai/api-reference/v2/Webhook/ListWebhookEndpoints",
+        "Store the JoggAI dashboard API key. Uses x-api-key with paths relative to /v2, for example GET /endpoints and POST /endpoint. Inspect the JSON code as well as HTTP status: only code 0 denotes success. JSON requests are supported; multipart uploads are not.",
     ),
     ("jvzoo", "none", "https://api.jvzoo.com/docs/", "No MCP found."),
     (

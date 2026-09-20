@@ -14,6 +14,23 @@ from harness.paths import HarnessPaths
 
 # Literal expected requests intentionally independent of catalogue metadata.
 CASES = [
+    ("joggai", {}, "/endpoints", "https://api.jogg.ai/v2/endpoints", "X-api-key", "fixture-key"),
+    (
+        "copicake",
+        {},
+        "/image/get",
+        "https://api.copicake.com/v1/image/get",
+        "Authorization",
+        "Bearer fixture-key",
+    ),
+    (
+        "emailoctopus",
+        {},
+        "/lists",
+        "https://api.emailoctopus.com/lists",
+        "Authorization",
+        "Bearer fixture-key",
+    ),
     (
         "acelle_mail",
         {"instance_domain": "mail.example.com"},
@@ -339,3 +356,46 @@ def test_4dem_malformed_auth_response_is_not_forwarded(tmp_path):
         result = generic._get(ctx, {"path": "/addressbook/"})
     assert result == "error: 4Dem authentication returned invalid JSON"
     assert send.call_count == 1
+
+
+@pytest.mark.parametrize(
+    "type_,path,url,body",
+    [
+        (
+            "joggai",
+            "/endpoint",
+            "https://api.jogg.ai/v2/endpoint",
+            {
+                "url": "https://example.com/webhook",
+                "status": "enabled",
+                "events": ["generated_avatar_video_success"],
+            },
+        ),
+        (
+            "copicake",
+            "/image/create",
+            "https://api.copicake.com/v1/image/create",
+            {
+                "template_id": "fixture-template",
+                "changes": [{"name": "title", "text": "Hello"}],
+                "options": {"format": "png"},
+            },
+        ),
+        (
+            "emailoctopus",
+            "/lists",
+            "https://api.emailoctopus.com/lists",
+            {"name": "Fixture list"},
+        ),
+    ],
+)
+def test_documented_json_write_paths(tmp_path, type_, path, url, body):
+    paths = HarnessPaths(home=tmp_path)
+    record = Connectors(paths).add(type_, type_, secret="fixture-key")
+    bound = tools_for_bot(paths, "atlas", record_ids={record["id"]})
+    with patch("connectors.generic._open", return_value=_response({"ok": True})) as send:
+        result = bound[type_ + "_request"][1]({"method": "POST", "path": path, "body": body})
+    assert "HTTP 200" in result
+    request = send.call_args.args[0]
+    assert request.full_url == url
+    assert json.loads(request.data) == body

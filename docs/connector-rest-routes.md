@@ -3,11 +3,11 @@
 Scope: implement the 144 catalogue connectors identified with missing REST hosts.
 This is an implementation ledger, not a claim of live-account verification.
 
-Twenty-three routes now have offline request-contract coverage through the real connector
+Twenty-six routes now have offline request-contract coverage through the real connector
 registry and credential store. Tests assert the outbound origin, version prefix,
 credential header, query and JSON body. Credentials are never followed through
 HTTP redirects. Production authenticated reads and writes remain unverified for these
-twenty-three routes. The remaining 121 connectors still need provider research and code.
+twenty-six routes. The remaining 118 connectors still need provider research and code.
 
 ## Implemented routes
 
@@ -46,6 +46,12 @@ CloudConvert currently uses its production automatic-region API, not its sandbox
 
 | `acelle_mail` | [Provider documentation](https://acellesend.com/rest-api) | Set instance_domain to the HTTPS hostname of your Acelle Mail installation, without a scheme or path. Store the API token from My Profile > API and Authentication. Paths are relative to /api/v1, for example /me. Authentication uses Bearer. Installations under a URL subdirectory are not covered. |
 | `emailable` | [Provider documentation](https://emailable.com/docs/api/authentication/) | Store an Emailable private API key or OAuth access token. Paths are relative to https://api.emailable.com/v1, for example /account. Authentication uses Bearer; public keys only allow verification. Test keys simulate verification without using credits. |
+
+| `joggai` | [Provider documentation](https://docs.jogg.ai/api-reference/v2/Webhook/ListWebhookEndpoints) | Store the JoggAI dashboard API key. Uses x-api-key with paths relative to /v2, for example GET /endpoints and POST /endpoint. Inspect the JSON code as well as HTTP status: only code 0 denotes success. JSON requests are supported; multipart uploads are not. |
+
+| `copicake` | [Provider documentation](https://docs.copicake.com/api/v1-image-get) | Store a Copicake API key. Paths are relative to /v1. GET /image/get requires the rendering id query parameter. POST /image/create accepts template_id, changes and options as JSON. Authentication uses Bearer. |
+
+| `emailoctopus` | [Provider documentation](https://emailoctopus.com/api-documentation/v2) | Store an EmailOctopus API key. Uses API v2 with Bearer authentication at https://api.emailoctopus.com, without a /v2 path prefix. GET /lists reads lists. Pass starting_after for cursor pagination. Legacy v1 query-key authentication is not used. |
 
 ActiveCampaign host selection: [official base URL guidance](https://developers.activecampaign.com/reference/url).
 
@@ -148,7 +154,7 @@ Live evidence for the third batch:
 | `constant_contact` | Pending provider research and implementation |
 | `contentdrips` | Pending provider research and implementation |
 | `convertkit` | Pending provider research and implementation |
-| `copicake` | Pending provider research and implementation |
+| `copicake` | Implemented; request-contract tests pass; production account verification pending |
 | `coupontools` | Pending provider research and implementation |
 | `crowdpower` | Pending provider research and implementation |
 | `curated` | Pending provider research and implementation |
@@ -174,7 +180,7 @@ Live evidence for the third batch:
 | `emailable` | Route and offline request tests added; live verification pending |
 | `emailchef` | Pending provider research and implementation |
 | `emaillistverify` | Pending provider research and implementation |
-| `emailoctopus` | Pending provider research and implementation |
+| `emailoctopus` | Implemented; request-contract tests pass; production account verification pending |
 | `emailverify_io` | Pending provider research and implementation |
 | `emelia` | Pending provider research and implementation |
 | `encharge` | Pending provider research and implementation |
@@ -227,7 +233,7 @@ Live evidence for the third batch:
 | `instagram` | Pending provider research and implementation |
 | `instasent` | Route and offline request tests added; live verification pending |
 | `jellyreach` | Pending provider research and implementation |
-| `joggai` | Pending provider research and implementation |
+| `joggai` | Implemented; request-contract tests pass; production account verification pending |
 | `jvzoo` | Pending provider research and implementation |
 | `kartra` | Pending provider research and implementation |
 | `kickofflabs` | Pending provider research and implementation |
@@ -246,3 +252,15 @@ Live evidence for the third batch:
 | `microsoft_excel` | Pending provider research and implementation |
 | `microsoft_outlook` | Pending provider research and implementation |
 | `microsoft_teams` | Pending provider research and implementation |
+
+### Fourth batch: JoggAI, Copicake and EmailOctopus
+
+2026-09-20: three new route-contract tests failed with the original missing-host
+metadata and pass after implementation. Added documented JSON write-path tests
+for JoggAI webhook creation, Copicake image creation and EmailOctopus list creation.
+206 focused tests pass; Ruff passes. Sequential invalid-key reads through the
+real bound connector returned HTTP 401 from all three providers. JoggAI returned
+code 10105, Copicake returned Unauthorized, and EmailOctopus rejected the token
+format. These checks prove reachability, not account access or successful writes.
+EmailOctopus uses its current v2 OpenAPI document, whose server URL has no version
+path prefix. Production authenticated operations remain unverified.
