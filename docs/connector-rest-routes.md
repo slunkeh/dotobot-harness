@@ -3,11 +3,11 @@
 Scope: implement the 144 catalogue connectors identified with missing REST hosts.
 This is an implementation ledger, not a claim of live-account verification.
 
-Ninety-nine routes now have offline request-contract coverage through the real connector
+One hundred routes now have offline request-contract coverage through the real connector
 registry and credential store. Tests assert the outbound origin, version prefix,
 credential header, query and JSON body. Credentials are never followed through
 HTTP redirects. Production authenticated reads and writes remain unverified for these
-ninety-nine routes. The remaining 45 connectors still need provider research and code.
+one hundred routes. The remaining 44 connectors still need provider research and code.
 
 ## Implemented routes
 
@@ -174,7 +174,7 @@ Live evidence for the third batch:
 | `apexverify` | Implemented; request contracts pass; invalid key rejected live, authenticated account acceptance pending |
 | `appsflyer` | Implemented hq1 API V2 token route; contracts pass; invalid token rejected live; account acceptance pending |
 | `arpoone` | Implemented v1.2 REST route; balance read and short-link JSON contracts pass; live invalid key rejected; authenticated acceptance open |
-| `asters` | Pending provider research and implementation |
+| `asters` | Implemented documented REST route; request contracts pass; live server names a different auth header; authenticated acceptance unresolved |
 | `attentive` | Route and offline request tests added; live verification pending |
 | `autoklose` | Pending provider research and implementation |
 | `automizy` | Pending provider research and implementation |
@@ -923,3 +923,10 @@ A disposable-store European profile GET with invalid credentials returned HTTP 4
 The [official authentication guide](https://docs.arpoone.com/docs/arpoone-api/getting-started/authentication/) specifies Bearer API keys. The [reference](https://docs.arpoone.com/api-reference/) loads [OpenAPI v1.2](https://docs.arpoone.com/services/Api/api/swagger/v1.2/swagger.json), with api.arpoone.com as server. Some balance code samples contain a .comt typo; the server definition and other official examples use .com. Added POST balance-read and short-link JSON contracts, preserving organization identifiers and nested items.
 
 A disposable-store POST /balance/currentbalance with an invalid key and synthetic organization UUID returned HTTP 401 Unauthorized. No links, messages or balance transfers were created. Authenticated acceptance remains open. Focused suite: 412 passed; Ruff clean.
+
+
+## Asters documented REST route
+
+The [getting started guide](https://docs.asters.ai/api/overview/getting-started) specifies api.asters.ai/api/external/v1.0 and JSON headers. The [authentication guide](https://docs.asters.ai/api/overview/authentication) specifies x-api-key, as do endpoint references. Added workspace GET and POST /data/posts retrieval with nested date filters, plus GET Content-Type coverage.
+
+A disposable-store GET /workspaces using the documented header returned HTTP 200 with data=[] and error="x-asters-key Key Not Found". This conflicts with the documented header name and does not prove the route authenticates correctly. A real key and confirmation of the current header contract are still needed. No social posts were created. Focused suite: 414 passed; Ruff clean.

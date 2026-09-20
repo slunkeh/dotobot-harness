@@ -15,6 +15,14 @@ from harness.paths import HarnessPaths
 # Literal expected requests intentionally independent of catalogue metadata.
 CASES = [
     (
+        "asters",
+        {},
+        "/workspaces",
+        "https://api.asters.ai/api/external/v1.0/workspaces",
+        "X-api-key",
+        "fixture-key",
+    ),
+    (
         "chatrace",
         {},
         "/accounts/flows",
@@ -2134,3 +2142,25 @@ def test_arpoone_json_contract(tmp_path, path, body):
     assert req.full_url == "https://api.arpoone.com/v1.2" + path
     assert req.get_header("Authorization") == "Bearer fixture-key"
     assert json.loads(req.data) == body
+
+
+def test_asters_posts_json(tmp_path):
+    paths = HarnessPaths(home=tmp_path)
+    record = Connectors(paths).add("asters", "Asters", secret="fixture-key")
+    bound = tools_for_bot(paths, "atlas", record_ids={record["id"]})
+    body = {
+        "socialAccountId": "fixture",
+        "page": 1,
+        "filters": {"date": {"from": "01-01-2026", "to": "01-31-2026"}},
+    }
+    with patch("connectors.generic._open", return_value=_response({})) as send:
+        assert "HTTP 200" in bound["asters_request"][1](
+            {"method": "POST", "path": "/data/posts", "body": body}
+        )
+    req = send.call_args.args[0]
+    assert req.full_url == "https://api.asters.ai/api/external/v1.0/data/posts"
+    assert req.get_header("X-api-key") == "fixture-key"
+    assert json.loads(req.data) == body
+    with patch("connectors.generic._open", return_value=_response({})) as send:
+        bound["asters_get"][1]({"path": "/workspaces"})
+    assert send.call_args.args[0].get_header("Content-type") == "application/json"

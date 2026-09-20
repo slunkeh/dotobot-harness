@@ -222,6 +222,10 @@ STUBS: list[dict] = [
     },
     {
         "type": "asters",
+        "api_base": "https://api.asters.ai/api/external/v1.0",
+        "auth_style": "header",
+        "auth_header": "x-api-key",
+        "content_type": "application/json",
         "name": "Asters",
         "auth": "api_key",
         "fields": [],

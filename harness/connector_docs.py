@@ -136,7 +136,12 @@ _ROWS: list[tuple[str, str, str, str]] = [
         "https://developers.asana.com/docs/mcp-server",
         "Vendor-hosted remote MCP.",
     ),
-    ("asters", "none", "", "Niche/unclear vendor. No public docs."),
+    (
+        "asters",
+        "official",
+        "https://docs.asters.ai/api",
+        "Store the workspace settings API key; sent in x-api-key. All requests include JSON Content-Type and Accept. GET /workspaces lists available workspaces. POST /data/posts reads posts using socialAccountId, page and optional filters.date from/to in MM-DD-YYYY format. Inspect error and data fields. Separate S3 media downloads are not part of this route. Live invalid-key response names x-asters-key instead of the documented x-api-key; authentication remains unresolved.",
+    ),
     (
         "attentive",
         "official",
