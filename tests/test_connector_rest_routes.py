@@ -1283,3 +1283,25 @@ def test_hypeauditor_create_plan(tmp_path):
     assert req.get_header("X-auth-id") == "12345"
     assert req.get_header("X-auth-hash") == "fixture-key"
     assert json.loads(req.data) == {"title": "Fixture"}
+
+
+def test_jvzoo_versioned_read_authentication(tmp_path):
+    import base64
+
+    paths = HarnessPaths(home=tmp_path)
+    record = Connectors(paths).add("jvzoo", "JVZoo", secret="fixture-key")
+    bound = tools_for_bot(paths, "atlas", record_ids={record["id"]})
+    with patch("connectors.generic._open", return_value=_response({})) as send:
+        assert "HTTP 200" in bound["jvzoo_get"][1](
+            {
+                "path": "/v3.0/transactions",
+                "query": {"start_date": "2025-01-01", "end_date": "2025-01-31"},
+            }
+        )
+    req = send.call_args.args[0]
+    assert (
+        req.full_url
+        == "https://api.jvzoo.com/v3.0/transactions?start_date=2025-01-01&end_date=2025-01-31"
+    )
+    assert req.get_header("Authorization") == "Basic " + base64.b64encode(b"fixture-key:x").decode()
+    assert req.data is None

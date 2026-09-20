@@ -869,7 +869,12 @@ _ROWS: list[tuple[str, str, str, str]] = [
         "https://docs.jogg.ai/api-reference/v2/Webhook/ListWebhookEndpoints",
         "Store the JoggAI dashboard API key. Uses x-api-key with paths relative to /v2, for example GET /endpoints and POST /endpoint. Inspect the JSON code as well as HTTP status: only code 0 denotes success. JSON requests are supported; multipart uploads are not.",
     ),
-    ("jvzoo", "none", "https://api.jvzoo.com/docs/", "No MCP found."),
+    (
+        "jvzoo",
+        "official",
+        "https://api.jvzoo.com/docs/",
+        "Store the API Application key alone. Basic auth sends it as username with literal x as password. Include version in paths: GET /v3.0/transactions with start_date and end_date, or supported /v2.1 and /v2.0 paths. Writes accept JSON. Inspect meta.status and results. Payment cancellation and affiliate changes require care; do not retry mutations blindly.",
+    ),
     (
         "kartra",
         "none",

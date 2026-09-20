@@ -3,11 +3,11 @@
 Scope: implement the 144 catalogue connectors identified with missing REST hosts.
 This is an implementation ledger, not a claim of live-account verification.
 
-Seventy-one routes now have offline request-contract coverage through the real connector
+Seventy-two routes now have offline request-contract coverage through the real connector
 registry and credential store. Tests assert the outbound origin, version prefix,
 credential header, query and JSON body. Credentials are never followed through
 HTTP redirects. Production authenticated reads and writes remain unverified for these
-seventy-one routes. The remaining 73 connectors still need provider research and code.
+seventy-two routes. The remaining 72 connectors still need provider research and code.
 
 ## Implemented routes
 
@@ -19,6 +19,7 @@ CloudConvert currently uses its production automatic-region API, not its sandbox
 
 | Connector | Provider reference | Setup |
 |---|---|---|
+| `jvzoo` | [Provider documentation](https://api.jvzoo.com/docs/) | Store the API Application key alone; Basic auth uses it as username and x as password. Include /v3.0, /v2.1 or /v2.0 in paths. GET /v3.0/transactions takes start_date and end_date. JSON writes are supported; inspect meta.status and results. |
 | `hypeauditor` | [Provider documentation](https://hypeauditor.com/swagger/public-api/v1/) | Store the API token and configure numeric client_id. Uses X-Auth-Hash and X-Auth-Id. GET /api/v1/media-plan/plans lists plans; POST with JSON title creates a plan. Include full API prefixes in paths. API entitlement and credits apply; report requests may consume credits. |
 | `funnelcockpit` | [Provider documentation](https://api.funnelcockpit.com/) | Store the private API key, sent directly in Authorization without Bearer. GET /me verifies the user; GET /email/tags uses zero-based page and limit. POST /email/tag takes JSON contactId and tagId. Subscriber/tag operations may trigger automations; plan access applies. |
 | `kickofflabs` | [Provider documentation](https://support.kickofflabs.com/developer/common-api-behavior/) | Store the campaign API Access key. Uses Bearer with JSON Content-Type. GET /campaigns lists campaigns; POST /CAMPAIGN_ID/ creates or updates a lead with email or phone_number. Lead changes may trigger campaign automations. |
@@ -270,7 +271,7 @@ Live evidence for the third batch:
 | `instasent` | Route and offline request tests added; live verification pending |
 | `jellyreach` | Pending provider research and implementation |
 | `joggai` | Implemented; request-contract tests pass; production account verification pending |
-| `jvzoo` | Pending provider research and implementation |
+| `jvzoo` | Implemented; request contract passes; invalid key rejected live, account acceptance pending |
 | `kartra` | Pending provider research and implementation |
 | `kickofflabs` | Implemented; request contracts pass; invalid key rejected live, account acceptance pending |
 | `kingsumo` | Pending provider research and implementation |
@@ -675,3 +676,11 @@ before implementation; all five new tests pass. The focused suite passes 313 tes
 Ruff passes. A disposable bound media-plan GET using client ID 0 and an invalid token
 returned HTTP 403 Access denied. No plans or reports were created; authenticated
 account acceptance remains open.
+
+## JVZoo validation
+
+The official combined OpenAPI reference confirms all supported version prefixes
+and Basic authentication with a literal x password. The new test failed before
+implementation and passes afterward. The focused suite passes 314 tests; Ruff passes.
+A disposable bound v3 transaction GET returned HTTP 401 Invalid API Key present.
+No account mutations were attempted; authenticated acceptance remains open.

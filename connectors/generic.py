@@ -213,7 +213,12 @@ def _headers(ctx: ConnectorContext, secret: str) -> dict[str, str]:
     if style in {"basic", "basic_key"}:
         import base64
 
-        credentials = secret + ":" if style == "basic_key" else secret
+        from harness.connectors import _CATALOG_TYPES
+
+        cat = _CATALOG_TYPES[str(ctx.record["type"])]
+        credentials = (
+            secret + ":" + str(cat.get("basic_password", "")) if style == "basic_key" else secret
+        )
         token = base64.b64encode(credentials.encode("utf-8")).decode("ascii")
         hdrs["Authorization"] = f"Basic {token}"
         return hdrs
