@@ -15,6 +15,22 @@ from harness.paths import HarnessPaths
 # Literal expected requests intentionally independent of catalogue metadata.
 CASES = [
     (
+        "ecologi",
+        {},
+        "/users/fixture/trees",
+        "https://public.ecologi.com/users/fixture/trees",
+        "Authorization",
+        "Bearer fixture-key",
+    ),
+    (
+        "greenspark",
+        {},
+        "/projects",
+        "https://api.getgreenspark.com/v1/projects",
+        "X-api-key",
+        "fixture-key",
+    ),
+    (
         "cleverreach",
         {},
         "/groups",
@@ -476,6 +492,12 @@ def test_4dem_malformed_auth_response_is_not_forwarded(tmp_path):
 @pytest.mark.parametrize(
     "type_,path,url,body",
     [
+        (
+            "ecologi",
+            "/impact/trees",
+            "https://public.ecologi.com/impact/trees",
+            {"number": 1, "test": True},
+        ),
         (
             "google_calendar",
             "/calendars",

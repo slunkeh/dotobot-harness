@@ -3,11 +3,11 @@
 Scope: implement the 144 catalogue connectors identified with missing REST hosts.
 This is an implementation ledger, not a claim of live-account verification.
 
-Forty-two routes now have offline request-contract coverage through the real connector
+Forty-four routes now have offline request-contract coverage through the real connector
 registry and credential store. Tests assert the outbound origin, version prefix,
 credential header, query and JSON body. Credentials are never followed through
 HTTP redirects. Production authenticated reads and writes remain unverified for these
-forty-two routes. The remaining 102 connectors still need provider research and code.
+forty-four routes. The remaining 100 connectors still need provider research and code.
 
 ## Implemented routes
 
@@ -61,6 +61,8 @@ CloudConvert currently uses its production automatic-region API, not its sandbox
 | `constant_contact` | [Provider documentation](https://developer.constantcontact.com/api_guide/getting-started/v3-technical-overview) | Store a current Constant Contact V3 OAuth access token. Authentication uses Bearer; paths are relative to /v3, for example GET /contacts. Writes use JSON and require corresponding scopes. OAuth consent and expired-token refresh are not performed by this stored-token route. |
 | `lawmatics` | [Provider documentation](https://help.lawmatics.com/en/articles/15939403-api-authentication-oauth2-setup-guide) | Store a Lawmatics OAuth access token obtained through a developer app. Authentication uses Bearer; paths are relative to /v1, for example GET /users/me. Lawmatics documents non-expiring tokens with no scopes and full account CRUD access; revoke through integration settings. This route does not perform OAuth consent. JSON bodies are supported, not multipart uploads. |
 | `infusionsoft` | [Provider documentation](https://developer.infusionsoft.com/postman-quick-start/) | Infusionsoft is now Keap. Store a Personal Access Token or Service Account Key. Authentication uses X-Keap-API-Key. Paths are relative to /crm/rest/v1, for example GET /contacts; JSON bodies follow the REST v1 schema. This route does not use legacy XML-RPC keys or OAuth bearer tokens. REST v2 is not covered by this v1 base. |
+| `ecologi` | [Provider documentation](https://docs.ecologi.com/) | Store the Ecologi Impact API key; authentication uses Bearer. Paths are relative to https://public.ecologi.com. POST /impact/trees takes a JSON number and test flag. Set test to true for non-billable test requests; live impact purchases are billed. Public reporting uses GET /users/USERNAME/trees and does not require authentication at the provider, although this connector currently requires a stored key. Idempotency-Key headers are not exposed; do not automatically retry purchase requests. |
+| `greenspark` | [Provider documentation](https://docs.getgreenspark.com/reference/authentication) | Store a Greenspark API key, not a Widget key. Authentication uses X-API-KEY. Paths are relative to the production /v1 API, for example GET /projects. Impact writes take JSON and may incur charges. This route uses production; the separate demo and sandbox environments are not configured. Plan eligibility and key permissions apply. |
 
 ActiveCampaign host selection: [official base URL guidance](https://developers.activecampaign.com/reference/url).
 
@@ -184,7 +186,7 @@ Live evidence for the third batch:
 | `easypromos` | Pending provider research and implementation |
 | `easysendy` | Pending provider research and implementation |
 | `echtpost_postcards` | Pending provider research and implementation |
-| `ecologi` | Pending provider research and implementation |
+| `ecologi` | Implemented; request contracts pass; authenticated account verification pending |
 | `email_on_acid` | Route and offline tests added; public sandbox authentication and read passed; production verification pending |
 | `emailable` | Route and offline request tests added; live verification pending |
 | `emailchef` | Pending provider research and implementation |
@@ -225,7 +227,7 @@ Live evidence for the third batch:
 | `gosquared` | Pending provider research and implementation |
 | `gozen_growth` | Pending provider research and implementation |
 | `grade_us` | Pending provider research and implementation |
-| `greenspark` | Pending provider research and implementation |
+| `greenspark` | Implemented; request contracts pass; authenticated account verification pending |
 | `growsurf` | Route and offline request tests added; live verification pending |
 | `herobot` | Pending provider research and implementation |
 | `heysummit` | Pending provider research and implementation |
@@ -357,3 +359,26 @@ Additional schema evidence: CleverReach publishes its JSON request schemas at
 [the v3 OpenAPI endpoint](https://rest.cleverreach.com/v3/explorer/swagger.json).
 Lawmatics documents its resource paths in
 [Core Objects and Endpoints](https://help.lawmatics.com/en/articles/15939438-core-objects-endpoints-reference).
+
+### Tenth batch: Ecologi and Greenspark
+
+2026-09-20: both route cases failed before implementation and pass afterward.
+237 focused tests pass; Ruff passes. Ecologi has an additional documented
+JSON test-purchase request contract. A bound request with an intentionally
+invalid key and test=true returned HTTP 401 (no user for the API key).
+A bound Greenspark GET /projects returned HTTP 401 Unauthorized. No purchases
+or account mutations were completed. Production account functionality is not
+verified. Ecologi reporting is public but its current connector still expects
+a stored key. Greenspark uses production; its documented demo/sandbox hosts
+remain a separate configuration enhancement.
+
+Greenspark host and JSON request evidence: [projects](https://docs.getgreenspark.com/reference/getprojects),
+[impact creation](https://docs.getgreenspark.com/reference/createimpact), and
+[environments](https://docs.getgreenspark.com/reference/environments).
+
+Research pending implementation: Enormail's current official reference is
+https://developer.enormail.eu/ (singular developer). It documents Basic
+authentication using the API key as username and an empty password, at
+https://api.enormail.eu/api/1.0. Request body encoding still needs verification.
+The old Flexmail developer.flexmail.eu hostname does not resolve; its current
+marketing API reference must be located before configuring that route.

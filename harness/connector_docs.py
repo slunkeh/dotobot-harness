@@ -477,7 +477,12 @@ _ROWS: list[tuple[str, str, str, str]] = [
         "https://mcp.composio.dev/echtpost",
         "Composio toolkit.",
     ),
-    ("ecologi", "none", "https://ecologi.com/", "No public API found."),
+    (
+        "ecologi",
+        "official",
+        "https://docs.ecologi.com/",
+        "Store the Ecologi Impact API key; authentication uses Bearer. Paths are relative to https://public.ecologi.com. POST /impact/trees takes a JSON number and test flag. Set test to true for non-billable test requests; live impact purchases are billed. Public reporting uses GET /users/USERNAME/trees and does not require authentication at the provider, although this connector currently requires a stored key. Idempotency-Key headers are not exposed; do not automatically retry purchase requests.",
+    ),
     (
         "elastic_email",
         "official",
@@ -726,9 +731,9 @@ _ROWS: list[tuple[str, str, str, str]] = [
     ("grade_us", "none", "https://gradeus.com/", "No public docs surfaced."),
     (
         "greenspark",
-        "none",
-        "https://www.getgreenspark.com/",
-        "No API docs surfaced.",
+        "official",
+        "https://docs.getgreenspark.com/reference/authentication",
+        "Store a Greenspark API key, not a Widget key. Authentication uses X-API-KEY. Paths are relative to the production /v1 API, for example GET /projects. Impact writes take JSON and may incur charges. This route uses production; the separate demo and sandbox environments are not configured. Plan eligibility and key permissions apply.",
     ),
     (
         "growsurf",
