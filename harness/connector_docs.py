@@ -91,8 +91,8 @@ _ROWS: list[tuple[str, str, str, str]] = [
     (
         "airship",
         "official",
-        "https://www.airship.com/docs/developer/ai-tools/mcp-server/",
-        "Official MCP. Also github.com/urbanairship/agent-tools.",
+        "https://www.airship.com/docs/developer/rest-api/ua/introduction/",
+        "North American HTTP API using a dashboard-generated Bearer token, not an OAuth JWT or Basic credential pair. Dotobot sends the required version-3 Accept header. Include /api in paths, for example GET /api/channels. Token roles limit endpoint access. EU and OAuth hosts are not configured by this route. JSON requests are supported; CSV uploads are not. Messaging endpoints can deliver to real audiences.",
     ),
     (
         "airtable",

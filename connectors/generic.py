@@ -193,9 +193,12 @@ def _join(base: str, path: str) -> str | None:
 
 
 def _headers(ctx: ConnectorContext, secret: str) -> dict[str, str]:
+    from harness.connectors import _CATALOG_TYPES
+
     style = auth_style(ctx)
+    cat = _CATALOG_TYPES[str(ctx.record["type"])]
     hdrs = {
-        "Accept": "application/json",
+        "Accept": str(cat.get("accept", "application/json")),
         "User-Agent": "dotobot/0.2.9",
     }
     if style == "query":

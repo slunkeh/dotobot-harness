@@ -1529,3 +1529,16 @@ def test_everwebinar_form_read(tmp_path, path, body):
         **{k: [str(v)] for k, v in body.items()},
     }
     assert body == original
+
+
+def test_airship_version_header(tmp_path):
+    paths = HarnessPaths(home=tmp_path)
+    record = Connectors(paths).add("airship", "Airship", secret="fixture-key")
+    bound = tools_for_bot(paths, "atlas", record_ids={record["id"]})
+    with patch("connectors.generic._open", return_value=_response({"ok": True})) as send:
+        result = bound["airship_get"][1]({"path": "/api/channels", "query": {"limit": 1}})
+    assert "HTTP 200" in result
+    req = send.call_args.args[0]
+    assert req.full_url == "https://go.urbanairship.com/api/channels?limit=1"
+    assert req.get_header("Accept") == "application/vnd.urbanairship+json; version=3"
+    assert req.get_header("Authorization") == "Bearer fixture-key"

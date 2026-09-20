@@ -3,11 +3,11 @@
 Scope: implement the 144 catalogue connectors identified with missing REST hosts.
 This is an implementation ledger, not a claim of live-account verification.
 
-Eighty-one routes now have offline request-contract coverage through the real connector
+Eighty-two routes now have offline request-contract coverage through the real connector
 registry and credential store. Tests assert the outbound origin, version prefix,
 credential header, query and JSON body. Credentials are never followed through
 HTTP redirects. Production authenticated reads and writes remain unverified for these
-eighty-one routes. The remaining 63 connectors still need provider research and code.
+eighty-two routes. The remaining 62 connectors still need provider research and code.
 
 ## Implemented routes
 
@@ -170,7 +170,7 @@ Live evidence for the third batch:
 | `adroll` | Pending provider research and implementation |
 | `adtraction` | Implemented; request contracts pass; authenticated account verification pending |
 | `aimtell` | Pending provider research and implementation |
-| `airship` | Pending provider research and implementation |
+| `airship` | Implemented North American dashboard-token route; version-header contract passes; invalid token rejected live; EU/OAuth routing and account acceptance pending |
 | `apexverify` | Implemented; request contracts pass; invalid key rejected live, authenticated account acceptance pending |
 | `appsflyer` | Pending provider research and implementation |
 | `arpoone` | Pending provider research and implementation |
@@ -781,3 +781,9 @@ The bound overview call with the documented public demo key and site token retur
 The current official API uses api.webinarjam.com/everwebinar. [Webinar listing](https://support.webinarjam.com/en/articles/15370154-retrieve-a-full-list-of-all-webinars-published-in-your-account-everwebinar-api) and [webinar details](https://support.webinarjam.com/en/articles/15370155-get-details-about-one-particular-webinar-from-your-account-everwebinar-api) both require form POST. Tests cover key escaping, body preservation, paths and timezone encoding.
 
 A bound disposable-store POST /webinars with an invalid key returned HTTP 401 with a valid-key-required error. No registration or subscription change was attempted. All 338 focused tests and Ruff pass. There are 81 implemented routes and 63 pending; the midpoint full suite predates this addition.
+
+## Airship HTTP API
+
+The [official introduction](https://www.airship.com/docs/developer/rest-api/ua/introduction/) documents dashboard Bearer tokens on go.urbanairship.com and the mandatory application/vnd.urbanairship+json; version=3 Accept header. Catalogue-owned Accept metadata now supplies this version without allowing caller header overrides. The [OpenAPI specification](https://www.airship.com/docs/openapi/go/spec.json) confirms GET /api/channels.
+
+The bound North American channels probe returned HTTP 401 with Unauthorized and error_code 40101. No message was sent. This route does not yet cover EU or OAuth-specific hosts, Basic credentials or CSV uploads. Production account acceptance remains open. All 339 focused tests and Ruff pass; 82 routes are implemented and 62 pending. The midpoint full suite predates this addition.
