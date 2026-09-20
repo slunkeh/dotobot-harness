@@ -453,8 +453,8 @@ _ROWS: list[tuple[str, str, str, str]] = [
     (
         "dux_soup",
         "official",
-        "https://www.dux-soup.com/blog/dux-soup-mcp-use-ai-to-control-your-linkedin-automation",
-        "Official + aggregator. Also zapier.com/mcp/dux-soup.",
+        "https://support.dux-soup.com/article/227-the-dux-soup-api",
+        "Turbo or Cloud API: store the Connect-tab Authentication Key and configure numeric userid. Include the user ID in full /xapi/remote/... paths. Dotobot signs GET URLs and JSON bodies with HMAC-SHA1/Base64 in X-Dux-Signature. Non-GET bodies automatically receive targeturl, timestamp and userid; omit those fields from tool arguments. Queue and campaign actions can initiate LinkedIn outreach. Use conversation batch with empty profileids for a no-op read check.",
     ),
     (
         "dynamic_content_snippet",

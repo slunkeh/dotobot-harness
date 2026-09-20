@@ -2189,3 +2189,70 @@ def test_instabot_master_key_pair(tmp_path, method, path, body):
     assert req.get_header("Authorization") == "X-Instabot-Master-Api-Key fixture-master"
     if body is not None:
         assert json.loads(req.data) == body
+
+
+@pytest.mark.parametrize("method", ["GET", "POST", "PUT", "DELETE"])
+def test_dux_signature_and_envelope(tmp_path, method):
+    import base64
+    import hashlib
+    import hmac
+
+    paths = HarnessPaths(home=tmp_path)
+    record = Connectors(paths).add(
+        "dux_soup", "Dux", config={"userid": "123"}, secret="fixture-key"
+    )
+    bound = tools_for_bot(paths, "atlas", record_ids={record["id"]})
+    path = "/xapi/remote/control/123/conversations/recent/batch"
+    body = {"profileids": [], "direction": "all"}
+    with (
+        patch("time.time", return_value=1700000000),
+        patch("connectors.generic._open", return_value=_response({})) as send,
+    ):
+        if method == "GET":
+            result = bound["dux_soup_get"][1]({"path": path, "query": {"label": "a+b"}})
+        else:
+            result = bound["dux_soup_request"][1]({"method": method, "path": path, "body": body})
+    assert "HTTP 200" in result
+    req = send.call_args.args[0]
+    url = "https://app.dux-soup.com" + path
+    if method == "GET":
+        url += "?label=a%2Bb"
+        signed = url.encode()
+        assert req.data is None
+    else:
+        expected = {**body, "targeturl": url, "timestamp": 1700000000000, "userid": "123"}
+        assert json.loads(req.data) == expected
+        signed = json.dumps(expected).encode()
+        assert req.data == signed
+    assert req.full_url == url
+    assert req.get_header("Authorization") is None
+    assert (
+        req.get_header("X-dux-signature")
+        == base64.b64encode(hmac.new(b"fixture-key", signed, hashlib.sha1).digest()).decode()
+    )
+    assert body == {"profileids": [], "direction": "all"}
+
+
+@pytest.mark.parametrize(
+    "userid, body",
+    [
+        ("", {}),
+        ("abc", {}),
+        ("456", {}),
+        ("123", {"timestamp": 0}),
+        ("123", {"userid": "456"}),
+        ("123", {"targeturl": "https://example.com"}),
+    ],
+)
+def test_dux_invalid_envelope_blocks_transport(tmp_path, userid, body):
+    paths = HarnessPaths(home=tmp_path)
+    record = Connectors(paths).add(
+        "dux_soup", "Dux", config={"userid": userid}, secret="fixture-key"
+    )
+    bound = tools_for_bot(paths, "atlas", record_ids={record["id"]})
+    with patch("connectors.generic._open") as send:
+        result = bound["dux_soup_request"][1](
+            {"method": "POST", "path": "/xapi/remote/control/123/queue", "body": body}
+        )
+    assert "error:" in result
+    send.assert_not_called()

@@ -3,11 +3,11 @@
 Scope: implement the 144 catalogue connectors identified with missing REST hosts.
 This is an implementation ledger, not a claim of live-account verification.
 
-One hundred and one routes now have offline request-contract coverage through the real connector
+One hundred and two routes now have offline request-contract coverage through the real connector
 registry and credential store. Tests assert the outbound origin, version prefix,
 credential header, query and JSON body. Credentials are never followed through
 HTTP redirects. Production authenticated reads and writes remain unverified for these
-one hundred and one routes. The remaining 43 connectors still need provider research and code.
+one hundred and two routes. The remaining 42 connectors still need provider research and code.
 
 ## Implemented routes
 
@@ -216,7 +216,7 @@ Live evidence for the third batch:
 | `drip` | Route and offline request tests added; live verification pending |
 | `dripcel` | Pending provider research and implementation |
 | `dropcontact` | Route and offline request tests added; live verification pending |
-| `dux_soup` | Pending provider research and implementation |
+| `dux_soup` | Implemented HMAC REST route; URL/body signing and envelope tests pass; live invalid token rejected; authenticated acceptance open |
 | `dynamic_content_snippet` | Pending provider research and implementation |
 | `dynapictures` | Route and offline request tests added; live verification pending |
 | `egoi` | Route and offline request tests added; live verification pending |
@@ -939,3 +939,10 @@ The [official server guide](https://docs.instabot.io/docs/serverapi) specifies a
 A disposable-store GET /users?type=all with invalid keys returned HTTP 400, API Key is invalid. This does not establish master-key acceptance. No users were created or changed. Focused suite: 416 passed; Ruff clean.
 
 Asters follow-up: documented x-api-key alone returned x-asters-key Key Not Found; x-asters-key alone returned API key is missing; both invalid headers returned x-asters-key Key Not Found. All were HTTP 200. These results do not resolve the current credential contract, so its documented route remains unchanged and authentication is still open.
+
+
+## Dux-Soup signed REST route
+
+The [official API guide](https://support.dux-soup.com/article/227-the-dux-soup-api) specifies HMAC-SHA1 with Base64 output, signing GET URLs or request JSON bodies. Added signing after final outbound encoding, with automatic targeturl, millisecond timestamp and configured numeric userid for non-GET requests. Paths must contain that user ID. Caller-supplied envelope fields are rejected before transport. The fixed host permits documented remote-control/team paths; use each sub-API's actual path and method.
+
+Tests cover exact signed URL/body bytes for GET, POST, PUT and DELETE, plus six invalid envelope cases. These method cases test transport signing, not that every tested path supports every method. A disposable-store POST to the [documented empty conversation batch](https://support.dux-soup.com/article/603-messaging-activity-api), with user ID 0 and an invalid key, returned HTTP 403 invalid token. No LinkedIn action was requested. A Turbo/Cloud account and real key are needed for authenticated acceptance. Focused suite: 426 passed; Ruff clean.

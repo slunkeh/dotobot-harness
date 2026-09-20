@@ -34,7 +34,17 @@ KNOWN_BASES: dict[str, tuple[str, str]] = {
     "telegram": ("https://api.telegram.org", "telegram"),
 }
 
-_STYLES = ("bearer", "basic", "telegram", "header", "basic_key", "4dem", "query", "header_pair")
+_STYLES = (
+    "bearer",
+    "basic",
+    "telegram",
+    "header",
+    "basic_key",
+    "4dem",
+    "query",
+    "header_pair",
+    "dux",
+)
 
 
 def tool_names(type_: str) -> list[str]:
@@ -237,7 +247,7 @@ def _headers(ctx: ConnectorContext, secret: str) -> dict[str, str]:
             for name, prefix, value in zip(cat["auth_headers"], prefixes, pair, strict=True)
         )
         return hdrs
-    if style == "query":
+    if style in {"query", "dux"}:
         return hdrs
     if style == "header":
         from harness.connectors import _CATALOG_TYPES
@@ -349,6 +359,23 @@ def _http(
             body = {**(body or {}), parameter: key}
         else:
             url += ("&" if "?" in url else "?") + urllib.parse.urlencode({parameter: key})
+    if style == "dux":
+        import time
+
+        userid = str((ctx.record.get("config") or {}).get("userid") or "")
+        if not re.fullmatch(r"[0-9]+", userid) or not re.search(
+            r"/" + re.escape(userid) + r"(?:/|$)", urllib.parse.urlsplit(url).path
+        ):
+            return "error: configure numeric Dux-Soup userid and include it in the request path"
+        if method != "GET":
+            if any(k in (body or {}) for k in ("targeturl", "timestamp", "userid")):
+                return "error: Dux-Soup targeturl, timestamp and userid are supplied automatically"
+            body = {
+                **(body or {}),
+                "targeturl": url,
+                "timestamp": int(time.time() * 1000),
+                "userid": userid,
+            }
     # Final boundary: a sentinel the model echoed into the path,
     # query, or body is substituted with its plaintext here; one that cannot
     # be unsealed raises before any I/O — the request is refused, never
@@ -452,6 +479,15 @@ def _http(
         data = ("".join(parts) + f"--{boundary}--\r\n").encode("utf-8")
         hdrs["Content-Type"] = "multipart/form-data; boundary=" + boundary
 
+    if style == "dux":
+        import base64
+        import hashlib
+        import hmac
+
+        message = url.encode("utf-8") if method == "GET" else data
+        hdrs["X-Dux-Signature"] = base64.b64encode(
+            hmac.new(key.encode("utf-8"), message, hashlib.sha1).digest()
+        ).decode("ascii")
     req = urllib.request.Request(url, data=data, method=method, headers=hdrs)
     try:
         with _open(req, timeout=_TIMEOUT) as resp:
