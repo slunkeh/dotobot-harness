@@ -254,7 +254,7 @@ Live evidence for the third batch:
 | `gist` | Implemented; request contracts pass; authenticated account verification pending |
 | `gitter` | Pending provider research and implementation |
 | `gobio_link` | Pending provider research and implementation |
-| `goodbits` | Pending provider research and implementation |
+| `goodbits` | Pending: website, API and support hosts fail DNS resolution; official API contract unavailable |
 | `google_ad_manager` | Pending provider research and implementation |
 | `google_ads` | Pending provider research and implementation |
 | `google_analytics` | Implemented; Data API request contracts pass; invalid token rejected live; authenticated account acceptance pending |
@@ -994,3 +994,7 @@ A disposable-store GET /balance with an invalid key returned HTTP 401, ok false 
 The [vendor PHP SDK](https://github.com/icontact/icontact-api-php/blob/master/lib/iContactApi.php) specifies app.icontact.com/icp, three credential headers, Api-Version 2.2 and JSON Content-Type on reads and writes. Added a stored three-value JSON credential array and opt-in JSON array request bodies, including the tool schema. Tests cover account discovery and array-based list creation without sending a live write. Pro and Pro Select use separate APIs and are not this connector.
 
 A disposable-store GET /a/ with three invalid credential values returned HTTP 401 with Api username invalid. Account authentication and real writes remain open. Focused suite: 446 passed; Ruff clean.
+
+## Goodbits availability investigation
+
+The referenced official documentation URL is https://support.goodbits.io/article/115-goodbit-api. A direct fetch failed with could not resolve host. Independent local resolver checks for goodbits.io, api.goodbits.io and support.goodbits.io all returned name-resolution errors. This is a current availability blocker, not proof of permanent shutdown. No replacement hostname or credential contract was inferred from aggregator integrations. Goodbits remains in the original 144-connector scope and pending until a supported contract and reachable host can be established.
