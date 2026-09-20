@@ -176,6 +176,7 @@ def _no_network(monkeypatch):
         raise AssertionError("network I/O attempted with an unresolved sentinel")
 
     monkeypatch.setattr(urllib.request, "urlopen", boom)
+    monkeypatch.setattr(generic, "_open", boom)
     return calls
 
 
@@ -216,7 +217,7 @@ def test_sentinel_in_tool_args_is_unsealed_at_the_connector_boundary(tmp_path, m
 
         return Resp()
 
-    monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
+    monkeypatch.setattr(generic, "_open", fake_urlopen)
     out = generic._request(ctx, {"method": "POST", "path": f"/lists/{token}", "body": {"k": token}})
     assert "HTTP 200" in out
     assert token not in seen["url"] and "tok-abc123XYZ-us6" in seen["url"]

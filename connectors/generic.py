@@ -34,7 +34,20 @@ KNOWN_BASES: dict[str, tuple[str, str]] = {
     "telegram": ("https://api.telegram.org", "telegram"),
 }
 
-_STYLES = ("bearer", "basic", "telegram")
+_STYLES = (
+    "bearer",
+    "basic",
+    "telegram",
+    "header",
+    "basic_key",
+    "4dem",
+    "query",
+    "header_pair",
+    "header_values",
+    "path_suffix",
+    "kartra",
+    "dux",
+)
 
 
 def tool_names(type_: str) -> list[str]:
@@ -46,6 +59,9 @@ def tool_names(type_: str) -> list[str]:
 
 def tools(type_: str) -> list[ConnectorTool]:
     t = str(type_ or "").strip() or "connector"
+    from harness.connectors import _CATALOG_TYPES
+
+    array_body = bool((_CATALOG_TYPES.get(t) or {}).get("json_array_body"))
     return [
         ConnectorTool(
             ToolSpec(
@@ -63,7 +79,7 @@ def tools(type_: str) -> list[ConnectorTool]:
                         },
                         "query": {
                             "type": "object",
-                            "description": "optional query string as string values",
+                            "description": "optional query values; arrays repeat a parameter",
                         },
                     },
                     "required": ["path"],
@@ -87,8 +103,8 @@ def tools(type_: str) -> list[ConnectorTool]:
                         },
                         "path": {"type": "string"},
                         "body": {
-                            "type": "object",
-                            "description": "JSON object body",
+                            "type": ["object", "array"] if array_body else "object",
+                            "description": "Body object, encoded as required by the provider",
                         },
                     },
                     "required": ["method", "path"],
@@ -105,6 +121,24 @@ def resolve_base(ctx: ConnectorContext) -> str | None:
 
     type_ = str(ctx.record.get("type") or "")
     cat = _CATALOG_TYPES.get(type_) or {}
+    if type_ == "instagram":
+        mode = (ctx.record.get("config") or {}).get("login_type", "instagram")
+        return {
+            "instagram": "https://graph.instagram.com",
+            "facebook": "https://graph.facebook.com",
+        }.get(mode)
+    if type_ == "airship":
+        config = ctx.record.get("config") or {}
+        region = config.get("region", "us")
+        mode = config.get("auth_mode", "bearer")
+        if region not in ("us", "eu") or mode not in ("bearer", "basic", "oauth"):
+            return None
+        hosts = (
+            ("api.asnapius.com", "api.asnapieu.com")
+            if mode == "oauth"
+            else ("go.urbanairship.com", "go.airship.eu")
+        )
+        return "https://" + hosts[region == "eu"]
     url = str(cat.get("api_base") or "").strip()
     if not url:
         template = str(cat.get("api_base_template") or "").strip()
@@ -129,6 +163,8 @@ def auth_style(ctx: ConnectorContext) -> str:
 
     type_ = str(ctx.record.get("type") or "")
     cat = _CATALOG_TYPES.get(type_) or {}
+    if type_ == "airship" and (ctx.record.get("config") or {}).get("auth_mode") == "basic":
+        return "basic"
     style = str(cat.get("auth_style") or "").strip().lower()
     if style in _STYLES:
         return style
@@ -141,6 +177,8 @@ def auth_style(ctx: ConnectorContext) -> str:
 def _fill(template: str, fields: list, config: dict) -> str:
     values: dict[str, str] = {}
     for field in fields:
+        if "{" + str(field) + "}" not in template:
+            continue
         value = str(config.get(field, "")).strip()
         if not _HOST.match(value):
             return ""
@@ -191,21 +229,105 @@ def _join(base: str, path: str) -> str | None:
 
 
 def _headers(ctx: ConnectorContext, secret: str) -> dict[str, str]:
+    from harness.connectors import _CATALOG_TYPES
+
     style = auth_style(ctx)
+    cat = _CATALOG_TYPES[str(ctx.record["type"])]
     hdrs = {
-        "Accept": "application/json",
+        "Accept": str(cat.get("accept", "application/json")),
         "User-Agent": "dotobot/0.2.9",
     }
+    hdrs.update(cat.get("fixed_headers", {}))
+    if style in {"header_pair", "header_values"}:
+        count = len(cat["auth_headers"])
+        try:
+            pair = json.loads(secret)
+        except (ValueError, TypeError):
+            pair = None
+        if (
+            not isinstance(pair, list)
+            or len(pair) != count
+            or any(
+                not isinstance(v, str) or not v or any(ord(c) < 32 or ord(c) > 126 for c in v)
+                for v in pair
+            )
+        ):
+            raise ValueError(
+                f"store the credential as a JSON array of {count} nonempty printable ASCII strings"
+            )
+        prefixes = cat.get("auth_header_prefixes", [""] * count)
+        hdrs.update(
+            (name, prefix + value)
+            for name, prefix, value in zip(cat["auth_headers"], prefixes, pair, strict=True)
+        )
+        return hdrs
+    if style in {"query", "dux", "path_suffix", "kartra"}:
+        return hdrs
+    if style == "header":
+        from harness.connectors import _CATALOG_TYPES
+
+        # Header names and prefixes are trusted catalogue metadata, never tool
+        # arguments or user configuration. The stored credential remains sealed
+        # until ConnectorContext.secret() resolves it at the request boundary.
+        cat = _CATALOG_TYPES[str(ctx.record["type"])]
+        value = json.dumps(secret) if cat.get("auth_quote") else secret
+        hdrs[cat["auth_header"]] = str(cat.get("auth_prefix", "")) + value
+        return hdrs
     if style == "telegram":
         return hdrs
-    if style == "basic":
+    if style in {"basic", "basic_key"}:
         import base64
 
-        token = base64.b64encode(secret.encode("utf-8")).decode("ascii")
+        from harness.connectors import _CATALOG_TYPES
+
+        cat = _CATALOG_TYPES[str(ctx.record["type"])]
+        credentials = (
+            secret + ":" + str(cat.get("basic_password", "")) if style == "basic_key" else secret
+        )
+        token = base64.b64encode(credentials.encode("utf-8")).decode("ascii")
         hdrs["Authorization"] = f"Basic {token}"
         return hdrs
     hdrs["Authorization"] = f"Bearer {secret}"
     return hdrs
+
+
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    """Never replay connector credentials or bodies at a redirected destination."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+def _open(req, *, timeout):
+    return urllib.request.build_opener(_NoRedirect()).open(req, timeout=timeout)
+
+
+def _fourdem_token(base: str, key: str) -> str:
+    """Exchange the stored API key for a short-lived token for this request.
+
+    Do not persist tokens or cache them across connector records. Reauthenticating
+    avoids expired tokens and automatically respects API-key rotation.
+    """
+    request = urllib.request.Request(
+        base + "/authenticate",
+        data=json.dumps({"APIKey": key}).encode("utf-8"),
+        method="POST",
+        headers={"Content-Type": "application/json", "Accept": "application/json"},
+    )
+    try:
+        with _open(request, timeout=_TIMEOUT) as response:
+            payload = json.loads(response.read(65_537))
+    except urllib.error.HTTPError as exc:
+        exc.close()
+        raise ValueError(f"4Dem authentication failed (HTTP {exc.code})") from None
+    except (urllib.error.URLError, TimeoutError, OSError):
+        raise ValueError("could not reach 4Dem authentication") from None
+    except (ValueError, UnicodeError):
+        raise ValueError("4Dem authentication returned invalid JSON") from None
+    token = payload.get("token") if isinstance(payload, dict) else None
+    if not isinstance(token, str) or not token or any(ord(c) < 33 or ord(c) > 126 for c in token):
+        raise ValueError("4Dem authentication returned no usable token")
+    return token
 
 
 def _http(
@@ -232,9 +354,70 @@ def _http(
         url = _join(base, path)
         if not url:
             return "error: path must stay on the connector's API host"
+    if style == "kartra":
+        url = url.rstrip("/")
+        if (
+            method != "POST"
+            or urllib.parse.urlsplit(url).path != "/api"
+            or query
+            or urllib.parse.urlsplit(url).query
+        ):
+            return "error: Kartra requires POST to /api without query parameters; use path /"
+        names = {"app_id", "api_key", "api_password"}
+        try:
+            credentials = json.loads(key)
+        except ValueError:
+            credentials = None
+        if (
+            not isinstance(credentials, dict)
+            or set(credentials) != names
+            or any(not isinstance(v, str) or not v for v in credentials.values())
+        ):
+            return "error: store Kartra credentials as a JSON object with app_id, api_key and api_password"
+        if any(k.split("[", 1)[0] in names for k in (body or {})):
+            return "error: authentication comes from the connector secret store"
+        body = {**(body or {}), **credentials}
+    if style == "path_suffix":
+        parts = urllib.parse.urlsplit(url)
+        url = urllib.parse.urlunsplit(
+            parts._replace(path=parts.path.rstrip("/") + "/" + urllib.parse.quote(key, safe=""))
+        )
     if query:
-        qs = urllib.parse.urlencode({str(k): v for k, v in query.items() if v is not None})
+        qs = urllib.parse.urlencode(
+            {str(k): v for k, v in query.items() if v is not None}, doseq=True
+        )
         url += ("&" if "?" in url else "?") + qs
+    if style == "query":
+        from harness.connectors import _CATALOG_TYPES
+
+        auth_config = _CATALOG_TYPES[str(ctx.record["type"])]
+        parameter = auth_config["auth_query"]
+        supplied = urllib.parse.parse_qs(urllib.parse.urlsplit(url).query, keep_blank_values=True)
+        if any(k == parameter or k.startswith(parameter + "[") for k in supplied) or (
+            body is not None and parameter in body
+        ):
+            return "error: authentication comes from the connector secret store"
+        if (auth_config.get("auth_in_form") or auth_config.get("auth_in_json")) and method != "GET":
+            body = {**(body or {}), parameter: key}
+        else:
+            url += ("&" if "?" in url else "?") + urllib.parse.urlencode({parameter: key})
+    if style == "dux":
+        import time
+
+        userid = str((ctx.record.get("config") or {}).get("userid") or "")
+        if not re.fullmatch(r"[0-9]+", userid) or not re.search(
+            r"/" + re.escape(userid) + r"(?:/|$)", urllib.parse.urlsplit(url).path
+        ):
+            return "error: configure numeric Dux-Soup userid and include it in the request path"
+        if method != "GET":
+            if any(k in (body or {}) for k in ("targeturl", "timestamp", "userid")):
+                return "error: Dux-Soup targeturl, timestamp and userid are supplied automatically"
+            body = {
+                **(body or {}),
+                "targeturl": url,
+                "timestamp": int(time.time() * 1000),
+                "userid": userid,
+            }
     # Final boundary: a sentinel the model echoed into the path,
     # query, or body is substituted with its plaintext here; one that cannot
     # be unsealed raises before any I/O — the request is refused, never
@@ -261,22 +444,147 @@ def _http(
         if body is not None
         else None
     )
-    hdrs = _headers(ctx, key)
-    if data is not None:
-        hdrs["Content-Type"] = "application/json"
+    if style == "4dem":
+        try:
+            auth_key = _fourdem_token(base, key)
+        except ValueError as exc:
+            return f"error: {exc}"
+    else:
+        auth_key = key
+    try:
+        hdrs = _headers(ctx, auth_key)
+    except ValueError as exc:
+        return f"error: {exc}"
+    if ctx.record.get("type") == "linkedin" and urllib.parse.urlsplit(url).path.startswith(
+        "/rest/"
+    ):
+        version = str((ctx.record.get("config") or {}).get("api_version") or "202609")
+        if not re.fullmatch(r"[0-9]{4}(0[1-9]|1[0-2])", version):
+            return "error: LinkedIn api_version must be YYYYMM"
+        hdrs["LinkedIn-Version"] = version
+        hdrs["X-Restli-Protocol-Version"] = "2.0.0"
+    if ctx.record.get("type") == "google_ads":
+        config = ctx.record.get("config") or {}
+        for field in ("login_customer_id", "linked_customer_id"):
+            value = config.get(field)
+            if value is not None:
+                value = str(value)
+                if not re.fullmatch(r"[0-9]+", value):
+                    return f"error: Google Ads {field} must contain digits only"
+                hdrs[field.replace("_", "-")] = value
+    if ctx.record.get("type") == "google_ad_manager":
+        project = (ctx.record.get("config") or {}).get("quota_project")
+        if project is not None:
+            project = str(project)
+            if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9.:-]*", project):
+                return "error: invalid Google Ad Manager quota_project"
+            hdrs["x-goog-user-project"] = project
+    if ctx.record.get("type") == "discourse":
+        username = str((ctx.record.get("config") or {}).get("api_username") or "")
+        if not re.fullmatch(r"[A-Za-z0-9_.-]+", username):
+            return "error: configure Discourse api_username using letters, numbers, dots, hyphens or underscores"
+        hdrs["Api-Username"] = username
+    if ctx.record.get("type") == "hypeauditor":
+        client_id = str((ctx.record.get("config") or {}).get("client_id") or "")
+        if not re.fullmatch(r"[0-9]+", client_id):
+            return "error: configure HypeAuditor client_id as a numeric account ID"
+        hdrs["X-Auth-Id"] = client_id
+    from harness.connectors import _CATALOG_TYPES
+
+    cat = _CATALOG_TYPES.get(str(ctx.record.get("type") or "")) or {}
+    if data is not None or cat.get("content_type"):
+        hdrs["Content-Type"] = str(cat.get("content_type") or "application/json")
+        if (
+            data is not None
+            and (
+                cat.get("body_encoding") == "form"
+                or any(
+                    re.fullmatch(pattern, urllib.parse.urlparse(url).path)
+                    for pattern in cat.get("form_body_paths", [])
+                )
+            )
+            and not any(
+                re.fullmatch(pattern, urllib.parse.urlparse(url).path)
+                for pattern in cat.get("json_body_paths", [])
+            )
+        ):
+            # Resolve redaction sentinels before encoding so substituted secrets
+            # cannot introduce form fields through ampersands or equals signs.
+            data = urllib.parse.urlencode(_form_fields(json.loads(data))).encode("utf-8")
+            hdrs["Content-Type"] = "application/x-www-form-urlencoded"
+
+    if data is not None and cat.get("body_encoding") == "xml":
+        payload = json.loads(data)
+        if set(payload) != {"xml"} or not isinstance(payload["xml"], str):
+            return 'error: XML body must be an object containing only an "xml" string'
+        data = payload["xml"].encode("utf-8")
+        hdrs["Content-Type"] = "application/xml; charset=utf-8"
+
+    if data is not None and cat.get("body_encoding") == "multipart":
+        import uuid
+
+        fields = json.loads(data)
+        if any(
+            not re.fullmatch(r"[A-Za-z0-9_]+", name) or isinstance(value, (dict, list))
+            for name, value in fields.items()
+        ):
+            return "error: multipart body needs simple field names and scalar values; file uploads are unsupported"
+        boundary = "dotobot-" + uuid.uuid4().hex
+        parts = []
+        for name, value in fields.items():
+            value = (
+                ""
+                if value is None
+                else str(value).lower()
+                if isinstance(value, bool)
+                else str(value)
+            )
+            parts.append(
+                f'--{boundary}\r\nContent-Disposition: form-data; name="{name}"\r\n\r\n{value}\r\n'
+            )
+        data = ("".join(parts) + f"--{boundary}--\r\n").encode("utf-8")
+        hdrs["Content-Type"] = "multipart/form-data; boundary=" + boundary
+
+    if style == "dux":
+        import base64
+        import hashlib
+        import hmac
+
+        message = url.encode("utf-8") if method == "GET" else data
+        hdrs["X-Dux-Signature"] = base64.b64encode(
+            hmac.new(key.encode("utf-8"), message, hashlib.sha1).digest()
+        ).decode("ascii")
     req = urllib.request.Request(url, data=data, method=method, headers=hdrs)
     try:
-        with urllib.request.urlopen(req, timeout=_TIMEOUT) as resp:
+        with _open(req, timeout=_TIMEOUT) as resp:
             raw = resp.read().decode("utf-8", "replace")
             status = resp.status
     except urllib.error.HTTPError as exc:
         detail = exc.read().decode("utf-8", "replace")[:400]
         return f"error: HTTP {exc.code}: {detail}"
     except (urllib.error.URLError, TimeoutError, OSError) as exc:
-        return f"error: could not reach API: {exc}"
+        return (
+            "error: could not reach API"
+            if style in {"query", "path_suffix"}
+            else f"error: could not reach API: {exc}"
+        )
     if len(raw) > _MAX_RESULT:
         raw = raw[:_MAX_RESULT] + "\n… (truncated)"
     return f"HTTP {status}\n{raw}" if raw else f"HTTP {status}"
+
+
+def _form_fields(value: Any, prefix: str = "") -> list[tuple[str, str]]:
+    """Encode nested provider fields using PHP-style bracket notation."""
+    if isinstance(value, (dict, list)):
+        items = value.items() if isinstance(value, dict) else enumerate(value)
+        result = []
+        for key, child in items:
+            name = f"{prefix}[{key}]" if prefix else str(key)
+            result.extend(_form_fields(child, name))
+        return result
+    if isinstance(value, bool):
+        value = "true" if value else "false"
+    return [(prefix, "" if value is None else str(value))]
 
 
 def _get(ctx: ConnectorContext, args: dict[str, Any]) -> str:
@@ -297,6 +605,10 @@ def _request(ctx: ConnectorContext, args: dict[str, Any]) -> str:
     if not path:
         return "error: needs 'path'"
     body = args.get("body")
-    if body is not None and not isinstance(body, dict):
+    from harness.connectors import _CATALOG_TYPES
+
+    cat = _CATALOG_TYPES[str(ctx.record["type"])]
+    allowed = (dict, list) if cat.get("json_array_body") else (dict,)
+    if body is not None and not isinstance(body, allowed):
         return "error: body must be a JSON object"
     return _http(ctx, method, path, body=body)
