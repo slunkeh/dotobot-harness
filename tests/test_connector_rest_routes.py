@@ -15,6 +15,14 @@ from harness.paths import HarnessPaths
 # Literal expected requests intentionally independent of catalogue metadata.
 CASES = [
     (
+        "curated",
+        {},
+        "/publications",
+        "https://api.curated.co/api/v3/publications",
+        "Authorization",
+        'Token token="fixture-key"',
+    ),
+    (
         "apexverify",
         {},
         "/account/credits",
@@ -1118,3 +1126,19 @@ def test_dribbble_documented_encoding(tmp_path, method):
         assert json.loads(req.data) == {"title": "Fixture"}
     else:
         assert req.data is None
+
+
+def test_curated_quotes_stored_token_and_creates_draft(tmp_path):
+    paths = HarnessPaths(home=tmp_path)
+    secret = 'fixture"\\token'
+    record = Connectors(paths).add("curated", "Curated", secret=secret)
+    bound = tools_for_bot(paths, "atlas", record_ids={record["id"]})
+    with patch("connectors.generic._open", return_value=_response({})) as send:
+        assert "HTTP 200" in bound["curated_request"][1](
+            {"method": "POST", "path": "/publications/123/issues/"}
+        )
+    req = send.call_args.args[0]
+    assert req.full_url == "https://api.curated.co/api/v3/publications/123/issues/"
+    assert req.get_header("Authorization") == "Token token=" + json.dumps(secret)
+    assert req.method == "POST"
+    assert req.data is None

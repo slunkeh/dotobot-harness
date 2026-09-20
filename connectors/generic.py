@@ -205,7 +205,8 @@ def _headers(ctx: ConnectorContext, secret: str) -> dict[str, str]:
         # arguments or user configuration. The stored credential remains sealed
         # until ConnectorContext.secret() resolves it at the request boundary.
         cat = _CATALOG_TYPES[str(ctx.record["type"])]
-        hdrs[cat["auth_header"]] = str(cat.get("auth_prefix", "")) + secret
+        value = json.dumps(secret) if cat.get("auth_quote") else secret
+        hdrs[cat["auth_header"]] = str(cat.get("auth_prefix", "")) + value
         return hdrs
     if style == "telegram":
         return hdrs

@@ -3,11 +3,11 @@
 Scope: implement the 144 catalogue connectors identified with missing REST hosts.
 This is an implementation ledger, not a claim of live-account verification.
 
-Sixty-four routes now have offline request-contract coverage through the real connector
+Sixty-five routes now have offline request-contract coverage through the real connector
 registry and credential store. Tests assert the outbound origin, version prefix,
 credential header, query and JSON body. Credentials are never followed through
 HTTP redirects. Production authenticated reads and writes remain unverified for these
-sixty-four routes. The remaining 80 connectors still need provider research and code.
+sixty-five routes. The remaining 79 connectors still need provider research and code.
 
 ## Implemented routes
 
@@ -19,6 +19,7 @@ CloudConvert currently uses its production automatic-region API, not its sandbox
 
 | Connector | Provider reference | Setup |
 |---|---|---|
+| `curated` | [Provider documentation](https://support.curated.co/help/getting-started-with-the-api) | Store the Account API Key. Dotobot quotes it in Authorization: Token token. GET /publications retrieves IDs. POST /publications/ID/issues/ creates a draft. Bodies use JSON. Publishing requires the website. |
 | `dribbble` | [Provider documentation](https://developer.dribbble.com/v2/) | Store an OAuth access token, used as Bearer. GET /user or /user/shots reads account data. PUT /shots/ID updates metadata with upload scope. The documented JSON body uses application/x-www-form-urlencoded Content-Type. OAuth lifecycle, multipart uploads and binary responses are unsupported here. |
 | `apexverify` | [Provider documentation](https://documentation.apexverify.com/api-reference/api-authentication) | Store the API key, sent in X-Api-Key. GET /account/credits reads the balance. POST /unit accepts JSON type (email or phone), target_country and unit. Verification consumes credits; review use_global_cache before submitting data. Multipart uploads and binary exports are unsupported by the generic JSON tool. |
 | `emailverify_io` | [Provider documentation](https://www.emailverify.io/api/docs) | Store the account API key. GET /v2/check-account-balance reads credits. POST /v1/validate-batch takes title and email_batch containing address objects, up to 5000. The stored key is inserted in GET queries or POST JSON; never pass it in tool arguments. Poll /v1/get-result-bulk-verification-task/ with task_id. Verification consumes credits. |
@@ -187,7 +188,7 @@ Live evidence for the third batch:
 | `copicake` | Implemented; request-contract tests pass; production account verification pending |
 | `coupontools` | Pending provider research and implementation |
 | `crowdpower` | Implemented; request contracts pass; authenticated account verification pending |
-| `curated` | Pending provider research and implementation |
+| `curated` | Implemented; request contracts pass; invalid-key probe returns 404 Record not found, authenticated acceptance pending |
 | `cyberimpact` | Implemented; request-contract tests pass; production account verification pending |
 | `demandbase` | Pending provider research and implementation |
 | `demio` | Pending provider research and implementation |
@@ -605,3 +606,13 @@ Two new tests failed before implementation and pass afterward. The focused suite
 passes 291 tests; Ruff passes. A disposable bound GET /user rejected an invalid
 token with HTTP 401 Bad credentials. No account writes or uploads were attempted;
 authenticated acceptance and provider acceptance of write encoding remain open.
+
+## Curated validation
+
+The official documentation confirms the v3 host, quoted-token header, JSON bodies
+and bodyless draft-creation endpoint. The route test failed before implementation;
+both new tests now pass, including escaping quotes and backslashes in a stored key.
+The focused suite passes 293 tests; Ruff passes. A disposable bound GET /publications
+with an invalid key returned HTTP 404 Record not found. This proves an HTTP response
+from the documented endpoint but does not prove authentication handling or account
+access. No drafts were created on the live service.

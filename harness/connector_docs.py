@@ -353,9 +353,9 @@ _ROWS: list[tuple[str, str, str, str]] = [
     ),
     (
         "curated",
-        "aggregator",
-        "https://composio.dev/toolkits/curated",
-        "Composio auto-generated.",
+        "official",
+        "https://support.curated.co/help/getting-started-with-the-api",
+        "Store the Account API Key from the account page. Uses quoted Token token authentication. GET /publications finds publication IDs; POST /publications/ID/issues/ creates a draft. JSON bodies are supported. The API cannot publish issues; use the Curated account interface to publish.",
     ),
     (
         "customer_io",
