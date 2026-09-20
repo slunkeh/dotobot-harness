@@ -23,9 +23,9 @@ _ROWS: list[tuple[str, str, str, str]] = [
     ),
     (
         "abyssale",
-        "aggregator",
-        "https://composio.dev/toolkits/abyssale",
-        "Composio-hosted toolkit.",
+        "official",
+        "https://developers.abyssale.com/rest-api/quickstart",
+        "Store a workspace API key. REST paths are relative to https://api.abyssale.com; for example GET /designs. Authentication uses x-api-key.",
     ),
     (
         "acelle_mail",
@@ -36,8 +36,8 @@ _ROWS: list[tuple[str, str, str, str]] = [
     (
         "activecampaign",
         "official",
-        "https://developers.activecampaign.com/page/mcp",
-        "Official remote MCP server.",
+        "https://developers.activecampaign.com/reference/authentication",
+        "Set api_domain to the host from Settings > Developer API URL, without https:// or /api/3. Do not guess the region. Store the API token. Paths are relative to /api/3, for example /users/me; authentication uses Api-Token.",
     ),
     (
         "active_trail",
@@ -139,9 +139,9 @@ _ROWS: list[tuple[str, str, str, str]] = [
     ("asters", "none", "", "Niche/unclear vendor. No public docs."),
     (
         "attentive",
-        "none",
-        "https://docs.attentivemobile.com/",
-        "General API docs. No MCP.",
+        "official",
+        "https://docs.attentive.com/docs/authentication",
+        "Store the private application API key. Paths are relative to https://api.attentivemobile.com/v1; GET /subscriptions needs an email or phone query. Authentication uses Bearer.",
     ),
     ("autoklose", "none", "https://autoklose.com/", "No MCP found."),
     (
@@ -226,9 +226,9 @@ _ROWS: list[tuple[str, str, str, str]] = [
     ),
     (
         "callrail",
-        "community",
-        "https://www.pulsemcp.com/servers/blue-interactive-callrail",
-        "Third party; also on Zapier.",
+        "official",
+        "https://apidocs.callrail.com/",
+        "Store a CallRail API key. Paths are relative to https://api.callrail.com/v3, for example GET /a.json. Authentication uses Authorization: Token token=KEY.",
     ),
     (
         "campaign_cleaner",
@@ -288,9 +288,9 @@ _ROWS: list[tuple[str, str, str, str]] = [
     ),
     (
         "cloud_convert",
-        "aggregator",
-        "https://composio.dev/toolkits/cloudconvert/framework/claude-agents-sdk",
-        "No standalone official/community repo.",
+        "official",
+        "https://cloudconvert.com/docs/getting-started/introduction",
+        "Store a scoped CloudConvert API key. Uses the production https://api.cloudconvert.com/v2 API; GET /users/me requires user.read. Paths omit /v2. Authentication uses Bearer.",
     ),
     (
         "cometly",
@@ -386,8 +386,8 @@ _ROWS: list[tuple[str, str, str, str]] = [
     (
         "doppler",
         "official",
-        "https://github.com/DopplerHQ/mcp-server",
-        "Listed MCP is Doppler secrets (docs.doppler.com/docs/mcp). This stub is Doppler marketing automation — verify before connecting.",
+        "https://restapi.fromdoppler.com/docs/gettingstarted",
+        "Store a Doppler Email Marketing API key from Control Panel > Advanced Preferences. Paths are relative to https://restapi.fromdoppler.com, for example /accounts/ACCOUNT_EMAIL/lists. Authentication uses token KEY. This is not the Doppler secrets product.",
     ),
     (
         "dribbble",
@@ -620,9 +620,9 @@ _ROWS: list[tuple[str, str, str, str]] = [
     ("getemails", "none", "https://getemails.com/", "No dedicated MCP found."),
     (
         "getresponse",
-        "partial",
-        "https://zapier.com/mcp/getresponse",
-        "Fallback API docs: apidocs.getresponse.com.",
+        "official",
+        "https://apidocs.getresponse.com/v3/authentication",
+        "Store a GetResponse SMB API key. Uses https://api.getresponse.com/v3 and X-Auth-Token: api-key KEY. GET /accounts checks access. GetResponse MAX accounts require a different host and X-Domain and are not covered by this route.",
     ),
     (
         "getswift",

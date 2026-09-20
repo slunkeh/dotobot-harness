@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import urllib.request
-
 import pytest
 
 from connectors import generic
@@ -58,7 +56,7 @@ def test_mailchimp_get_hits_the_dc_host(paths, monkeypatch):
                 return False
         return Resp()
 
-    monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
+    monkeypatch.setattr(generic, "_open", fake_urlopen)
     out = generic._get(ctx, {"path": "/lists"})
     assert seen["url"] == "https://us6.api.mailchimp.com/3.0/lists"
     assert seen["auth"] == "Bearer abc-us6"
@@ -105,7 +103,7 @@ def test_zendesk_template_needs_subdomain(paths, monkeypatch):
                 return False
         return Resp()
 
-    monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
+    monkeypatch.setattr(generic, "_open", fake_urlopen)
     out = generic._get(ctx, {"path": "/tickets.json"})
     assert seen["url"] == "https://acme.zendesk.com/api/v2/tickets.json"
     assert "HTTP 200" in out
@@ -131,7 +129,7 @@ def test_twilio_uses_basic_auth(paths, monkeypatch):
                 return False
         return Resp()
 
-    monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
+    monkeypatch.setattr(generic, "_open", fake_urlopen)
     generic._get(ctx, {"path": "/2010-04-01/Accounts.json"})
     assert seen["url"].startswith("https://api.twilio.com/")
     assert seen["auth"].startswith("Basic ")

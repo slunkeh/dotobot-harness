@@ -71,7 +71,7 @@ def permitted(path: str) -> bool:
         return len(parts) == 2 and parts[1].endswith(".py")
     if parts[0] == "deploy":
         return len(parts) == 2 and parts[1] in PUBLIC_DEPLOY
-    return path == "docs/research-hermes.md"
+    return path in {"docs/research-hermes.md", "docs/connector-rest-routes.md"}
 
 
 def public_jpeg(data: bytes) -> bytes:

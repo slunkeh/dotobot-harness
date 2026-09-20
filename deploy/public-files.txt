@@ -349,3 +349,6 @@ tests/test_predictable_updates.py
 deploy/update_service.py
 tests/test_update_host.py
 harness/update_rollback.py
+
+docs/connector-rest-routes.md
+tests/test_connector_rest_routes.py

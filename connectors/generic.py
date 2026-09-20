@@ -34,7 +34,7 @@ KNOWN_BASES: dict[str, tuple[str, str]] = {
     "telegram": ("https://api.telegram.org", "telegram"),
 }
 
-_STYLES = ("bearer", "basic", "telegram")
+_STYLES = ("bearer", "basic", "telegram", "header")
 
 
 def tool_names(type_: str) -> list[str]:
@@ -196,6 +196,15 @@ def _headers(ctx: ConnectorContext, secret: str) -> dict[str, str]:
         "Accept": "application/json",
         "User-Agent": "dotobot/0.2.9",
     }
+    if style == "header":
+        from harness.connectors import _CATALOG_TYPES
+
+        # Header names and prefixes are trusted catalogue metadata, never tool
+        # arguments or user configuration. The stored credential remains sealed
+        # until ConnectorContext.secret() resolves it at the request boundary.
+        cat = _CATALOG_TYPES[str(ctx.record["type"])]
+        hdrs[cat["auth_header"]] = str(cat.get("auth_prefix", "")) + secret
+        return hdrs
     if style == "telegram":
         return hdrs
     if style == "basic":
@@ -206,6 +215,17 @@ def _headers(ctx: ConnectorContext, secret: str) -> dict[str, str]:
         return hdrs
     hdrs["Authorization"] = f"Bearer {secret}"
     return hdrs
+
+
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    """Never replay connector credentials or bodies at a redirected destination."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+def _open(req, *, timeout):
+    return urllib.request.build_opener(_NoRedirect()).open(req, timeout=timeout)
 
 
 def _http(
@@ -266,7 +286,7 @@ def _http(
         hdrs["Content-Type"] = "application/json"
     req = urllib.request.Request(url, data=data, method=method, headers=hdrs)
     try:
-        with urllib.request.urlopen(req, timeout=_TIMEOUT) as resp:
+        with _open(req, timeout=_TIMEOUT) as resp:
             raw = resp.read().decode("utf-8", "replace")
             status = resp.status
     except urllib.error.HTTPError as exc:
