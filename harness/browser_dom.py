@@ -192,6 +192,8 @@ class Browser:
             raise cdp.CdpError("Invalid browser observation")
         if data.get("visibility") != "visible":
             raise cdp.CdpError("Browser tab changed; observe the active page")
+        if not str(data.get("url", "")).startswith(("http://", "https://")):
+            raise cdp.CdpError("This is no longer a web page; use standard computer tools")
         return data
 
     def act(self, operation, target=None, text=None):

@@ -69,6 +69,18 @@ def test_selects_visible_tab_and_refuses_ambiguous_windows(monkeypatch):
         browser_dom._visible_page_path(None, 123, pages)
 
 
+@pytest.mark.parametrize(
+    "url,visibility", [("chrome://settings", "visible"), ("https://example.test", "hidden")]
+)
+def test_observation_rejects_non_web_navigation_or_tab_switch(monkeypatch, url, visibility):
+    browser = browser_dom.Browser()
+    monkeypatch.setattr(
+        browser, "_call", lambda *a: {"url": url, "visibility": visibility, "elements": []}
+    )
+    with pytest.raises(cdp.CdpError):
+        browser.observe()
+
+
 _HTML = b"""<!doctype html><html><head><title>Browser guard fixture</title></head><body>
 <label for="city">City</label><input id="city"><input type="password" value="never-observe-this">
 <input autocomplete="cc-number" value="never-observe-card">
