@@ -88,7 +88,7 @@ def test_lifecycle_waits_for_inflight_restart(
     def competing_request():
         begun.set()
         if operation == "update":
-            return other.update_bot("atlas", model="echo-new")
+            return other.update_bot("atlas", private_browser=True)
         if operation == "restart":
             return other.restart("atlas")
         if operation == "remove":

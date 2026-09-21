@@ -513,6 +513,18 @@ class Orchestrator:
             if key in fields
         }
         bot = self.roster.get(name)
+        previous_lifecycle = (bot.embeddings, bot.private_browser)
+        provider_fields = {k: v for k, v in fields.items()
+                           if k in ("provider", "model", "reasoning", "auth_ref") and v is not None}
+        if any(getattr(bot, k) != v for k, v in provider_fields.items()):
+            from dataclasses import replace
+
+            from agent.runtime import build_agent_provider
+            from providers import ProviderError
+            try:
+                build_agent_provider(self.paths, replace(bot, **provider_fields))
+            except (ProviderError, ValueError) as exc:
+                raise RosterError(str(exc)) from exc
         old_personality = (bot.personality or "").strip()
         for key, value in overrides.items():
             setattr(bot, key, value)
@@ -555,17 +567,9 @@ class Orchestrator:
         # The cached server-side Memory holds the pre-update embedding route.
         with self._memory_lock:
             self._memories.pop(name, None)
-        # Title / role / description are roster labels. Restarting the process
-        # on every settings keystroke drops in-flight work; only restart when
-        # the running identity (provider / model / avatar) actually changes.
-        # `private_browser` restarts too: the agent process read the flag at
-        # spawn, and an already-running Chrome keeps its old jar links.
-        # `embeddings` restarts too: the agent resolves its embedding route
-        # once at spawn (build_agent), like the provider identity.
-        if any(
-            k in fields and fields[k] is not None
-            for k in ("provider", "model", "reasoning", "embeddings", "auth_ref", "private_browser")
-        ):
+        # Provider/model/reasoning/auth changes are adopted at the next turn.
+        # Only changed process-bound settings need the machine lifecycle.
+        if (bot.embeddings, bot.private_browser) != previous_lifecycle:
             self.restart(name)
         return bot
 

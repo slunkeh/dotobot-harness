@@ -1301,9 +1301,9 @@ class Agent:
         known once its stream ends. EchoProvider (and any duck-typed provider
         without stream_completion) falls through to complete().
         """
-        streamer = getattr(self.provider, "stream_completion", None)
+        streamer = getattr(self.active_provider, "stream_completion", None)
         if writer is None or streamer is None:
-            return self.provider.complete(messages, system=system, tools=tool_specs)
+            return self.active_provider.complete(messages, system=system, tools=tool_specs)
 
         def on_delta(chunk: str) -> None:
             if self._interrupt_requested():
@@ -1320,7 +1320,7 @@ class Agent:
         except ProviderError:
             if sink["chunks"]:
                 raise  # partial output is already visible; don't double-send
-            return self.provider.complete(messages, system=system, tools=tool_specs)
+            return self.active_provider.complete(messages, system=system, tools=tool_specs)
 
     def _interrupt_requested(self) -> bool:
         """The scheduler asked this run to stop (watchdog trip or takeover)."""
@@ -1366,7 +1366,7 @@ class Agent:
                     # compaction before the retry.
                     trim_loop_messages(
                         messages,
-                        loop_message_budget(self.provider, system=system, tools=tool_specs) // 2,
+                        loop_message_budget(self.active_provider, system=system, tools=tool_specs) // 2,
                         replayed_history=replayed_history,
                     )
                     continue
@@ -1399,12 +1399,12 @@ class Agent:
             return
         try:
             if self.on_usage is not None:
-                self.on_usage(self.provider.id, self.provider.model, requests, dict(tokens))
+                self.on_usage(self.active_provider.id, self.active_provider.model, requests, dict(tokens))
             else:
                 record_usage(
                     self.paths,
-                    self.provider.id,
-                    self.provider.model,
+                    self.active_provider.id,
+                    self.active_provider.model,
                     requests=requests,
                     tokens=tokens,
                     bot=self.bot.name,
@@ -1702,10 +1702,31 @@ class Agent:
         self._log(f"{self.bot.name}: steered {len(texts)} follow-up(s) into the live turn")
         return True
 
+    PROVIDER_FIELDS = ("provider", "model", "reasoning", "auth_ref")
+
+    def refresh_provider(self) -> None:
+        try:
+            roster = load_live_roster(self.paths.home)
+            entry = roster.get(self.bot.name) if roster is not None else None
+        except (ValueError, OSError):
+            return
+        if entry is None or all(getattr(entry, k) == getattr(self.bot, k) for k in self.PROVIDER_FIELDS):
+            return
+        # Construct first: invalid configuration leaves the current route intact,
+        # and raises a visible turn error instead of silently using the old model.
+        provider = build_agent_provider(self.paths, entry)
+        self.provider = provider
+        for key in self.PROVIDER_FIELDS:
+            setattr(self.bot, key, getattr(entry, key))
+
+    @property
+    def active_provider(self):
+        # A cancelled worker may still be winding down when another turn starts.
+        return getattr(self._turn_local, "provider", self.provider)
+
     #: Roster labels a running bot adopts without a restart. Identity fields
-    #: (provider, model, reasoning, embeddings, auth_ref, private_browser)
-    #: are resolved once at spawn and the orchestrator restarts the process
-    #: when they change, so they are deliberately not on this list.
+    #: Provider configuration refreshes separately at turn boundaries. Embeddings
+    #: and browser isolation still require their existing lifecycle transition.
     LIVE_PROFILE_FIELDS = ("role", "personality", "title", "avatar", "color", "dreaming", "caveman")
 
     def refresh_profile(self) -> bool:
@@ -1733,7 +1754,19 @@ class Agent:
                 changed = True
         return changed
 
-    def _produce(
+    def _produce(self, *args, **kwargs) -> str:
+        self.refresh_provider()
+        previous = getattr(self._turn_local, "provider", None)
+        self._turn_local.provider = self.provider
+        try:
+            return self._produce_current(*args, **kwargs)
+        finally:
+            if previous is None:
+                del self._turn_local.provider
+            else:
+                self._turn_local.provider = previous
+
+    def _produce_current(
         self,
         sender: str,
         text: str,
@@ -2112,7 +2145,7 @@ class Agent:
             tools,
             max(
                 0,
-                loop_message_budget(self.provider, system=system)
+                loop_message_budget(self.active_provider, system=system)
                 - max(
                     4_000,
                     estimate_message_tokens(Message(role="user", content=text, images=images)),
@@ -2152,9 +2185,9 @@ class Agent:
                 maybe_compact(
                     self.memory,
                     peer=thread_peer,
-                    provider=self.provider,
+                    provider=self.active_provider,
                     budget=history_budget(
-                        self.provider,
+                        self.active_provider,
                         system=system,
                         tools=tool_specs,
                         current=text,
@@ -2171,7 +2204,7 @@ class Agent:
             history, cutoff = build_history(
                 self.memory,
                 peer=thread_peer,
-                provider=self.provider,
+                provider=self.active_provider,
                 system=system,
                 tools=tool_specs,
                 current=text,
@@ -2318,11 +2351,11 @@ class Agent:
                     tools,
                     max(
                         0,
-                        loop_message_budget(self.provider, system=system)
+                        loop_message_budget(self.active_provider, system=system)
                         - max(4_000, protected_loop_tokens(messages, history)),
                     ),
                 )
-                loop_budget = loop_message_budget(self.provider, system=system, tools=tool_specs)
+                loop_budget = loop_message_budget(self.active_provider, system=system, tools=tool_specs)
                 trim_loop_messages(messages, loop_budget, replayed_history=history)
                 if sum(estimate_message_tokens(m) for m in messages) > loop_budget:
                     context_failed = True
@@ -3002,7 +3035,7 @@ class Agent:
         signal.signal(signal.SIGINT, _stop)
 
         load_soul(self.paths, self.bot.name, personality=self.bot.personality)
-        self._log(f"{self.bot.name} up (provider={self.provider.id}, model={self.provider.model})")
+        self._log(f"{self.bot.name} up (provider={self.active_provider.id}, model={self.active_provider.model})")
         # Boot check: a reply owed from before a crash/restart whose
         # message is no longer in the inbox gets a recovery prompt enqueued.
         self.check_obligations()
@@ -3572,6 +3605,22 @@ def build_agent(
             stream_delay = float(os.environ.get("HARNESS_STREAM_DELAY", "0.02"))
         except ValueError:
             stream_delay = 0.02
+    provider = build_agent_provider(paths, bot)
+    memory = Memory(paths=paths, bot=bot.name, embedder=resolve_embedder(bot, paths))
+    control = Control(paths)
+    return Agent(
+        paths=paths,
+        bot=bot,
+        provider=provider,
+        memory=memory,
+        control=control,
+        reply_timeout=reply_timeout,
+        stream_delay=stream_delay,
+    )
+
+
+def build_agent_provider(paths: HarnessPaths, bot: Bot):
+    """Resolve a provider without rebuilding agent state or its computer."""
     api_key = get_secret(bot.secret_ref(), paths)
     refresh = None
     provider_name = bot.provider
@@ -3622,21 +3671,10 @@ def build_agent(
 
     auth = Auth(api_key=api_key, refresh=refresh)
     model = resolve_model(kind, bot.model, paths) or None
-    provider = build_provider(
+    return build_provider(
         provider_name,
         model,
         auth=auth,
         persona=bot.role or bot.name,
         **extra,
-    )
-    memory = Memory(paths=paths, bot=bot.name, embedder=resolve_embedder(bot, paths))
-    control = Control(paths)
-    return Agent(
-        paths=paths,
-        bot=bot,
-        provider=provider,
-        memory=memory,
-        control=control,
-        reply_timeout=reply_timeout,
-        stream_delay=stream_delay,
     )
