@@ -357,8 +357,8 @@ def test_running_bot_adopts_roster_edits_next_turn(tmp_path):
     assert "Always answer in haiku." in prompt
     assert "Atlas the Poet" in prompt and "poet" in prompt
     assert "Answer briefly." not in agent.bot.system_prompt()
-    # Identity stays what the process was spawned with: the orchestrator
-    # restarts a bot for those, this refresh must never swap them live.
+    # Label refresh does not alter the provider: its separate refresh runs
+    # only at the next turn boundary.
     assert agent.bot.provider == "echo"
     assert agent.bot.model is None
 
@@ -393,3 +393,77 @@ def test_self_update_prompt_only_on_relevant_turns():
     for tool in NEW_TOOLS:
         assert tool in _SELF_UPDATE_PROMPT
     assert "Settings" in _SELF_UPDATE_PROMPT
+
+
+def test_provider_edits_do_not_restart_or_touch_queued_work(server, monkeypatch):
+    from agent import messaging
+    _, orch, _ = server
+    queued = messaging.send(orch.paths, messaging.Msg(to="atlas", frm="user", text="keep"))
+    calls = []
+    monkeypatch.setattr(orch, "restart", lambda *a, **k: calls.append(a))
+    orch.update_bot("atlas", model="other", reasoning="low", auth_ref="OTHER_KEY")
+    assert not calls
+    orch.update_bot("atlas", provider="echo", model="other", private_browser=False)
+    assert not calls
+    orch.update_bot("atlas", private_browser=True)
+    assert calls == [("atlas",)]
+    assert queued.exists()
+
+
+def test_invalid_provider_edit_does_not_persist_or_restart(server, monkeypatch):
+    from harness.roster import RosterError
+
+    _, orch, _ = server
+    before = orch.roster_path.read_bytes()
+    monkeypatch.setattr(orch, "restart", lambda *a, **k: pytest.fail("must not restart"))
+    with pytest.raises(RosterError, match="Unknown provider"):
+        orch.update_bot("atlas", provider="not-a-provider")
+    assert orch.roster.get("atlas").provider == "echo"
+    assert orch.roster_path.read_bytes() == before
+
+
+def test_provider_switch_waits_for_next_turn_and_retains_agent_state(tmp_path, monkeypatch):
+    import agent.runtime as runtime
+    from providers import Completion
+
+    paths = _paths(tmp_path)
+    agent = _agent(paths)
+    memory = agent.memory
+    entered, release = threading.Event(), threading.Event()
+    old = agent.provider
+
+    def complete(*args, **kwargs):
+        entered.set()
+        assert release.wait(5)
+        return Completion(text="old reply")
+
+    monkeypatch.setattr(old, "complete", complete)
+    built = []
+    new = EchoProvider()
+    monkeypatch.setattr(runtime, "build_agent_provider", lambda *a: built.append(a) or new)
+    replies = []
+    worker = threading.Thread(target=lambda: replies.append(agent._produce("user", "first")))
+    worker.start()
+    assert entered.wait(5)
+    save_roster(paths.home / "roster.json", Roster([Bot(name="atlas", provider="echo", model="next")]))
+    assert agent.provider is old and not built
+    release.set()
+    worker.join(5)
+    assert not worker.is_alive() and "old reply" in replies[0]
+    agent._produce("user", "second")
+    assert agent.provider is new and agent.memory is memory
+    assert agent.bot.model == "next" and len(built) == 1
+    agent._produce("user", "third")
+    assert len(built) == 1
+
+
+def test_invalid_live_provider_preserves_route_and_reports_error(tmp_path):
+    from providers import ProviderError
+
+    paths = _paths(tmp_path)
+    agent = _agent(paths)
+    old = agent.provider
+    save_roster(paths.home / "roster.json", Roster([Bot(name="atlas", provider="invalid")]))
+    with pytest.raises(ProviderError, match="Unknown provider"):
+        agent._produce("user", "hello")
+    assert agent.provider is old and agent.bot.provider == "echo"
