@@ -113,3 +113,35 @@ Before publishing the standard installer, maintainers must configure and verify
 references. Archives must use that same HTTPS origin; the installer rejects
 cross-origin downloads and checks their SHA-256 digests. Preparing this source
 tree does not configure the release domain or publish any releases.
+
+## Optional Jev context selection
+
+Jev by TypeSafe can filter clearly unrelated recalled memories before a bot
+answers. It is off by default and needs no Dotobot account. Use your own TypeSafe
+API key; TypeSafe bills your account directly. Enabling it sends the current
+request and recalled memory excerpts to TypeSafe. It does not replace your chat
+model, rewrite stored history or change the existing compaction safeguards.
+Uncertain selections stay included. Failed, rate-limited, timed-out or oversized
+requests fall back to standard memory.
+
+Compatible apps offer **Settings → Bot → Jev** on Mac and **Settings → Jev** on
+iPhone. Connect/test the key, then enable Jev separately. Older apps can use the
+authenticated server API:
+
+| Method | Path | JSON body | Purpose |
+| --- | --- | --- | --- |
+| GET | `/api/jev` | — | `enabled`, `configured`, credential `source`; never the key |
+| POST | `/api/jev/key` | `{"key":"YOUR_KEY"}` | Test access, then store key; leaves enablement unchanged |
+| POST | `/api/jev/test` | `{}` | Test the configured key with a small billed request |
+| PATCH | `/api/jev` | `{"enabled":true}` | Opt in, or use `false` to disable |
+| DELETE | `/api/jev/key` | — | Disable and remove the stored key |
+
+Use the harness linking key as the bearer credential and HTTPS outside a trusted
+local connection. Keys use the existing private credential store (0600 files),
+not settings or chat history. `TYPESAFE_API_KEY` in the server environment is also
+supported; it still requires explicit enablement and must be changed/removed in
+the environment. No SDK dependency is added. Calls use pinned model
+`jev-1.13.0` with a four-second network timeout and a bounded input size.
+The chat activity trail records `jev_context` only for attempted calls, including
+fallback when the request fails. Confidence filtering is conservative but must
+still be evaluated against your own tasks; it is not a guarantee of relevance.
