@@ -68,7 +68,8 @@ def tools(type_: str) -> list[ConnectorTool]:
                 name=f"{t}_get",
                 description=(
                     f"GET a path on the {t} REST API. Path is relative to the "
-                    "connector's API host. Use this to list or fetch records."
+                    "connector's API base, which already includes its version prefix. "
+                    "Do not repeat the base path. Use this to list or fetch records."
                 ),
                 parameters={
                     "type": "object",
@@ -220,8 +221,13 @@ def _join(base: str, path: str) -> str | None:
     raw = str(path or "").strip()
     if not raw or raw.lower().startswith("http") or "\\" in raw or ".." in raw:
         return None
-    joined = urllib.parse.urljoin(base.rstrip("/") + "/", raw.lstrip("/"))
     want = urllib.parse.urlparse(base)
+    # Accept the API-prefixed form from provider docs as well as relative paths.
+    prefix = want.path.strip("/")
+    relative = raw.lstrip("/")
+    if prefix and relative.startswith(prefix + "/"):
+        relative = relative[len(prefix) + 1:]
+    joined = urllib.parse.urljoin(base.rstrip("/") + "/", relative)
     got = urllib.parse.urlparse(joined)
     if got.scheme != "https" or got.netloc != want.netloc:
         return None

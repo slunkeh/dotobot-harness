@@ -140,6 +140,18 @@ def classify(tool_name: str, connector_type: str = "") -> str:
     name = str(tool_name or "").strip().lower()
     type_ = str(connector_type or "").strip().lower()
 
+    # These shipped REST adapters only expose GET and a separate write tool.
+    # Their service and account prefixes contain underscores, so splitting at
+    # the first underscore loses the read verb. Unknown operations stay writes.
+    from harness.connectors import WORKSPACE_TYPES
+
+    for service in WORKSPACE_TYPES - {"gmail"}:
+        if (not type_ or type_ == service) and name.startswith(service + "_"):
+            rest = name[len(service) + 1:]
+            if rest == "get" or rest.endswith("_get"):
+                return EFFECT_READ
+            return EFFECT_WRITE
+
     if not type_:
         # Infer the type from the tool's own prefix, which is how every
         # connector names them (`github_…`, `linear_…`, `<server>_…`).

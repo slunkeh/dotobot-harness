@@ -154,3 +154,11 @@ def test_tool_names_for_api_key_stub():
     assert tool_names("mailchimp") == ["mailchimp_get", "mailchimp_request"]
     assert "linear_create_issue" in tool_names("linear")
     assert tool_names("notion") == []  # MCP, names come from the server
+
+
+def test_api_prefixed_path_is_not_duplicated():
+    from connectors.generic import _join
+    base = "https://www.googleapis.com/drive/v3"
+    assert _join(base, "/drive/v3/files") == base + "/files"
+    assert _join(base, "/files") == base + "/files"
+    assert _join(base, "https://attacker.invalid/files") is None
