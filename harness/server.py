@@ -665,6 +665,8 @@ class _Handler(BaseHTTPRequestHandler):
             return self._oauth_callback()
         if not self._authed():
             return self._send_json({"error": "unauthorized"}, 401)
+        if path == "/api/jev" or path.startswith("/api/jev/"):
+            return self._jev("GET")
         if path.startswith("/api/voice/elevenlabs/"):
             return self._elevenlabs("GET")
         if path == "/api/health":
@@ -792,6 +794,8 @@ class _Handler(BaseHTTPRequestHandler):
         if not self._authed():
             return self._send_json({"error": "unauthorized"}, 401)
         path = urlparse(self.path).path.rstrip("/")
+        if path == "/api/jev" or path.startswith("/api/jev/"):
+            return self._jev("POST")
         if path == "/api/push/subscriptions":
             relay = getattr(self.orch.ws_hub, "push_relay", None)
             if relay is None:
@@ -905,6 +909,8 @@ class _Handler(BaseHTTPRequestHandler):
             return self._patch_connector(path[len("/api/connectors/") :])
         if path.startswith("/api/bots/"):
             return self._update_bot(path[len("/api/bots/") :])
+        if path == "/api/jev":
+            return self._jev("PATCH")
         if path == "/api/voice":
             from harness.voice import VoiceError, set_voice_settings
 
@@ -964,6 +970,8 @@ class _Handler(BaseHTTPRequestHandler):
         if not self._authed():
             return self._send_json({"error": "unauthorized"}, 401)
         path = urlparse(self.path).path.rstrip("/")
+        if path == "/api/jev" or path.startswith("/api/jev/"):
+            return self._jev("DELETE")
         if path.startswith("/api/bots/") and "/queue/" in path:
             name, _, rid = path[len("/api/bots/"):].partition("/queue/")
             return self._edit_queue(name, remove_id=rid)
@@ -1074,6 +1082,30 @@ class _Handler(BaseHTTPRequestHandler):
             hub.broadcast(frame)
             return True
         return self._ws_send_json(frame) is not False
+
+    def _jev(self, method: str):
+        from . import jev
+
+        path = urlparse(self.path).path.rstrip("/")
+        try:
+            data = self._read_json() if method in {"POST", "PATCH"} else {}
+            if not isinstance(data, dict):
+                raise jev.JevError("Expected a JSON object.")
+            if path == "/api/jev" and method == "GET":
+                result = jev.status(self.orch.paths)
+            elif path == "/api/jev" and method == "PATCH":
+                result = jev.set_enabled(self.orch.paths, data.get("enabled"))
+            elif path == "/api/jev/key" and method == "POST":
+                result = jev.connect(self.orch.paths, data.get("key"))
+            elif path == "/api/jev/key" and method == "DELETE":
+                result = jev.disconnect(self.orch.paths)
+            elif path == "/api/jev/test" and method == "POST":
+                result = jev.test(self.orch.paths)
+            else:
+                return self._send_json({"error": "not found"}, 404)
+            return self._send_json(result)
+        except jev.JevError as exc:
+            return self._send_json({"error": str(exc)}, 400)
 
     def _elevenlabs(self, method: str):
         from . import elevenlabs

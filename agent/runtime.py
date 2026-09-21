@@ -2174,8 +2174,11 @@ class Agent:
                 last_history_tokens=self._last_history_tokens,
             )
             self._last_history_tokens = sum(estimate_tokens(m.content or "") for m in history)
+        from harness.jev import select_context
+
         mem = self.memory.context_block(
-            text, session_cutoff=cutoff, token_budget=self._recall_budget()
+            text, session_cutoff=cutoff, token_budget=self._recall_budget(),
+            select_context=lambda items: select_context(self.paths, text, items, writer=writer),
         )
         if mem:
             system = system + "\n\n" + mem

@@ -24,6 +24,7 @@ harness/envscrub.py
 harness/fsutil.py
 harness/hostdeps.py
 harness/hostinput.py
+harness/jev.py
 harness/linking.py
 harness/logstream.py
 harness/machine_secrets.py
