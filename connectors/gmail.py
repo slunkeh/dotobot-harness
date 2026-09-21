@@ -56,16 +56,17 @@ class GmailError(RuntimeError):
 def _account(ctx: ConnectorContext) -> tuple[str, str]:
     """Return the account address and current OAuth access token."""
     name = str(ctx.record.get("name") or ctx.record.get("type") or "Gmail")
-    address = ctx.config("email") or ctx.config("address")
+    from harness import mcp_oauth
+
+    address = str((mcp_oauth.load_tokens(ctx.paths, ctx.record["id"]) or {}).get("email") or "")
     if not address:
         raise GmailError(
-            f"connector {name!r} has no Gmail address yet; the user adds it in "
-            "Manage > Plugins (the Gmail address field)."
+            f"Reconnect {name!r} through Dotobot to choose a Google account."
         )
-    from harness import google_oauth, mcp_oauth
+    from harness import delegated_oauth, mcp_oauth
 
     try:
-        token = google_oauth.token(ctx.paths, ctx.record)
+        token = delegated_oauth.token(ctx.paths, ctx.record)
     except mcp_oauth.OAuthError as exc:
         raise GmailError(str(exc)) from None
     return address, token

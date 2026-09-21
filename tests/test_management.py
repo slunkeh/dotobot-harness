@@ -703,7 +703,7 @@ def test_duplicate_uses_validated_routine_snapshot(server, monkeypatch):
 def test_connectors_catalog_and_crud(server):
     base, orch = server
     catalog = {c["type"]: c for c in _req(f"{base}/api/connectors/catalog")}
-    assert {"slack", "github", "google", "linear"} <= set(catalog)
+    assert {"slack", "github", "google_docs", "linear"} <= set(catalog)
     # gallery metadata for the plugin-store UI
     assert catalog["linear"]["category"] == "Project Management"
     assert catalog["linear"]["icon"]

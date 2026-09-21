@@ -216,7 +216,7 @@ If you cannot open the PR, say so. Do not review from memory.""",
         tagline="Buckets and drafts — never send, never delete, never unsubscribe.",
         category="Personal",
         role="Inbox zero without living in Gmail",
-        plugins=["google"],
+        plugins=["gmail"],
         featured=2,
         first_task=(
             "Triage mail since yesterday. Bucket needs-reply, fyi, newsletter, "
@@ -259,7 +259,7 @@ Never unsubscribe.""",
         tagline="Only items that map to the priority list — with a decision flag.",
         category="Ops",
         role="Source-linked daily digest",
-        plugins=["google", "slack"],
+        plugins=["gmail", "google_calendar", "slack"],
         featured=3,
         first_task=(
             "Review activity since yesterday across mail, calendar, and notes. "
@@ -342,7 +342,7 @@ Never publish the brief, contact people for interviews, or pay for papers.""",
         tagline="Volume without sounding like a sequence tool — and without sending.",
         category="Sales",
         role="Account research and review-ready outreach",
-        plugins=["google"],
+        plugins=["gmail"],
         featured=5,
         first_task=(
             "Research the accounts in this list. Score them, identify contacts, "
@@ -465,7 +465,7 @@ Never post the memo. Never scrape behind a login the owner did not authorize."""
         tagline="A DRAFT reply with a policy cite — the Send button stays yours.",
         category="Support",
         role="Policy-cited first-response drafts",
-        plugins=["google"],
+        plugins=["gmail"],
         featured=8,
         first_task=(
             "Read the inbound thread I point you at and draft a first response "
@@ -542,7 +542,7 @@ Never publish the brief.""",
         tagline="Walk in knowing the last promise — the customer already lived the rest.",
         category="Sales",
         role="Pre-call brief from mail and calendar",
-        plugins=["google", "slack"],
+        plugins=["google_calendar", "google_drive", "slack"],
         first_task=(
             "Prep me for my next customer meeting. Lead with the last promise "
             "and who will be in the room. Return an internal brief. Do not send."
@@ -857,7 +857,7 @@ asking.""",
         tagline="Evidence of last use, then a list — you click cancel.",
         category="Personal",
         role="Unused-subscription watch from mail",
-        plugins=["google"],
+        plugins=["gmail"],
         first_task=(
             "Audit subscriptions in mail for the last 90 days. Return a keep "
             "or cancel list with unsent drafts. Do not unsubscribe."
@@ -953,7 +953,7 @@ Never redesign for personal taste. Never edit design files or code.""",
         tagline="A thousand user voices into the five things to build next.",
         category="Product",
         role="Feedback themes ranked into a build-next list",
-        plugins=["slack", "google"],
+        plugins=["slack", "gmail", "google_sheets"],
         first_task=(
             "Read the feedback sources I point you at. Cluster into themes "
             "with real quotes and counts, then rank the top five with a RICE "
@@ -1003,7 +1003,7 @@ approval.""",
         tagline="Posts in your voice with an SEO pass — never published for you.",
         category="Marketing",
         role="Search-checked content drafts that stay drafts",
-        plugins=["google"],
+        plugins=["google_docs"],
         first_task=(
             "Draft the piece I describe, in the attached voice. Run an SEO "
             "pass: intent, one primary keyword, no cannibalizing an existing "
@@ -1054,7 +1054,7 @@ against search guidelines.""",
         tagline="Honest status from real sources — never a timeline to please.",
         category="Ops",
         role="Cross-team status, blockers, and faithful meeting notes",
-        plugins=["slack", "google"],
+        plugins=["slack", "google_docs"],
         first_task=(
             "Build a status pack for the project I name: done, in flight, "
             "blocked, at risk — each with a source. Flag slips honestly. "
@@ -1183,7 +1183,7 @@ deploy, merge, or mark issues fixed.""",
         tagline="Reconciled numbers, stated assumptions — never a payment, never a filing.",
         category="Finance",
         role="Read-only bookkeeping checks and scenario models",
-        plugins=["google"],
+        plugins=["google_sheets", "google_drive"],
         first_task=(
             "Review the statements or exports I point you at. Reconcile, flag "
             "unexplained differences, and give me base, upside, and downside "
@@ -1484,7 +1484,7 @@ without asking. Never chase a colleague more than once per request.""",
         tagline="Only requests that deserve attention get through — and every new yes is a no to something.",
         category="Assistants",
         role="Classifies inbound requests and challenges new commitments",
-        plugins=["google", "slack"],
+        plugins=["gmail", "google_calendar", "slack"],
         first_task=(
             "Classify what arrived since yesterday in mail and named channels: "
             "act now, schedule, delegate, decline, ignore. Give one line each "
@@ -1989,7 +1989,7 @@ Never give a score without the page behind it.""",
         tagline="Every meeting ends with owners, dates, and an unsent follow-up.",
         category="Sales",
         role="Turns a call into to-dos and a draft follow-up",
-        plugins=["google", "granola"],
+        plugins=["gmail", "google_docs", "granola"],
         first_task=(
             "Take the notes or transcript from my last call. Return decisions, "
             "to-dos with owners and dates, open questions, and a follow-up "
@@ -2039,7 +2039,7 @@ Never send, never create events, never invent a commitment.""",
         tagline="Walk-away, targets, and the next message — it prepares, you sign.",
         category="Sales",
         role="Prepares and runs a negotiation stance; never commits",
-        plugins=["google"],
+        plugins=["gmail", "google_docs"],
         first_task=(
             "Ask me about the deal: what we want, our walk-away, what the other "
             "side wants, and the deadline. Return a stance and a draft of the "
@@ -2091,7 +2091,7 @@ approval. Never bluff with a fact you cannot back.""",
         tagline="Reads a pitch deck against your stated criteria — analysis, not advice.",
         category="Sales",
         role="Reviews pitch decks against a profile you define",
-        plugins=["google"],
+        plugins=["google_drive"],
         first_task=(
             "Ask me what I look for in a deck (stage, sector, what kills a "
             "deal). Save it as my profile, then review the deck I share "
@@ -2142,7 +2142,7 @@ deck or your notes outside this chat.""",
         tagline="Every emailed or photographed receipt logged by month — never a payment.",
         category="Finance",
         role="Logs receipts and invoices into a monthly ledger",
-        plugins=["google"],
+        plugins=["gmail"],
         first_task=(
             "Find receipts and invoices in mail from the last 30 days. Extract "
             "vendor, date, amount, currency, and category into a table. Do not "
@@ -2204,7 +2204,7 @@ to a sheet the owner did not name.""",
         tagline="Money already owed to you: missed refunds, unused credits, expiring balances.",
         category="Finance",
         role="Finds refunds, credits, and balances the owner is owed",
-        plugins=["google"],
+        plugins=["gmail"],
         first_task=(
             "Search mail for refunds promised but not received, unused credits, "
             "gift-card balances, and price-drop guarantees from the last 90 "
@@ -2256,7 +2256,7 @@ payment details. Never list a claim without its evidence.""",
         tagline="Who is emailing you, how often, what you open — unsubscribe only on your list.",
         category="Personal",
         role="Audits newsletter senders and unsubscribes only with approval",
-        plugins=["google"],
+        plugins=["gmail"],
         first_task=(
             "Audit newsletters and automated senders from the last 60 days: "
             "sender, count, last opened. Propose a keep / unsubscribe list. "
@@ -2307,7 +2307,7 @@ Never unsubscribe off-list. Never delete mail. Never log in anywhere.""",
         tagline="Every ask buried in mail and chat lands in one ledger with a source link.",
         category="Personal",
         role="Sweeps inbox and channels for asks and keeps a to-do ledger",
-        plugins=["google", "slack"],
+        plugins=["gmail", "slack"],
         first_task=(
             "Sweep mail and named channels since yesterday for anything asking "
             "me to do something. Add each to the ledger with who asked, what, "
@@ -2408,7 +2408,7 @@ details on a site.""",
         tagline="Live fares and a day-by-day plan — booked only by you, only through official sellers.",
         category="Personal",
         role="Plans trips with real fares and logistics; never books",
-        plugins=["google"],
+        plugins=["gmail", "google_calendar"],
         first_task=(
             "Ask me for dates, origin, destination, budget, and who is travelling. "
             "Return two itinerary options with real fares and links. Book nothing."
@@ -2512,7 +2512,7 @@ plan a dish without a way to cook it.""",
         tagline="Three concrete things this week that would make life better — none of them a new habit.",
         category="Personal",
         role="Reads the week ahead and suggests three small, specific changes",
-        plugins=["google"],
+        plugins=["google_calendar"],
         first_task=(
             "Look at my calendar and mail for the coming week. Suggest three "
             "concrete, specific things that would make it better. Protect what "
@@ -2770,7 +2770,7 @@ Never reach for gore or slurs.""",
         tagline="A ping only when a message is time-sensitive — never a reply.",
         category="Personal",
         role="Watches mail and flags only what cannot wait",
-        plugins=["google"],
+        plugins=["gmail"],
         first_task=(
             "Check mail from the last two hours. Tell me only about messages "
             "with a deadline, a payment, a security alert, or a person waiting "
@@ -2820,7 +2820,7 @@ Never reply, forward, or archive. Never call a newsletter urgent.""",
         tagline="Tonight: tomorrow's day, with travel time and what to prep — nothing moved.",
         category="Personal",
         role="Evening briefing on tomorrow's calendar",
-        plugins=["google"],
+        plugins=["google_calendar"],
         first_task=(
             "Brief me on tomorrow: every event with time, place, who, travel "
             "time from the one before, and what I should prepare. Change nothing."
@@ -3017,7 +3017,7 @@ unverified score.""",
         tagline="Restaurants, reservations to approve, and reminders for the dates that matter.",
         category="Personal",
         role="Plans nights out and remembers the occasions",
-        plugins=["google"],
+        plugins=["google_calendar"],
         first_task=(
             "Ask me about my partner's tastes, our area, budget, and the dates "
             "that matter. Save them, then suggest three places for this weekend "
@@ -3388,7 +3388,7 @@ Never judge on a single turn.""",
         tagline="Work receipts into a claim that matches the policy — submitted by you.",
         category="Finance",
         role="Builds expense claims from receipts against a policy",
-        plugins=["google"],
+        plugins=["gmail"],
         first_task=(
             "Ask me for the expense policy (limits, categories, what needs a "
             "receipt) and the claim format. Save them. Then gather this month's "
@@ -3441,7 +3441,7 @@ personal receipt.""",
         tagline="Every bill's due date and amount in one list, with a nudge before it lands — never a payment.",
         category="Finance",
         role="Tracks bills and due dates from mail",
-        plugins=["google"],
+        plugins=["gmail"],
         first_task=(
             "Find bills and statements in mail from the last 60 days. List each "
             "with payee, amount, due date, and whether it is on direct debit. "
@@ -3491,7 +3491,7 @@ Never pay or change a payment. Never log in to a payee. Never delete mail.""",
         tagline="Purchases with return windows and warranty expiry, and the receipt to prove it.",
         category="Home",
         role="Logs purchases with return and warranty dates",
-        plugins=["google"],
+        plugins=["gmail", "google_drive"],
         first_task=(
             "Find purchase confirmations in mail from the last 90 days. For each: "
             "item, retailer, date, price, return window end, warranty end, "
@@ -3542,7 +3542,7 @@ warranty length.""",
         tagline="Free slots that work for everyone, an invite drafted — sent by you.",
         category="Ops",
         role="Finds meeting times and drafts invites",
-        plugins=["google"],
+        plugins=["google_calendar"],
         first_task=(
             "Ask me who needs to meet, for how long, and by when. Check my "
             "calendar and propose three slots with the reasoning. Draft the "
@@ -3593,7 +3593,7 @@ Never send an invite. Never guess someone's availability. Never double-book.""",
         tagline="A packing list from the itinerary and the forecast, checked off as you go.",
         category="Personal",
         role="Builds trip packing lists from itinerary and weather",
-        plugins=["google"],
+        plugins=["gmail"],
         first_task=(
             "Ask me where I am going, for how long, what I will do there, and "
             "how I travel. Check the forecast and build a packing list grouped "
@@ -3644,7 +3644,7 @@ section.""",
         tagline="Birthdays and anniversaries with a two-week heads-up and three gift ideas — nothing bought.",
         category="Personal",
         role="Remembers dates that matter and suggests gifts",
-        plugins=["google"],
+        plugins=["google_calendar"],
         first_task=(
             "Ask me for the people and dates I want to remember, and a line "
             "about each person. Save them. Tell me what is coming in the next "
@@ -3695,7 +3695,7 @@ did not give.""",
         tagline="A contract in plain words: what you owe, what they owe, what to ask about — not legal advice.",
         category="Personal",
         role="Plain-language summary of a contract with flags",
-        plugins=["google"],
+        plugins=["google_docs"],
         first_task=(
             "Share a contract, lease, or terms document. I will summarise "
             "obligations on each side, dates and money, and the clauses worth "
@@ -3846,7 +3846,7 @@ once. Never guess at usage.""",
         tagline="Boiler service, MOT, gutters, filters — what is due, when, and who did it last.",
         category="Home",
         role="Tracks recurring home and vehicle maintenance",
-        plugins=["google"],
+        plugins=["google_calendar"],
         first_task=(
             "Ask me what I own that needs looking after (home systems, vehicles, "
             "appliances) and when each was last serviced. Save it and show what "
@@ -3898,7 +3898,7 @@ Never skip a safety item.""",
         tagline="Energy, broadband, phone, insurance: what you pay vs what the market charges, with the switch drafted.",
         category="Finance",
         role="Compares household tariffs against current offers",
-        plugins=["google"],
+        plugins=["gmail", "google_sheets"],
         first_task=(
             "Ask me for my current energy, broadband, phone, and insurance "
             "deals: provider, tariff, monthly cost, contract end. Save them. "
@@ -3950,7 +3950,7 @@ offer you did not see live.""",
         tagline="Every delivery from mail in one list with its latest status — and a flag when one goes quiet.",
         category="Home",
         role="Tracks deliveries found in mail",
-        plugins=["google"],
+        plugins=["gmail"],
         first_task=(
             "Find shipping notices in mail from the last 30 days. For each: "
             "item, retailer, carrier, tracking link, latest status, expected "
@@ -4001,7 +4001,7 @@ log in or pay on a tracking page.""",
         tagline="CV and cover letter tailored to one advert, truthfully, with an application tracker — you apply.",
         category="Learning",
         role="Tailors applications to adverts and tracks them",
-        plugins=["google"],
+        plugins=["google_docs"],
         first_task=(
             "Share your CV and a job advert. I will show which requirements you "
             "meet, tailor the CV and draft a cover letter from your real "
@@ -5073,7 +5073,7 @@ unsubscribe.""",
         tagline="A customer win into a case study: situation, what changed, numbers with sources — approved by the customer before it leaves.",
         category="Marketing",
         role="Drafts customer case studies from notes and calls",
-        plugins=["google", "granola", "hubspot"],
+        plugins=["google_docs", "granola", "hubspot"],
         first_task=(
             "Point me at the customer and the win: call notes, emails, metrics. "
             "I will draft the case study with every number sourced and a list "
@@ -5124,7 +5124,7 @@ name a customer who asked not to be.""",
         tagline="A new starter's first day, week, and month: accounts, people, reading, and a first win — owned and dated.",
         category="Ops",
         role="Builds onboarding plans for new team members",
-        plugins=["notion", "slack", "google"],
+        plugins=["notion", "slack", "google_docs"],
         first_task=(
             "Tell me who is joining, their role, start date, and manager. I "
             "will draft the first-day, first-week, and first-month plan with "
@@ -5174,7 +5174,7 @@ Never book other people's calendars.""",
         tagline="Every tool and supplier the company pays for: owner, cost, renewal, notice period — cuts proposed, never made.",
         category="Ops",
         role="Keeps the register of vendors, contracts, and renewals",
-        plugins=["google", "quickbooks"],
+        plugins=["google_sheets", "google_drive", "quickbooks"],
         first_task=(
             "Find vendor invoices and contracts in mail and accounts from the "
             "last year. Build the register: vendor, what for, owner, cost, "
@@ -5528,7 +5528,7 @@ Never overstate scope.""",
         tagline="Every claim in a draft checked against a primary source: supported, contradicted, or unverifiable.",
         category="Research",
         role="Verifies claims in a document against primary sources",
-        plugins=["google"],
+        plugins=["google_docs"],
         first_task=(
             "Share a draft. I will extract every factual claim, check each "
             "against a primary source, and return a table: supported, "
@@ -5579,7 +5579,7 @@ the argument. Never soften unverifiable into supported.""",
         tagline="Proposals and statements of work from call notes: scope, deliverables, price table, assumptions — sent by you.",
         category="Sales",
         role="Drafts proposals and SOWs from notes",
-        plugins=["google", "granola", "hubspot"],
+        plugins=["google_docs", "granola", "hubspot"],
         first_task=(
             "Point me at the call notes and the pricing rules. I will draft "
             "the proposal: understanding, scope, deliverables, timeline, price "
@@ -5678,7 +5678,7 @@ Never edit unapproved. Never guess a stage. Never email a contact.""",
         tagline="Invoices from timesheets and deliverables, numbered and checked — sent by you.",
         category="Finance",
         role="Drafts invoices from logged work",
-        plugins=["google", "quickbooks"],
+        plugins=["google_sheets", "google_drive", "quickbooks"],
         first_task=(
             "Ask me for my invoice details (numbering, terms, tax setup, "
             "client records). Save them. Then draft this month's invoices from "
@@ -5728,7 +5728,7 @@ or tax setting unapproved.""",
         tagline="Everything your return needs, gathered and checked against a list — filed by you or your accountant.",
         category="Finance",
         role="Gathers and checks documents for a tax return",
-        plugins=["google"],
+        plugins=["google_sheets", "google_drive"],
         first_task=(
             "Ask me which return, which year, and which country. I will build "
             "the document checklist, find what is in mail and Drive, and show "
@@ -5880,7 +5880,7 @@ next reads when one was asked for.""",
         tagline="School emails, club schedules, and appointments into one week view with who is driving — nothing booked.",
         category="Home",
         role="Turns family mail into a shared week plan",
-        plugins=["google"],
+        plugins=["google_calendar"],
         first_task=(
             "Ask me who is in the family and which senders matter (school, "
             "clubs, doctor). Save them. Then read this week's mail and build "
@@ -5980,7 +5980,7 @@ note. Never ignore the zone.""",
         tagline="Every address change, utility, and deadline for a move in one dated checklist — you make the calls.",
         category="Home",
         role="Runs the moving checklist with dates and drafts",
-        plugins=["google"],
+        plugins=["gmail", "google_calendar"],
         first_task=(
             "Tell me the move date and the new address. I will build the "
             "checklist: notify, cancel, set up, pack, on the day, after, each "
@@ -6133,7 +6133,7 @@ advice; point to a person instead.""",
         tagline="Vaccinations, worming, vet visits, and food reorders for each pet, dated and reminded.",
         category="Home",
         role="Keeps each pet's care schedule and records",
-        plugins=["google"],
+        plugins=["google_calendar"],
         first_task=(
             "Tell me about each pet: species, breed, age, vet, and what is "
             "due when. I will save the records and show the next 90 days of "
@@ -6284,7 +6284,7 @@ Never register or file. Never call a name clear. Never imitate a brand.""",
         tagline="A document or brief into a slide outline with one idea per slide and speaker notes — built on approval.",
         category="Creative",
         role="Turns a document into a slide deck with notes",
-        plugins=["google", "canva"],
+        plugins=["google_drive", "canva"],
         first_task=(
             "Share the document or brief, the audience, and the time you have. "
             "I will propose the slide outline with one message per slide and "
@@ -6335,7 +6335,7 @@ Never build before approval. Never crowd a slide. Never share or present.""",
         tagline="A script or brief into scenes, shots, and a shooting schedule with what each shot needs.",
         category="Creative",
         role="Breaks scripts into shot lists and schedules",
-        plugins=["google", "notion"],
+        plugins=["google_docs", "notion"],
         first_task=(
             "Share the script or brief and the shoot constraints (days, "
             "locations, crew, kit). I will produce the scene breakdown, shot "

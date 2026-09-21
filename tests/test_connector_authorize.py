@@ -35,11 +35,12 @@ def test_card_payload_survives_an_unknown_type():
     assert payload["icon"] is None
 
 
-def test_google_card_copy_depends_on_the_connector_name():
-    gmail = card_payload({"id": "g1", "type": "google", "name": "Gmail"})
-    drive = card_payload({"id": "g2", "type": "google", "name": "Google Drive"})
+def test_google_card_copy_uses_the_actual_service():
+    gmail = card_payload({"id": "g1", "type": "gmail", "name": "Personal"})
+    drive = card_payload({"id": "g2", "type": "google_drive", "name": "Work"})
     assert "email" in gmail["description"].lower()
-    assert "files" in drive["description"].lower()
+    assert "google drive" in drive["description"].lower()
+    assert drive["title"] == "Work"
 
 
 def test_connect_stub_emits_the_card_and_tells_the_bot_to_wait(tmp_path):

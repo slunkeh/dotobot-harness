@@ -33,11 +33,12 @@ def paths(tmp_path):
 
 
 @pytest.fixture
-def gmail_ctx(paths):
+def gmail_ctx(paths, monkeypatch):
     record = Connectors(paths).add("gmail", "Gmail", {"email": ADDRESS}, secret=APP_PASSWORD)
     from harness.mcp_oauth import save_tokens
 
-    save_tokens(paths, record["id"], {"access_token": "test-access-token"})
+    save_tokens(paths, record["id"], {"mode": "delegated", "capability": "fixture", "email": ADDRESS})
+    monkeypatch.setattr("harness.delegated_oauth.request", lambda *a: {"access_token": "test-access-token", "service": "gmail"})
     return ConnectorContext(paths=paths, bot="atlas", record=record)
 
 
@@ -274,7 +275,7 @@ def test_missing_oauth_asks_to_connect(paths, no_network):
     ctx = ConnectorContext(paths=paths, bot="atlas", record=record)
     out = gmail._list_labels(ctx, {})
     assert out.startswith("error:")
-    assert "Connect this Google account" in out
+    assert "Reconnect" in out
     assert "request_secret" not in out
 
 
@@ -283,7 +284,7 @@ def test_missing_address_names_the_field(paths, no_network):
     ctx = ConnectorContext(paths=paths, bot="atlas", record=record)
     out = gmail._search_threads(ctx, {})
     assert out.startswith("error:")
-    assert "address" in out.lower()
+    assert "choose a Google account" in out
 
 
 def test_old_app_password_is_not_used(paths, imap):
@@ -292,7 +293,7 @@ def test_old_app_password_is_not_used(paths, imap):
     set_secret("GMAIL_APP_PASSWORD", "old-password", paths)
     record = Connectors(paths).add("gmail", "Gmail", {"email": ADDRESS}, secret="old-password")
     ctx = ConnectorContext(paths=paths, bot="atlas", record=record)
-    assert "Connect this Google account" in gmail._list_labels(ctx, {})
+    assert "Reconnect" in gmail._list_labels(ctx, {})
     assert imap.logins == []
 
 
@@ -756,7 +757,7 @@ def test_ids_are_gmail_hex():
 
 def test_record_is_named_by_its_address_unless_the_user_named_it(paths):
     store = Connectors(paths)
-    by_address = store.add("gmail", "Gmail", {"email": "ada@example.com"}, secret="x")
+    by_address = store.add("gmail", "ada@example.com", {"email": "ada@example.com"}, secret="x")
     assert by_address["name"] == "ada@example.com"
     named = store.add("gmail", "Work", {"email": "ada@work.example"}, secret="x")
     assert named["name"] == "Work"
@@ -768,7 +769,7 @@ def test_record_is_named_by_its_address_unless_the_user_named_it(paths):
 
 def test_two_inboxes_bind_under_their_own_prefixes(paths):
     store = Connectors(paths)
-    store.add("gmail", "Gmail", {"email": "ada@example.com"}, secret="x")
+    store.add("gmail", "ada@example.com", {"email": "ada@example.com"}, secret="x")
     store.add("gmail", "Work", {"email": "ada@work.example"}, secret="y")
     bound = tools_for_bot(paths, "atlas")
     assert "gmail_ada_example_com_send" in bound
@@ -791,10 +792,11 @@ def test_each_inbox_tool_uses_its_own_credentials(paths, monkeypatch):
     store = Connectors(paths)
     from harness.mcp_oauth import save_tokens
 
-    first = store.add("gmail", "Gmail", {"email": "ada@example.com"})
+    first = store.add("gmail", "ada@example.com", {"email": "ada@example.com"})
     second = store.add("gmail", "Work", {"email": "ada@work.example"})
-    save_tokens(paths, first["id"], {"access_token": "aaaaaaaaaaaaaaaa"})
-    save_tokens(paths, second["id"], {"access_token": "bbbbbbbbbbbbbbbb"})
+    save_tokens(paths, first["id"], {"mode": "delegated", "capability": "aaaaaaaaaaaaaaaa", "email": "ada@example.com"})
+    save_tokens(paths, second["id"], {"mode": "delegated", "capability": "bbbbbbbbbbbbbbbb", "email": "ada@work.example"})
+    monkeypatch.setattr("harness.delegated_oauth.request", lambda bundle, *a: {"access_token": bundle["capability"], "service": "gmail"})
     logins = []
 
     def connect(address, password):
@@ -838,7 +840,7 @@ def test_removing_an_inbox_drops_only_its_secret(paths):
     from harness.secrets import get_secret
 
     store = Connectors(paths)
-    a = store.add("gmail", "Gmail", {"email": "ada@example.com"}, secret="aaaa")
+    a = store.add("gmail", "ada@example.com", {"email": "ada@example.com"}, secret="aaaa")
     b = store.add("gmail", "Work", {"email": "ada@work.example"}, secret="bbbb")
     assert store.remove(a["id"]) is True
     assert get_secret(f"connector_{a['id']}", paths) is None

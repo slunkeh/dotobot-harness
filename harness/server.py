@@ -749,6 +749,11 @@ class _Handler(BaseHTTPRequestHandler):
             return self._get_recipe(rid)
         if path.startswith("/api/connectors/") and path.endswith("/oauth/status"):
             cid = path[len("/api/connectors/") : -len("/oauth/status")].strip("/")
+            from . import delegated_oauth
+            from .connectors import WORKSPACE_TYPES
+            record = next((r for r in Connectors(self.orch.paths).list() if r.get("id") == cid), None)
+            if record and record["type"] in WORKSPACE_TYPES:
+                return self._send_json({"connector": cid, "status": "connected" if delegated_oauth.connected(self.orch.paths, cid) else "idle"})
             return self._send_json(mcp_oauth.status(self.orch.paths, cid))
         if path == "/api/prompts":
             return self._get_prompts()
@@ -856,6 +861,9 @@ class _Handler(BaseHTTPRequestHandler):
         if path.startswith("/api/rooms/") and path.endswith("/messages"):
             rid = path[len("/api/rooms/") : -len("/messages")].strip("/")
             return self._post_room_message(rid)
+        if path.startswith("/api/connectors/") and path.endswith("/delegated-auth"):
+            cid = path[len("/api/connectors/") : -len("/delegated-auth")].strip("/")
+            return self._install_delegated_auth(cid)
         if path == "/api/connectors/oauth/exchange":
             return self._connector_oauth_exchange()
         if path.startswith("/api/connectors/") and path.endswith("/oauth/start"):
@@ -1851,7 +1859,10 @@ class _Handler(BaseHTTPRequestHandler):
         return self._send_json(record)
 
     def _remove_connector(self, connector_id: str):
-        removed = Connectors(self.orch.paths).remove(connector_id)
+        try:
+            removed = Connectors(self.orch.paths).remove(connector_id)
+        except MCPOAuthError as exc:
+            return self._send_json({"error": str(exc)}, 502)
         return self._send_json({"removed": connector_id, "ok": removed})
 
     # -- connector OAuth (remote MCP servers) --------------------------------
@@ -1873,24 +1884,9 @@ class _Handler(BaseHTTPRequestHandler):
         )
         if record is None:
             return self._send_json({"error": f"no connector {connector_id!r}"}, 404)
-        from . import google_oauth
-
-        if google_oauth.supported(str(record.get("type") or "")):
-            redirect = str(data.get("redirect_uri") or f"{self.server.public_url}/oauth/callback")
-            try:
-                return self._send_json(
-                    google_oauth.start_authorize(
-                        self.orch.paths,
-                        record,
-                        redirect,
-                        client_id=str(data.get("client_id") or ""),
-                        client_secret=str(data.get("client_secret") or ""),
-                    )
-                )
-            except MCPOAuthError as exc:
-                return self._send_json(
-                    {"connector": connector_id, "status": "error", "message": str(exc)}, 502
-                )
+        from .connectors import WORKSPACE_TYPES
+        if record.get("type") in WORKSPACE_TYPES:
+            return self._send_json({"status": "unavailable", "message": "Connect this account through Dotobot's account service. Update your app if needed."}, 409)
         url = connector_mcp_url(str(record.get("type", "")), record.get("config"))
         if not url:
             return self._send_json(
@@ -1949,7 +1945,30 @@ class _Handler(BaseHTTPRequestHandler):
             _oauth_page(ok=True, message="You can close this window and return to the app.")
         )
 
+    def _install_delegated_auth(self, connector_id: str):
+        from . import delegated_oauth
+        from .connectors import WORKSPACE_TYPES
+        records = Connectors(self.orch.paths)
+        record = next((r for r in records.list() if r["id"] == connector_id), None)
+        if not record or record["type"] not in WORKSPACE_TYPES:
+            return self._send_json({"error": "Unsupported delegated connector"}, 400)
+        try:
+            email = delegated_oauth.install(self.orch.paths, record, self._read_json())
+            records.update(connector_id, name=email or record["name"], config={"email": email})
+            return self._send_json({"status": "connected"})
+        except MCPOAuthError as exc:
+            return self._send_json({"error": str(exc)}, 400)
+
     def _delete_connector_oauth(self, connector_id: str):
+        from . import delegated_oauth
+        from .connectors import WORKSPACE_TYPES
+        record = next((r for r in Connectors(self.orch.paths).list() if r["id"] == connector_id), None)
+        if record and record["type"] in WORKSPACE_TYPES:
+            try:
+                delegated_oauth.disconnect(self.orch.paths, record)
+            except MCPOAuthError as exc:
+                return self._send_json({"error": str(exc)}, 502)
+
         removed = mcp_oauth.clear_tokens(self.orch.paths, connector_id)
         try:
             from connectors import mcp as mcp_runtime

@@ -744,40 +744,26 @@ _ROWS: list[tuple[str, str, str, str]] = [
     ),
     ("goodbits", "none", "https://goodbits.io/", "No known MCP server."),
     (
-        "google_ad_manager",
-        "community",
-        "https://developers.google.com/ad-manager/api/beta/getting-started",
-        "REST uses a stored OAuth access token. Enable the API and grant network access. End-user tokens require config quota_project; service-account tokens may omit it. Paths omit /v1. Token issuance and refresh are not automatic.",
-    ),
-    (
-        "google_ads",
-        "official",
-        "https://developers.google.com/google-ads/api/docs/developer-toolkit/mcp-server",
-        "Official MCP. REST credentials are a stored JSON array [OAuth access token, developer token]. Include the API version in paths. Optional config login_customer_id and linked_customer_id are digit-only IDs. Token creation and refresh are manual.",
-    ),
-    (
-        "google_analytics",
-        "official",
-        "https://developers.google.com/analytics/devguides/reporting/data/v1/rest",
-        "GA4 Data API. Store a current OAuth access token, not an API key or service-account JSON. Uses Bearer; consent, token creation and refresh are not implemented. Enable the Data API and grant the token identity property access with analytics.readonly or analytics scope. Include /v1beta or /v1alpha in paths. GET /v1beta/properties/PROPERTY_ID/metadata; POST /v1beta/properties/PROPERTY_ID:runReport with dimensions, metrics and dateRanges JSON. Set a small limit and page with offset to avoid response truncation. Admin API and Measurement Protocol use different hosts and are not routed here.",
-    ),
-    (
         "google_calendar",
         "official",
         "https://developers.google.com/workspace/calendar/api/v3/reference",
-        "Connect your Google account to grant access. OAuth refreshes access automatically; pasted tokens are not supported. GET /users/me/calendarList lists calendars; use a token with calendar.calendarlist.readonly or another scope allowed by that endpoint. Writes need the corresponding calendar scope. Paths omit /calendar/v3.",
+        "Connect your Google account to grant access. Dotobot manages consent and refreshes access through its private account service; pasted tokens are not supported. GET /users/me/calendarList lists calendars; use a token with calendar.calendarlist.readonly or another scope allowed by that endpoint. Writes need the corresponding calendar scope. Paths omit /calendar/v3.",
     ),
     (
         "google_drive",
         "official",
         "https://developers.google.com/workspace/drive/api/reference/rest/v3",
-        "Connect your Google account to grant access. OAuth refreshes access automatically; pasted tokens are not supported. GET /files lists file metadata; drive.metadata.readonly is sufficient for that read. JSON metadata writes need an appropriate write scope. Paths omit /drive/v3. Binary and multipart uploads or downloads are not supported by these text tools.",
+        "Connect your Google account to grant access. Dotobot manages consent and refreshes access through its private account service; pasted tokens are not supported. GET /files lists file metadata; drive.metadata.readonly is sufficient for that read. JSON metadata writes need an appropriate write scope. Paths omit /drive/v3. Binary and multipart uploads or downloads are not supported by these text tools.",
+    ),
+    (
+        "google_docs", "official", "https://developers.google.com/workspace/docs/api/reference/rest",
+        "Connect through your Dotobot account. GET /documents/DOCUMENT_ID reads a document; POST /documents creates one; POST /documents/DOCUMENT_ID:batchUpdate edits it. Each Google account has its own connection. Paths omit /v1.",
     ),
     (
         "google_sheets",
         "official",
         "https://developers.google.com/workspace/sheets/api/reference/rest/v4/spreadsheets/get",
-        "Connect your Google account to grant access. OAuth refreshes access automatically; pasted tokens are not supported. GET /spreadsheets/SPREADSHEET_ID reads a spreadsheet; spreadsheets.readonly is sufficient for reads. Writes require spreadsheets or another supported write scope. Paths omit /v4. Use fields and ranges to limit large responses.",
+        "Connect your Google account to grant access. Dotobot manages consent and refreshes access through its private account service; pasted tokens are not supported. GET /spreadsheets/SPREADSHEET_ID reads a spreadsheet; spreadsheets.readonly is sufficient for reads. Writes require spreadsheets or another supported write scope. Paths omit /v4. Use fields and ranges to limit large responses.",
     ),
     (
         "gosquared",
@@ -1068,19 +1054,19 @@ _ROWS: list[tuple[str, str, str, str]] = [
         "microsoft_excel",
         "official",
         "https://learn.microsoft.com/en-us/graph/api/workbook-list-worksheets?view=graph-rest-1.0",
-        "Connect your Google account to grant access. OAuth refreshes access automatically; pasted tokens are not supported. GET /me/drive/items/ITEM_ID/workbook/worksheets lists worksheets. Use a delegated Graph token with Files.ReadWrite; application-only tokens are unsupported for this method. Calls are sessionless: workbook changes persist. Workbook-Session-Id and file uploads are not supported. Uses the global Graph cloud; paths omit /v1.0.",
+        "Connect your Google account to grant access. Dotobot manages consent and refreshes access through its private account service; pasted tokens are not supported. GET /me/drive/items/ITEM_ID/workbook/worksheets lists worksheets. Use a delegated Graph token with Files.ReadWrite; application-only tokens are unsupported for this method. Calls are sessionless: workbook changes persist. Workbook-Session-Id and file uploads are not supported. Uses the global Graph cloud; paths omit /v1.0.",
     ),
     (
         "microsoft_outlook",
         "official",
         "https://learn.microsoft.com/en-us/graph/api/user-list-messages?view=graph-rest-1.0",
-        "Connect your Google account to grant access. OAuth refreshes access automatically; pasted tokens are not supported. GET /me/messages lists messages with delegated Mail.ReadBasic for basic properties; bodies need Mail.Read. Application tokens use /users/USER_ID/messages with application permissions. Mail writes need corresponding permissions. Uses the global Graph cloud; paths omit /v1.0.",
+        "Connect your Google account to grant access. Dotobot manages consent and refreshes access through its private account service; pasted tokens are not supported. GET /me/messages lists messages with delegated Mail.ReadBasic for basic properties; bodies need Mail.Read. Application tokens use /users/USER_ID/messages with application permissions. Mail writes need corresponding permissions. Uses the global Graph cloud; paths omit /v1.0.",
     ),
     (
         "microsoft_teams",
         "official",
         "https://learn.microsoft.com/en-us/graph/api/user-list-joinedteams?view=graph-rest-1.0",
-        "Connect your Google account to grant access. OAuth refreshes access automatically; pasted tokens are not supported. GET /me/joinedTeams requires delegated Team.ReadBasic.All with a work or school account. Personal accounts are unsupported. Application tokens use /users/USER_ID/joinedTeams. Other operations require their own permissions. Uses the global Graph cloud; paths omit /v1.0.",
+        "Connect your Google account to grant access. Dotobot manages consent and refreshes access through its private account service; pasted tokens are not supported. GET /me/joinedTeams requires delegated Team.ReadBasic.All with a work or school account. Personal accounts are unsupported. Application tokens use /users/USER_ID/joinedTeams. Other operations require their own permissions. Uses the global Graph cloud; paths omit /v1.0.",
     ),
     (
         "monday",
@@ -1220,12 +1206,6 @@ _ROWS: list[tuple[str, str, str, str]] = [
         "none",
         "https://www.1password.dev/environments/mcp-server",
         "Official MCP is local stdio only (1password-mcp via the desktop app). No hosted HTTP URL. www.1password.dev/mcp is Mintlify docs search, not vaults.",
-    ),
-    (
-        "google",
-        "none",
-        "https://developers.google.com/workspace",
-        "Umbrella Google stub. Prefer the Gmail / Calendar / Drive / Sheets / Ads entries.",
     ),
     (
         "cloudflare",

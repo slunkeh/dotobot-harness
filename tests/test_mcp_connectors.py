@@ -520,7 +520,7 @@ def test_gmail_listing_ignores_old_password_and_reports_static_tools(paths):
     listed = Connectors(paths).list()[0]
     assert listed["secret_configured"] is False
     assert listed["oauth_configured"] is False
-    assert listed["name"] == "ada@example.com"
+    assert listed["name"] == "Gmail"
     assert listed["config"] == {"email": "ada@example.com"}
     assert "gmail_send" in listed["tools"]
     assert "gmail_send_draft" in listed["tools"]
@@ -562,7 +562,7 @@ def test_catalog_marks_mcp_types():
     assert by_type["gmail"]["mcp"] is False
     assert "mcp_url" not in by_type["gmail"]
     assert by_type["gmail"]["auth"] == "oauth"
-    assert by_type["gmail"]["fields"] == ["email"]
+    assert by_type["gmail"]["fields"] == []
     assert by_type["gmail"]["implemented"] is True
     assert by_type["github"]["prefer_static"] is True
     assert by_type["github"]["auth"] == "api_key"
@@ -730,38 +730,23 @@ def test_oauth_start_without_mcp_url_is_501(server):
     assert err.value.code == 501
 
 
-@pytest.mark.parametrize("kind", ["gmail", "google_calendar", "google_drive", "google_sheets"])
-def test_google_oauth_connects_over_http_without_mcp(server, monkeypatch, kind):
-    from harness.google_oauth import SCOPES
-
+@pytest.mark.parametrize("kind", ["gmail", "google_calendar", "google_drive", "google_sheets", "google_docs"])
+def test_workspace_uses_delegation_not_native_google_oauth(server, monkeypatch, kind):
+    from harness import delegated_oauth
     base, orch, fake = server
-    monkeypatch.setenv("GOOGLE_DESKTOP_CLIENT_ID", "google-desktop")
-
-    def tokens(url, form):
-        assert url == "https://oauth2.googleapis.com/token"
-        assert "resource" not in form
-        return {
-            "access_token": "google-access",
-            "refresh_token": "google-refresh",
-            "scope": " ".join(SCOPES[kind]),
-            "expires_in": 3600,
-        }
-
-    monkeypatch.setattr(fake, "post_form", tokens)
     record = _req(f"{base}/api/connectors", "POST", {"type": kind, "name": kind})
     cid = record["id"]
-    start = _req(
-        f"{base}/api/connectors/{cid}/oauth/start",
-        "POST",
-        {"redirect_uri": "http://127.0.0.1:18765/callback"},
-    )
-    assert start["authorize_url"].startswith("https://accounts.google.com/")
-    done = _req(
-        f"{base}/api/connectors/oauth/exchange",
-        "POST",
-        {"state": start["state"], "code": "google-code"},
-    )
-    assert done["status"] == "connected"
+    with pytest.raises(urllib.error.HTTPError) as error:
+        _req(f"{base}/api/connectors/{cid}/oauth/start", "POST", {})
+    assert error.value.code == 409
+    mcp_oauth.save_tokens(orch.paths, cid, {"access_token": "legacy", "refresh_token": "legacy-refresh"})
+    assert _req(f"{base}/api/connectors/{cid}/oauth/status")["status"] == "idle"
+    monkeypatch.setattr(delegated_oauth, "request", lambda *args: {
+        "access_token": "short-lived", "email": "test@example.com", "service": kind})
+    _req(f"{base}/api/connectors/{cid}/delegated-auth", "POST", {
+        "broker_url": "https://broker.example/integrations", "grant_id": "grant", "capability": "opaque"})
     assert _req(f"{base}/api/connectors")[0]["oauth_configured"] is True
+    assert _req(f"{base}/api/connectors/{cid}/oauth/status")["status"] == "connected"
     _req(f"{base}/api/connectors/{cid}/oauth", "DELETE")
     assert _req(f"{base}/api/connectors")[0]["oauth_configured"] is False
+    assert _req(f"{base}/api/connectors/{cid}/oauth/status")["status"] == "idle"

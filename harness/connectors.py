@@ -23,9 +23,10 @@ from typing import Any
 
 from .connector_docs import DOCS
 from .connector_stubs import STUBS
-from .google_oauth import SCOPES as _GOOGLE_SCOPES
 from .paths import HarnessPaths
 from .secrets import delete_secret, secret_source, set_secret
+
+WORKSPACE_TYPES = frozenset({"gmail", "google_calendar", "google_drive", "google_sheets", "google_docs"})
 
 # Available connector types the UI can offer, with the gallery metadata a
 # client needs to render a plugin-store style browser. `auth` is how
@@ -69,15 +70,6 @@ CATALOG: list[dict] = [
             "access token (classic ghp_ or fine-grained github_pat_)."
         ),
         "icon": "chevron.left.forwardslash.chevron.right",
-    },
-    {
-        "type": "google",
-        "name": "Google",
-        "auth": "oauth",
-        "fields": [],
-        "category": "Productivity",
-        "description": "Gmail, Calendar, and Drive (OAuth sign-in planned).",
-        "icon": "globe",
     },
     {
         "type": "notion",
@@ -338,11 +330,11 @@ CATALOG: list[dict] = [
         "icon": "chart.bar.xaxis",
     },
     {
-        # Gmail uses Google OAuth with IMAP/SMTP XOAUTH2.
+        # Gmail uses delegated short-lived OAuth access with IMAP/SMTP XOAUTH2.
         "type": "gmail",
         "name": "Gmail",
-        "auth": "api_key",
-        "fields": ["email"],
+        "auth": "oauth",
+        "fields": [],
         "multi_account": True,
         "category": "Inbox And Collaboration",
         "description": (
@@ -739,8 +731,8 @@ CATALOG: list[dict] = [
 # Google API consent is independent of remote MCP discovery.
 
 for _entry in CATALOG:
-    if _entry["type"] in _GOOGLE_SCOPES:
-        _entry.update(auth="oauth", oauth_supported=True, multi_account=True, prefer_static=True)
+    if _entry["type"] in WORKSPACE_TYPES:
+        _entry.update(auth="oauth", oauth_supported=True, multi_account=True, prefer_static=True, auth_broker="control_plane")
 
 _CATALOG_TYPES = {c["type"]: c for c in CATALOG}
 
@@ -779,8 +771,6 @@ FEATURED: list[str] = [
     "typeform",
     "whatsapp",
     "telegram",
-    "google_ads",
-    "google_analytics",
     "ahrefs",
     "linkedin",
     "monday",
@@ -1222,8 +1212,11 @@ class Connectors:
         oauth = mcp_oauth.connected(self.paths, str(item.get("id", "")))
         out["oauth_configured"] = oauth
         type_ = str(item.get("type", ""))
-        if type_ in _GOOGLE_SCOPES:
+        if type_ in WORKSPACE_TYPES:
+            from . import delegated_oauth
+
             out["secret_configured"] = False
+            out["oauth_configured"] = delegated_oauth.connected(self.paths, str(item.get("id", "")))
         cached = item.get("mcp_tools")
         prefer_static = bool(_CATALOG_TYPES.get(type_, {}).get("prefer_static"))
         if oauth and isinstance(cached, list) and cached and not prefer_static:
@@ -1340,6 +1333,10 @@ class Connectors:
         kept = [i for i in items if i["id"] != connector_id]
         if len(kept) == len(items):
             return False
+        from . import delegated_oauth
+        record = next(i for i in items if i["id"] == connector_id)
+        if record["type"] in WORKSPACE_TYPES:
+            delegated_oauth.disconnect(self.paths, record)
         self._save(kept)
         delete_secret(f"connector_{connector_id}", self.paths)
         mcp_oauth.clear_tokens(self.paths, connector_id)
