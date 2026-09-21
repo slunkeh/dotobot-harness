@@ -7,7 +7,7 @@ import urllib.error
 import pytest
 
 from agent.memory import Memory
-from harness import jev, jev_features, prefs
+from harness import cdp, jev, jev_features, prefs
 from harness.paths import HarnessPaths
 from harness.secrets import get_secret
 
@@ -64,6 +64,7 @@ def test_connect_enable_disable_disconnect(paths, upstream):
         "configured": False,
         "source": None,
         "features": {name: False for name in jev_features.FEATURES},
+        "browser": {"cdp_enabled": cdp.enabled()},
     }
     prefs.save(paths, {"caveman": True})
     result = jev.connect(paths, "customer-jev-secret")
@@ -79,6 +80,7 @@ def test_connect_enable_disable_disconnect(paths, upstream):
         "configured": False,
         "source": None,
         "features": {name: False for name in jev_features.FEATURES},
+        "browser": {"cdp_enabled": cdp.enabled()},
     }
     assert len(upstream) == 1
 
