@@ -97,7 +97,7 @@ def question(instructions, criteria):
     }
 
 
-def summary_problem(paths, source, summary):
+def summary_problem(paths, source, summary, *, writer=None):
     answers = choices(
         paths,
         "compaction",
@@ -111,6 +111,7 @@ def summary_problem(paths, source, summary):
                 },
             )
         },
+        writer=writer,
     )
     return (
         "it lost or contradicted important tasks, constraints, decisions or identifiers; preserve these from the source"
@@ -201,7 +202,10 @@ def filter_tool_result(paths, query, result, *, writer=None):
         },
         ensure_ascii=False,
     )
-    return envelope[1] + selected + envelope[4] if envelope else selected
+    selected = envelope[1] + selected + envelope[4] if envelope else selected
+    # Added omission metadata must not grow a result past the runtime cap and
+    # cut off the trusted outer boundary. No savings means no replacement.
+    return selected if len(selected) < len(result) else result
 
 
 def check_completion(paths, text, evidence, *, writer=None):
@@ -258,7 +262,7 @@ def handoff_advice(paths, task, candidates, pending, *, writer=None):
     }
 
 
-def notification_priority(paths, text):
+def notification_priority(paths, text, *, writer=None):
     answers = choices(
         paths,
         "notifications",
@@ -273,5 +277,6 @@ def notification_priority(paths, text):
                 },
             )
         },
+        writer=writer,
     )
     return {"attention": 1, "routine": -1}.get(answers["attention"], 0) if answers else 0

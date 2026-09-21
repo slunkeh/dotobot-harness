@@ -561,7 +561,7 @@ def _remember(ctx: ToolContext, args: dict[str, Any]) -> str:
     text = str(args.get("text", "")).strip()
     if not text:
         return "error: remember needs 'text'"
-    review = ctx.memory.remember(text)
+    review = ctx.memory.remember(text, writer=ctx.writer)
     return "ok: remembered" + (
         "; advisory memory review: "
         + json.dumps(review)

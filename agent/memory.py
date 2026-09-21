@@ -107,7 +107,7 @@ class Memory:
         return pack_embedding(vec) if vec is not None else None
 
     # -- facts ------------------------------------------------------------
-    def remember(self, text: str, *, kind: str = "fact") -> dict | None:
+    def remember(self, text: str, *, kind: str = "fact", writer=None) -> dict | None:
         self.ensure()
         # Facts scrub like session records: the embedding derives
         # from the same scrubbed text, so a stored credential is never posted
@@ -117,7 +117,9 @@ class Memory:
         from harness.jev_features import enabled, review_memory
 
         review = (
-            review_memory(self.paths, text, [{"text": f.get("text", "")} for f in self.facts()])
+            review_memory(
+                self.paths, text, [{"text": f.get("text", "")} for f in self.facts()], writer=writer
+            )
             if enabled(self.paths, "memory")
             else None
         )

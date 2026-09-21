@@ -2164,6 +2164,7 @@ class Agent:
                     session_id=self.session_id,
                     paths=self.paths,
                     bot=self.bot.name,
+                    writer=writer,
                 )
             except Exception:
                 pass  # compaction is best-effort; the turn must go on
@@ -2851,7 +2852,9 @@ class Agent:
                 writer.final(
                     final_text,
                     self.bot.name,
-                    notification_priority=notification_priority(self.paths, final_text),
+                    notification_priority=notification_priority(
+                        self.paths, final_text, writer=writer
+                    ),
                 )
             else:
                 writer.final(final_text, self.bot.name)

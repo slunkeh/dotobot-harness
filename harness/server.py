@@ -4210,6 +4210,7 @@ def asdict_event(ev):
         "voice_call_id": ev.voice_call_id,
         "voice_input_id": ev.voice_input_id,
         "voice_text": ev.voice_text,
+        "notification_priority": ev.notification_priority,
         "value": ev.value,
         "text": ev.text,
         "frm": ev.frm,

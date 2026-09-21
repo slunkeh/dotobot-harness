@@ -225,6 +225,10 @@ def test_priority_survives_stream_and_never_suppresses_notifications(paths, monk
         notification_priority=features.notification_priority(paths, "Routine progress"),
     )
     event = next(e for e in StreamReader(paths, "priority")._read_new() if e.type == "final")
+    from harness.server import asdict_event
+
+    forwarded = asdict_event(event)
+    assert forwarded["notification_priority"] == -1
     assert event.notification_priority == -1
     assert StreamEvent.from_dict({"type": "final"}).notification_priority == 0
     relay = PushRelay(paths.home, "https://relay.example/push")
@@ -341,3 +345,12 @@ def test_notifications_disabled_preserve_fifo(paths, monkeypatch):
     with sqlite3.connect(relay.path) as db:
         rows = db.execute("SELECT payload FROM outbox ORDER BY created").fetchall()
     assert [json.loads(r[0])["priority"] for r in rows] == [0, 0]
+
+
+def test_filter_never_grows_result_or_cuts_trust_boundary(paths, monkeypatch):
+    enable(paths, "tool_results")
+    answer(monkeypatch, {"0": "omit", "1": "keep", "2": "keep"})
+    original = wrap_external(
+        json.dumps({"items": [{"id": "tiny"}, {"text": "x" * 5000}, {"text": "y" * 5000}]})
+    )
+    assert features.filter_tool_result(paths, "query", original) == original
