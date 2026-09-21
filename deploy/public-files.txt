@@ -7,6 +7,7 @@ harness/approvals.py
 harness/audit.py
 harness/boot.py
 harness/bot_cleanup.py
+harness/browser_dom.py
 harness/browser_idle.py
 harness/bundle.py
 harness/cdp.py
@@ -80,6 +81,7 @@ agent/gate.py
 agent/govern.py
 agent/history.py
 agent/humanizer.py
+agent/jev_browser.py
 agent/learn_demo.py
 agent/memory.py
 agent/mentions.py
@@ -189,6 +191,7 @@ tests/test_boot.py
 tests/test_bot_cleanup.py
 tests/test_bot_deletion_contract.py
 tests/test_browser_idle.py
+tests/test_browser_dom.py
 tests/test_browser_split.py
 tests/test_bundle.py
 tests/test_cards.py
@@ -244,6 +247,7 @@ tests/test_interactive.py
 tests/test_isolation_container.py
 tests/test_isolation_machines.py
 tests/test_isolation_vm.py
+tests/test_jev_browser.py
 tests/test_lifecycle_concurrency.py
 tests/test_linking.py
 tests/test_logstream.py
