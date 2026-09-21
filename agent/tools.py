@@ -521,12 +521,54 @@ def _resolve_colleague(
     )
 
 
+def _recommend_handoff(ctx: ToolContext, args: dict[str, Any]) -> str:
+    from harness.jev_features import enabled, handoff_advice
+    from harness.roster import load_live_roster
+
+    task = str(args.get("task") or "").strip()
+    if not task:
+        return "error: recommend_handoff needs task"
+    if not enabled(ctx.paths, "handoffs"):
+        return "Jev handoff advice is disabled; use the roster and existing handoff tools."
+    roster = load_live_roster(ctx.paths.home)
+    if roster is None:
+        return "No live roster available; ask the user which bot should help."
+    allowed = None
+    if ctx.room:
+        room, error = _find_room(ctx.paths, ctx.room, member=ctx.bot)
+        if room is None:
+            return "error: cannot inspect handoffs outside the current group"
+        allowed = room.members
+    candidates = [
+        {"name": b.name, "role": b.role}
+        for b in roster
+        if b.name != ctx.bot and (allowed is None or b.name in allowed)
+    ]
+    pending = []
+    for bot in candidates:
+        for msg in messaging.pending(ctx.paths, bot["name"]):
+            if msg.frm == ctx.bot and msg.room == ctx.room:
+                pending.append({"bot": bot["name"], "text": msg.text})
+    advice = handoff_advice(ctx.paths, task, candidates, pending, writer=ctx.writer)
+    return (
+        json.dumps(advice)
+        if advice
+        else "No confident Jev recommendation; use the roster and inspect pending work."
+    )
+
+
 def _remember(ctx: ToolContext, args: dict[str, Any]) -> str:
     text = str(args.get("text", "")).strip()
     if not text:
         return "error: remember needs 'text'"
-    ctx.memory.remember(text)
-    return "ok: remembered"
+    review = ctx.memory.remember(text, writer=ctx.writer)
+    return "ok: remembered" + (
+        "; advisory memory review: "
+        + json.dumps(review)
+        + ". Existing facts preserved; resolve conflicts with the user before replacing anything."
+        if review
+        else ""
+    )
 
 
 def _read_soul(ctx: ToolContext, args: dict[str, Any]) -> str:
@@ -2672,6 +2714,18 @@ def default_tools() -> dict[str, Tool]:
 
 def _build_default_tools() -> dict[str, Tool]:
     return {
+        "recommend_handoff": Tool(
+            ToolSpec(
+                name="recommend_handoff",
+                description="Optionally ask Jev which existing bot fits a task and whether equivalent work is pending. Advisory only; never sends messages or overrides the user's selected recipient.",
+                parameters={
+                    "type": "object",
+                    "properties": {"task": {"type": "string"}},
+                    "required": ["task"],
+                },
+            ),
+            _recommend_handoff,
+        ),
         "stay_silent": Tool(
             ToolSpec(
                 name="stay_silent",

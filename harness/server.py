@@ -1094,7 +1094,8 @@ class _Handler(BaseHTTPRequestHandler):
             if path == "/api/jev" and method == "GET":
                 result = jev.status(self.orch.paths)
             elif path == "/api/jev" and method == "PATCH":
-                result = jev.set_enabled(self.orch.paths, data.get("enabled"))
+                from .jev_features import configure
+                result = configure(self.orch.paths, data)
             elif path == "/api/jev/key" and method == "POST":
                 result = jev.connect(self.orch.paths, data.get("key"))
             elif path == "/api/jev/key" and method == "DELETE":
@@ -4209,6 +4210,7 @@ def asdict_event(ev):
         "voice_call_id": ev.voice_call_id,
         "voice_input_id": ev.voice_input_id,
         "voice_text": ev.voice_text,
+        "notification_priority": ev.notification_priority,
         "value": ev.value,
         "text": ev.text,
         "frm": ev.frm,

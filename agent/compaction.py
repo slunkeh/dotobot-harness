@@ -327,6 +327,7 @@ def summarize_turns(
     *,
     budget: int,
     required: list[str] | None = None,
+    check_summary: Callable[[str, str], str] | None = None,
 ) -> str | None:
     """Plain provider `complete()` over the flattened pre-split turns, with
     each candidate validated before it is allowed to persist.
@@ -354,6 +355,8 @@ def summarize_turns(
         except Exception:  # never lose the turn over a summarizer hiccup
             return _fallback_summary(pre, budget)
         problem = summary_problem(text, required=required or [])
+        if not problem and check_summary:
+            problem = check_summary(flatten_turns(pre), text)
         if not problem:
             return text
     return None
@@ -396,6 +399,7 @@ def _maybe_fold(
     provider: Provider,
     budget: int,
     session_id: str,
+    writer=None,
 ) -> bool:
     """Fold the oldest live summaries into one epoch record when the chain
     outgrew `chain_cap()`. Each fold covers the union of the folded ranges and
@@ -406,6 +410,10 @@ def _maybe_fold(
         return False
     folded = chain[: len(chain) - cap + 1]
     body = summarize_summaries(provider, folded, budget=budget)
+    from harness.jev_features import summary_problem as jev_problem
+
+    if jev_problem(memory.paths, [_summary_body(r) for r in folded], body, writer=writer):
+        return False
     frm = float(folded[0].get("covers_from", 0.0))
     until = float(folded[-1].get("covers_until", 0.0))
     generation = max(int(r.get("generation") or 1) for r in folded) + 1
@@ -431,6 +439,7 @@ def maybe_compact(
     session_id: str,
     paths: HarnessPaths,
     bot: str,
+    writer=None,
 ) -> bool:
     """Compact the 1:1 thread with `peer` when it outgrew `budget` tokens.
 
@@ -466,13 +475,24 @@ def maybe_compact(
         # The post-seam thread is just the current exchange; the only thing
         # that can still shrink is an over-long chain.
         return _maybe_fold(
-            memory, peer=peer, provider=provider, budget=budget, session_id=session_id
+            memory,
+            peer=peer,
+            provider=provider,
+            budget=budget,
+            session_id=session_id,
+            writer=writer,
         )
     chain = summary_chain(memory, peer)
     covers_from = float(chain[-1].get("covers_until", 0.0)) if chain else 0.0
     covers_until = raw[split][2] if split < len(raw) else time.time()
+    from harness.jev_features import summary_problem as jev_problem
+
     summary = summarize_turns(
-        provider, pre, budget=budget, required=required_summary_terms(pre, paths, bot)
+        provider,
+        pre,
+        budget=budget,
+        required=required_summary_terms(pre, paths, bot),
+        check_summary=lambda source, text: jev_problem(paths, source, text, writer=writer),
     )
     if summary is None:
         return False  # no candidate validated; persist nothing
@@ -489,5 +509,7 @@ def maybe_compact(
         generation=1,
         durable=durable or None,
     )
-    _maybe_fold(memory, peer=peer, provider=provider, budget=budget, session_id=session_id)
+    _maybe_fold(
+        memory, peer=peer, provider=provider, budget=budget, session_id=session_id, writer=writer
+    )
     return True

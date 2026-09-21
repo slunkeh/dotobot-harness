@@ -25,6 +25,7 @@ harness/fsutil.py
 harness/hostdeps.py
 harness/hostinput.py
 harness/jev.py
+harness/jev_features.py
 harness/linking.py
 harness/logstream.py
 harness/machine_secrets.py
