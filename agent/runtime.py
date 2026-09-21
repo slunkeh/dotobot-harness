@@ -598,7 +598,10 @@ def _connector_note(
             )
             continue
         if cid in mentioned_ids:
-            parts.append(f"The user @mentioned {name}. Use its MCP tools. It is not a roster bot.")
+            parts.append(
+                f"The user @mentioned {name} ({type_}, @connector:{cid}). "
+                "Use its MCP tools. It is not a roster bot."
+            )
         else:
             parts.append(
                 f"The user named {name} or one of its tools. "

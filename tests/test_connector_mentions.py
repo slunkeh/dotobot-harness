@@ -443,3 +443,22 @@ def test_tool_result_cannot_expand_the_connector_offer(tmp_path, monkeypatch):
 
     agent.provider = ResultProvider("inspect")
     assert agent._produce("user", "Read the saved page") == "Read."
+
+
+@pytest.mark.parametrize("selected", [0, 1, 2])
+def test_account_identity_mentions_do_not_collide_on_email(selected):
+    from harness.connectors import connector_scope_delta
+
+    records = [
+        _rec(kind, "person@example.com", oauth=True, cid=f"a00{index}")
+        for index, kind in enumerate(("gmail", "google_calendar", "google_drive"))
+    ]
+    record = records[selected]
+    text = f"check @connector:{record['id']}"
+    assert mentioned_connected(text, records) == [record]
+    assert [m["connector_id"] for m in connector_scope_delta(text, records)["matches"]] == [
+        record["id"]
+    ]
+    assert mentioned_connected(f"don't use @connector:{record['id']}", records) == []
+    assert mentioned_connected(f'quoted "{text}"', records) == []
+    assert mentioned_connected(text + "extra", records) == []

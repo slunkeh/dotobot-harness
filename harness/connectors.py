@@ -847,7 +847,9 @@ def mentioned_connected(text: str, records: list[dict]) -> list[dict]:
         if cid not in selected or cid in seen:
             continue
         titles = mention_titles(str(rec.get("type") or ""), str(rec.get("name") or ""))
-        if any(_at_mentions(text, title) for title in titles):
+        if _at_mentions(text, f"connector:{cid}") or any(
+            _at_mentions(text, title) for title in titles
+        ):
             if cid:
                 seen.add(cid)
             out.append(rec)
@@ -1005,6 +1007,9 @@ def connector_scope_delta(text: str, records: list[dict]) -> dict[str, Any]:
                 if name.startswith(type_ + "_") and not name.startswith(prefix + "_"):
                     name = prefix + name[len(type_) :]
                 specific.append(name)
+            identity = f"connector:{cid}"
+            if _at_mentions(clause, identity):
+                specific.insert(0, identity)
             exact = next((name for name in specific if name and _word_in(clause, name)), "")
             broad = next((name for name in generic if _word_in(clause, name)), "")
             if exact or broad:
