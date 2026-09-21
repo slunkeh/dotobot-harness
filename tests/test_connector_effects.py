@@ -179,3 +179,12 @@ def test_one_policy_rule_can_forbid_every_vendor_write():
         ).allowed
         is True
     )
+
+@pytest.mark.parametrize('kind', ['google_calendar', 'google_drive', 'google_docs', 'google_sheets'])
+@pytest.mark.parametrize('account', ['', 'personal_'])
+def test_workspace_rest_reads_are_reads(kind, account):
+    name = f'{kind}_{account}get'
+    assert classify(name) == EFFECT_READ
+    assert govern.classify(name, {'path': '/files'}, {name})[0] == govern.INTENT_READ_TOOL
+    assert classify(f'{kind}_{account}request') == EFFECT_WRITE
+    assert classify(f'{kind}_{account}delete') == EFFECT_WRITE
