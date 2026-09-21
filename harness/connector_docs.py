@@ -1222,12 +1222,6 @@ _ROWS: list[tuple[str, str, str, str]] = [
         "Official MCP is local stdio only (1password-mcp via the desktop app). No hosted HTTP URL. www.1password.dev/mcp is Mintlify docs search, not vaults.",
     ),
     (
-        "google",
-        "none",
-        "https://developers.google.com/workspace",
-        "Umbrella Google stub. Prefer the Gmail / Calendar / Drive / Sheets / Ads entries.",
-    ),
-    (
         "cloudflare",
         "official",
         "https://developers.cloudflare.com/agents/model-context-protocol/cloudflare/servers-for-cloudflare/",

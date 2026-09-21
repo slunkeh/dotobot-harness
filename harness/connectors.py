@@ -71,15 +71,6 @@ CATALOG: list[dict] = [
         "icon": "chevron.left.forwardslash.chevron.right",
     },
     {
-        "type": "google",
-        "name": "Google",
-        "auth": "oauth",
-        "fields": [],
-        "category": "Productivity",
-        "description": "Gmail, Calendar, and Drive (OAuth sign-in planned).",
-        "icon": "globe",
-    },
-    {
         "type": "notion",
         "name": "Notion",
         "auth": "oauth",

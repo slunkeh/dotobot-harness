@@ -9,7 +9,7 @@ import pytest
 
 from connectors.base import ConnectorContext
 from harness import google_oauth, mcp_oauth
-from harness.connectors import Connectors
+from harness.connectors import Connectors, catalog
 from harness.paths import HarnessPaths
 
 
@@ -132,3 +132,14 @@ def test_expired_token_does_not_fall_back_to_old_password(paths, monkeypatch):
     )
     with pytest.raises(mcp_oauth.OAuthError, match="Reconnect"):
         google_oauth.token(paths, record)
+
+
+def test_catalog_offers_workspace_oauth_instead_of_obsolete_google_placeholder():
+    entries = {entry["type"]: entry for entry in catalog()}
+    assert "google" not in entries
+    for kind in google_oauth.SCOPES:
+        entry = entries[kind]
+        assert entry["auth"] == "oauth"
+        assert entry["oauth_supported"] is True
+        assert entry["multi_account"] is True
+        assert "planned" not in entry.get("description", "").lower()
