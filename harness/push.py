@@ -71,6 +71,14 @@ def notification(frame: dict) -> dict | None:
     conv = "room:" + str(frame["room"]) if frame.get("room") else "bot:" + bot
     event_id = hashlib.sha256(json.dumps([kind, bot, conv, identity]).encode()).hexdigest()
     return {
+        "priority": 2
+        if kind != "final"
+        else (
+            frame.get("notification_priority")
+            if type(frame.get("notification_priority")) is int
+            and frame["notification_priority"] in (-1, 0, 1)
+            else 0
+        ),
         "event_id": event_id,
         "bot": bot,
         "conv": conv,
@@ -95,6 +103,7 @@ class PushRelay:
             or parts.fragment
         ):
             raise ValueError("HARNESS_PUSH_RELAY_URL must be an HTTPS URL")
+        self.home = home
         self.url = url
         self.title_for = title_for
         self.path = home / "push.sqlite3"
@@ -137,6 +146,11 @@ class PushRelay:
         event = notification(frame)
         if event is None:
             return
+        from .jev_features import enabled
+        from .paths import HarnessPaths
+
+        if not enabled(HarnessPaths.resolve(self.home), "notifications"):
+            event["priority"] = 0
         if self.title_for is not None:
             title, author = self.title_for(event["bot"], frame.get("room"))
             event["title"] = title
@@ -158,15 +172,17 @@ class PushRelay:
         now = time.time()
         with self.lock, self._db() as db:
             row = db.execute(
-                "SELECT o.id, o.subscription, o.payload, o.attempts, s.secret FROM outbox o JOIN subscriptions s ON s.id=o.subscription WHERE o.done=0 AND o.next_attempt<=? AND o.created>? AND s.expires>? ORDER BY o.created LIMIT 1",
+                "SELECT o.id, o.subscription, o.payload, o.attempts, s.secret FROM outbox o JOIN subscriptions s ON s.id=o.subscription WHERE o.done=0 AND o.next_attempt<=? AND o.created>? AND s.expires>? ORDER BY COALESCE(json_extract(o.payload, '$.priority'), 0) DESC, o.created LIMIT 1",
                 (now, now - 3600, now),
             ).fetchone()
         if row is None:
             return False
         key, sid, payload, attempts, secret = row
+        event = json.loads(payload)
+        event.pop("priority", None)  # Local ordering only; preserve the relay API.
         request = urllib.request.Request(
             self.url,
-            data=json.dumps({"subscription_id": sid, **json.loads(payload)}).encode(),
+            data=json.dumps({"subscription_id": sid, **event}).encode(),
             headers={"Authorization": "Bearer " + secret, "Content-Type": "application/json"},
             method="POST",
         )

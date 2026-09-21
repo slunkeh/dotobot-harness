@@ -107,20 +107,30 @@ class Memory:
         return pack_embedding(vec) if vec is not None else None
 
     # -- facts ------------------------------------------------------------
-    def remember(self, text: str, *, kind: str = "fact") -> None:
+    def remember(self, text: str, *, kind: str = "fact") -> dict | None:
         self.ensure()
         # Facts scrub like session records: the embedding derives
         # from the same scrubbed text, so a stored credential is never posted
         # to the embedding provider — which can be a different vendor than
         # the bot's chat route.
         text = scrub_secrets(text)
+        from harness.jev_features import enabled, review_memory
+
+        review = (
+            review_memory(self.paths, text, [{"text": f.get("text", "")} for f in self.facts()])
+            if enabled(self.paths, "memory")
+            else None
+        )
         record = {"ts": time.time(), "kind": kind, "text": text}
+        if review:
+            record["jev_review"] = review
         packed = self._packed_embedding(text)
         if packed:
             record["embedding"] = packed
         with self.facts_file.open("a", encoding="utf-8") as fh:
             fh.write(json.dumps(record, ensure_ascii=False) + "\n")
         self._facts_cache = None
+        return review
 
     def facts(self) -> list[dict]:
         stamp = _file_stamp(self.facts_file)

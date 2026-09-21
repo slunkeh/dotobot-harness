@@ -162,13 +162,14 @@ references. Archives must use that same HTTPS origin; the installer rejects
 cross-origin downloads and checks their SHA-256 digests. Preparing this source
 tree does not configure the release domain or publish any releases.
 
-## Optional Jev context selection
+## Optional Jev assistance
 
 Jev by TypeSafe can filter clearly unrelated recalled memories before a bot
 answers. It is off by default and needs no Dotobot account. Use your own TypeSafe
 API key; TypeSafe bills your account directly. Enabling it sends the current
 request and recalled memory excerpts to TypeSafe. It does not replace your chat
-model, rewrite stored history or change the existing compaction safeguards.
+model or grant permission to act. Additional features are separate opt-ins; merely
+enabling Jev never enables them.
 Uncertain selections stay included. Failed, rate-limited, timed-out or oversized
 requests fall back to standard memory.
 
@@ -178,11 +179,37 @@ authenticated server API:
 
 | Method | Path | JSON body | Purpose |
 | --- | --- | --- | --- |
-| GET | `/api/jev` | — | `enabled`, `configured`, credential `source`; never the key |
+| GET | `/api/jev` | — | `enabled`, `configured`, credential `source`, and `features`; never the key |
 | POST | `/api/jev/key` | `{"key":"YOUR_KEY"}` | Test access, then store key; leaves enablement unchanged |
 | POST | `/api/jev/test` | `{}` | Test the configured key with a small billed request |
 | PATCH | `/api/jev` | `{"enabled":true}` | Opt in, or use `false` to disable |
 | DELETE | `/api/jev/key` | — | Disable and remove the stored key |
+
+### Additional checks (all off by default)
+
+PATCH `/api/jev` with `{"features":{"compaction":true,"memory":true}}` to
+select individual features. The main `enabled` switch must also be on. Feature
+choices survive disabling Jev, but no feature calls TypeSafe while it is off.
+Compatible Mac/iPhone settings expose each supported feature separately.
+
+| Feature key | Behavior and data sent to TypeSafe |
+| --- | --- |
+| `compaction` | Compare the same bounded conversation excerpt used by the summarizer with its candidate summary. Confidently missing/contradicted constraints, decisions, identifiers or unfinished work trigger existing corrective retries. No passing candidate means no summary commit. Epoch folds with a detected omission are skipped. Original session records remain intact. |
+| `memory` | Compare a new memory with the last 30 saved facts. Persist advisory durable/temporary and new/duplicate/conflict labels alongside it; the remember tool reports them. Never silently delete, replace or discard a requested memory. |
+| `tool_results` | Filter clearly unrelated entries from large, successful read-only JSON search results (`results`, `items`, `messages`, `events` or `files`). Preserve original retained objects, pagination/count metadata and external-content boundaries; mark omissions. Unsupported shapes, errors, uncertainty, and an all-omitted result keep the original. At most three eligible results are considered per turn. |
+| `completion` | Compare a final reply with this turn's original tool receipts. Append an explicit unverified-outcomes note for confidently unsupported action-completion claims. A model judgment is not proof of success or failure. |
+| `handoffs` | Offer `recommend_handoff(task)` to the bot. Compare the task with roster roles and the requesting bot's pending handoffs in this conversation; group chats restrict candidates to members. Recommend a bot and flag possible duplicates. Never send, suppress, reroute or authorize a handoff. |
+| `notifications` | Classify the final reply's attention needs to order pending push delivery. Approval/input prompts retain top priority. Every notification remains queued; nothing is suppressed. Existing notification preferences and relay payloads remain unchanged. |
+
+All checks use the owner's key, redact registered secrets, and retain the existing
+48 KB request bound and four-second HTTP timeout. There are no paid background
+scans. Each extra check can add a request and latency; questions about the same
+state are batched. Oversized inputs and failed/invalid answers use baseline
+behavior. Confidence below 0.9 is treated as uncertain, not correctness evidence.
+Thresholds are conservative starting policies, not measured accuracy guarantees.
+The offline suite uses fake judgments; live quality, latency and savings still
+need evaluation on representative user tasks. Tool filtering is intentionally
+limited to structured result lists, not arbitrary command output or screenshots.
 
 Use the harness linking key as the bearer credential and HTTPS outside a trusted
 local connection. Keys use the existing private credential store (0600 files),

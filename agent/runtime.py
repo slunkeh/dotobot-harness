@@ -1951,6 +1951,10 @@ class Agent:
         # updating it in place leaked connector tools into the global
         # catalogue, where they outlived the connector being disabled.
         tools = dict(default_tools())
+        from harness.jev_features import enabled as jev_enabled
+
+        if not jev_enabled(self.paths, "handoffs"):
+            tools.pop("recommend_handoff", None)
         if not room:
             tools.pop("stay_silent", None)
         try:
@@ -2177,7 +2181,9 @@ class Agent:
         from harness.jev import select_context
 
         mem = self.memory.context_block(
-            text, session_cutoff=cutoff, token_budget=self._recall_budget(),
+            text,
+            session_cutoff=cutoff,
+            token_budget=self._recall_budget(),
             select_context=lambda items: select_context(self.paths, text, items, writer=writer),
         )
         if mem:
@@ -2221,6 +2227,8 @@ class Agent:
 
         stuck_reason: str | None = None
         final_text = ""
+        jev_evidence = []
+        jev_filter_checks = 0
         sink: dict = {"typing": False, "chunks": []}
         repair_budget = repairs.RepairState()
         tool_stats = repairs.ToolStats()
@@ -2625,6 +2633,25 @@ class Agent:
                             # state. The gate holds them until the model can
                             # inspect this failure and choose a new action.
                             ctx.computer_batch_failed = True
+                        # Preserve the original, scrubbed receipt for completion checks.
+                        jev_evidence.append({"tool": call.name, "result": str(result)})
+                        from harness.jev_features import filter_tool_result
+
+                        if (
+                            jev_filter_checks < 3
+                            and s_intent in {govern.INTENT_READ, govern.INTENT_READ_TOOL}
+                            and not str(result).startswith("error:")
+                            and len(str(result)) >= 4000
+                        ):
+                            jev_filter_checks += 1
+                            query = "\n".join(
+                                m.content
+                                for m in messages
+                                if m.role == "user" and isinstance(m.content, str)
+                            )
+                            result = cap_tool_result(
+                                filter_tool_result(self.paths, query, str(result), writer=writer)
+                            )
                         messages.append(
                             Message(
                                 role="tool", content=result, tool_call_id=call.id, name=call.name
@@ -2751,6 +2778,11 @@ class Agent:
             self._record_turn_usage(turn_requests, turn_usage, origin)
             computer_progress.finish(writer, ctx, error=crashed or stuck_reason is not None)
 
+        from harness.jev_features import check_completion
+
+        if final_text and not self._turn_interrupted() and stuck_reason is None:
+            final_text = check_completion(self.paths, final_text, jev_evidence, writer=writer)
+
         if task:
             try:
                 status = (
@@ -2812,7 +2844,17 @@ class Agent:
                 )
             except Exception:
                 pass
-            writer.final(final_text, self.bot.name)
+            from harness.jev_features import enabled as jev_enabled
+            from harness.jev_features import notification_priority
+
+            if jev_enabled(self.paths, "notifications"):
+                writer.final(
+                    final_text,
+                    self.bot.name,
+                    notification_priority=notification_priority(self.paths, final_text),
+                )
+            else:
+                writer.final(final_text, self.bot.name)
 
         skip_dup = False
         if self._turn_interrupted():
@@ -3030,6 +3072,7 @@ class Agent:
             if quiet >= silence:
                 return "silence", quiet
         from harness.update_state import held
+
         if held(self.paths, self.bot.name):
             return None, None
         waited: float | None = None
@@ -3117,6 +3160,7 @@ class Agent:
         messages that arrived during the drain with an explicit restart error
         rather than queueing them into a dying process."""
         from harness.update_state import held
+
         if self._drain_ts is None or held(self.paths, self.bot.name):
             return
         recovery.stamp_shutdown(self.statestore, self.bot.name)
@@ -3138,6 +3182,7 @@ class Agent:
             return False
         with messaging.queue_lock(self.paths, self.bot.name):
             from harness import update_state
+
             if update_state.held(self.paths, self.bot.name) and self.scheduler.zombies:
                 return False  # Escaped workers must finish before acknowledging a safe restart.
             if update_state.acknowledge(self.paths, self.bot.name):
@@ -3304,7 +3349,9 @@ class Agent:
             run.began_paused = paused
             order = messaging.queue_order(self.paths, self.bot.name)
             if msg.id in order:
-                messaging.save_queue_order(self.paths, self.bot.name, [i for i in order if i != msg.id])
+                messaging.save_queue_order(
+                    self.paths, self.bot.name, [i for i in order if i != msg.id]
+                )
         outcome: dict = {}
 
         def _turn() -> None:

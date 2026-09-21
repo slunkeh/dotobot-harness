@@ -298,8 +298,13 @@ class StreamWriter:
         self._emit({"type": "takeover", "bot": bot, "reason": reason, "id": uuid.uuid4().hex})
 
     def secret_request(
-        self, bot: str, name: str, reason: str, title: str | None = None,
-        *, prompt_id: str | None = None,
+        self,
+        bot: str,
+        name: str,
+        reason: str,
+        title: str | None = None,
+        *,
+        prompt_id: str | None = None,
     ) -> None:
         """Ask the user for a secret by NAME; the value never enters the stream."""
         ev: dict[str, Any] = {
@@ -423,11 +428,19 @@ class StreamWriter:
         )
         self.close()
 
-    def final(self, text: str, frm: str) -> None:
+    def final(self, text: str, frm: str, *, notification_priority: int = 0) -> None:
         # Close the streamed message with the authoritative full text BEFORE
         # `final`, so upsert clients settle on exactly what the transcript keeps.
         self._emit_message(streaming=False, text=text)
-        self._emit({"type": "final", "text": text, "frm": frm, "message_id": self._message_id})
+        self._emit(
+            {
+                "type": "final",
+                "text": text,
+                "frm": frm,
+                "message_id": self._message_id,
+                "notification_priority": notification_priority,
+            }
+        )
         self._final = True
         self.close()
 
@@ -477,6 +490,7 @@ class StreamEvent:
     voice_call_id: str | None = None
     voice_input_id: str | None = None
     voice_text: str | None = None
+    notification_priority: int = 0
     #: a consumed follow-up belongs to this still-independent stream
     target_request_id: str | None = None
     #: canonical cursor at injection, so CLI does not replay old questions
@@ -491,6 +505,7 @@ class StreamEvent:
             voice_call_id=d.get("voice_call_id"),
             voice_input_id=d.get("voice_input_id"),
             voice_text=d.get("voice_text"),
+            notification_priority=d.get("notification_priority", 0),
             ts=d.get("ts", 0.0),
             value=d.get("value"),
             text=d.get("text"),

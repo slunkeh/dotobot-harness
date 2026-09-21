@@ -159,6 +159,7 @@ EFFECTS: dict[str, Effect] = {
     "propose_skill": Effect(INTENT_WRITE_STATE, lambda a: _arg(a, "name")),
     "load_skill": Effect(INTENT_READ, lambda a: _arg(a, "name", "path", "file")),
     "read_soul": Effect(INTENT_READ, lambda a: ""),
+    "recommend_handoff": Effect(INTENT_READ, lambda a: _arg(a, "task")),
     "recall": Effect(INTENT_READ, lambda a: _arg(a, "query")),
     "read_shared_facts": Effect(INTENT_READ, lambda a: _arg(a, "query")),
     # -- the deployment --------------------------------------------------

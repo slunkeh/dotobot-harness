@@ -7,7 +7,7 @@ import urllib.error
 import pytest
 
 from agent.memory import Memory
-from harness import jev, prefs
+from harness import jev, jev_features, prefs
 from harness.paths import HarnessPaths
 from harness.secrets import get_secret
 
@@ -59,7 +59,12 @@ class Writer:
 
 
 def test_connect_enable_disable_disconnect(paths, upstream):
-    assert jev.status(paths) == {"enabled": False, "configured": False, "source": None}
+    assert jev.status(paths) == {
+        "enabled": False,
+        "configured": False,
+        "source": None,
+        "features": {name: False for name in jev_features.FEATURES},
+    }
     prefs.save(paths, {"caveman": True})
     result = jev.connect(paths, "customer-jev-secret")
     assert result["configured"] and not result["enabled"]
@@ -69,7 +74,12 @@ def test_connect_enable_disable_disconnect(paths, upstream):
     assert jev.set_enabled(paths, True)["enabled"]
     assert prefs.load(paths)["caveman"]
     assert not jev.set_enabled(paths, False)["enabled"]
-    assert jev.disconnect(paths) == {"enabled": False, "configured": False, "source": None}
+    assert jev.disconnect(paths) == {
+        "enabled": False,
+        "configured": False,
+        "source": None,
+        "features": {name: False for name in jev_features.FEATURES},
+    }
     assert len(upstream) == 1
 
 
@@ -221,6 +231,12 @@ def test_authenticated_api_lifecycle(paths, upstream):
         assert call("/key", "POST", {"key": "customer-key"})["configured"]
         assert call("", "PATCH", {"enabled": True})["enabled"]
         assert call("/test", "POST", {})["enabled"]
+        configured = call("", "PATCH", {"features": {"compaction": True}})
+        assert configured["features"]["compaction"] and not configured["features"]["memory"]
+        with pytest.raises(urllib.error.HTTPError) as invalid:
+            call("", "PATCH", {"features": {"unknown": True}})
+        assert invalid.value.code == 400
+        assert call()["features"] == configured["features"]
         with pytest.raises(urllib.error.HTTPError) as error:
             call("", "PATCH", [])
         assert error.value.code == 400
