@@ -55,6 +55,11 @@ class ConnectorContext:
         construction; one this process cannot unseal raises
         UnresolvedSentinelError so no request is ever sent carrying it.
         """
+        from harness import delegated_oauth
+        from harness.connectors import WORKSPACE_TYPES
+
+        if str(self.record.get("type") or "") in WORKSPACE_TYPES:
+            return delegated_oauth.token(self.paths, self.record)
         value = get_secret(self.secret_name, self.paths)
         if not value and fallback:
             value = get_secret(fallback, self.paths)

@@ -1,76 +1,184 @@
-#!/bin/sh
-# Install a self-hosted Dotobot server. The apps are sold separately.
-# curl -fsSL https://dotobot.com/install.sh | sudo sh -s -- --ip YOUR_PUBLIC_IP
-set -eu
+#!/bin/bash
+# curl -fsSL https://dotobot.com/install.sh | bash
+# Read the whole function before execution so curl's stdin is never reused.
+dotobot_install() {
+set -euo pipefail
+case "${1:-}" in -h|--help)
+cat <<'HELP'
+Dotobot container installer (Linux or macOS, amd64/arm64)
 
-case "${1:-}" in
-    -h|--help)
-        cat <<'HELP'
-Dotobot server installer (Ubuntu 24.04 / Debian 12, amd64 or arm64)
+curl -fsSL https://dotobot.com/install.sh | bash
 
-curl -fsSL https://dotobot.com/install.sh | sudo sh -s -- --ip YOUR_PUBLIC_IP
-
---ip ADDRESS        public IPv4 or IPv6 address; no domain needed
+--ip ADDRESS        public IPv4/IPv6 for HTTPS on ports 80 and 443
 --domain NAME       optional DNS name pointing to this server
---update            install the latest release on an existing self-hosted install
---auto-update       opt in to automatic daily updates
---no-auto-update    turn automatic updates off (the initial default)
---link              print the installed server's link code after checking HTTPS
+--port NUMBER       localhost port (default 8765; retain on later commands)
+--update            request the latest release with per-bot progress
+--link              check the installed server and print its private link code
+--uninstall         stop/remove Dotobot containers, retaining data and Docker
+--delete-data       with --uninstall, also delete all Dotobot data
 
-When neither address option is supplied, enter a public IP or domain at the prompt.
-Requires root and inbound TCP 80/443 for Caddy's HTTPS certificate. IP certificates
-renew automatically; private/LAN addresses cannot receive public IP certificates.
-No Dotobot account is needed on the server. Existing installations retain their
-state, link key, address and update policy.
-HARNESS_RELEASE_MANIFEST overrides the HTTPS release manifest URL.
+Without an address, bind only to localhost; no public IP is needed for Mac tests.
+Docker is installed if missing. macOS opens Docker Desktop for its license and
+permission prompts. Existing Docker installations are reused, never replaced.
+DOTOBOT_HOME selects a dedicated installation directory (default ~/.local/share/dotobot).
+HARNESS_RELEASE_MANIFEST selects an HTTPS release manifest.
+Existing system-service installs retain their original update procedure.
 HELP
-        exit 0 ;;
+return ;;
 esac
-
-# Source checkouts use their original update path; never create a second home.
-LEGACY_HOME="${HOME:-/root}"
-if [ -n "${SUDO_USER:-}" ] && command -v getent >/dev/null 2>&1; then
-    OWNER_HOME=$(getent passwd "$SUDO_USER" | cut -d: -f6)
-    [ -z "$OWNER_HOME" ] || LEGACY_HOME="$OWNER_HOME"
+# No prompts or terminal escapes when redirected or used by automation.
+interactive=0
+[ ! -t 1 ] || [ "${TERM:-dumb}" = dumb ] || interactive=1
+accent='' reset=''
+if [ "$interactive" -eq 1 ] && [ -z "${NO_COLOR+x}" ]; then
+    accent=$'\033[1;36m'; reset=$'\033[0m'
 fi
-for LEGACY_DIR in "${HARNESS_INSTALL_DIR:-}" "$LEGACY_HOME/.dotobot" "$LEGACY_HOME/.agent-harness"; do
-    if [ -n "$LEGACY_DIR" ] && [ -f "$LEGACY_DIR/harness/__init__.py" ]; then
-        echo "Existing source installation at $LEGACY_DIR was left unchanged. Update that checkout using its existing procedure; this installer creates new system services only." >&2
-        exit 1
+printf '%s' "$accent"
+cat <<'LOGO'
+       _       _        _           _
+    __| | ___ | |_ ___ | |__   ___ | |_
+   / _` |/ _ \| __/ _ \| '_ \ / _ \| __|
+  | (_| | (_) | || (_) | |_) | (_) | |_
+   \__,_|\___/ \__\___/|_.__/ \___/ \__|
+
+  Your team. Your server.
+LOGO
+printf '%s\n' "$reset"
+
+dotobot_step() {
+    local label=$1 status=0 pid tick=0
+    shift
+    printf '\n  %s\n' "$label"
+    if [ "$interactive" -eq 1 ]; then
+        "$@" <&0 >>"$setup_log" 2>&1 &
+        pid=$!
+        trap 'kill "$pid" 2>/dev/null || true; wait "$pid" 2>/dev/null || true; exit 130' INT TERM
+        while kill -0 "$pid" 2>/dev/null; do
+            printf '\r  [%*s====%*s] Working...' "$((tick % 16))" '' "$((16 - tick % 16))" ''
+            tick=$((tick + 1))
+            sleep 0.2
+        done
+        wait "$pid" || status=$?
+        trap - INT TERM
+        printf '\r%60s\r' ''
+    else
+        "$@" >>"$setup_log" 2>&1 || status=$?
+    fi
+    if [ "$status" -ne 0 ]; then
+        printf '\n  Setup stopped. Your diagnostic log: %s\n' "$setup_log" >&2
+        tail -n 20 "$setup_log" >&2
+    fi
+    return "$status"
+}
+
+printf '  [--------------------] 0/5  Checking Docker\n'
+case "$(uname -s)" in Linux|Darwin) ;; *) echo 'Use Linux, macOS, or a Linux shell with Docker integration.' >&2; return 1;; esac
+if [ "$(uname -s)" = Darwin ] && [ "$(id -u)" -eq 0 ]; then
+    echo 'Run this installer as your normal Mac user; it requests administrator permission only when needed.' >&2
+    return 1
+fi
+owner_home=$HOME
+if [ -n "${SUDO_USER:-}" ] && command -v getent >/dev/null 2>&1; then
+    found_home=$(getent passwd "$SUDO_USER" | cut -d: -f6)
+    [ -z "$found_home" ] || owner_home=$found_home
+fi
+case "$(uname -m)" in x86_64|aarch64|arm64) ;; *) echo '64-bit amd64 or arm64 is required.' >&2; return 1;; esac
+# Preserve the existing system install contract, including its timer and data.
+if [ -d /etc/dotobot-server ] && [ -f /opt/harness/current/deploy/public_install.py ]; then
+    if [ "$(id -u)" -eq 0 ]; then
+        exec /usr/bin/python3 /opt/harness/current/deploy/public_install.py "$@"
+    fi
+    exec sudo /usr/bin/python3 /opt/harness/current/deploy/public_install.py "$@"
+fi
+for legacy in "${HARNESS_INSTALL_DIR:-}" "$owner_home/.dotobot" "$owner_home/.agent-harness" "$owner_home/agent-harness" /opt/harness/current; do
+    if [ -n "$legacy" ] && [ -f "$legacy/harness/__init__.py" ]; then
+        echo "Existing source installation at $legacy was left unchanged. Use its current update procedure." >&2
+        return 1
     fi
 done
-
-[ "$(uname -s)" = Linux ] || { echo 'The server installer supports Linux; install the apps from the App Store.' >&2; exit 1; }
-[ "$(id -u)" -eq 0 ] || { echo 'Run this installer with sudo (see --help).' >&2; exit 1; }
-# Never adopt a managed/personal server merely because it uses the same paths.
-if [ -f /etc/dotobot-server/install.json ] && [ -f /opt/harness/current/deploy/public_install.py ]; then
-    exec /usr/bin/python3 /opt/harness/current/deploy/public_install.py "$@"
+if [ -e /etc/systemd/system/harness.service ]; then
+    echo 'An existing harness system service was left unchanged.' >&2; return 1
 fi
-if [ ! -f /etc/dotobot-server/install.json ] && { [ -e /opt/harness/current ] || [ -e /etc/systemd/system/harness.service ]; }; then
-    echo 'An existing harness installation was found. It has been left unchanged; use its existing update procedure.' >&2
-    exit 1
+# Only install Docker when neither its CLI nor the existing Mac app is present.
+if [ "$(uname -s)" = Darwin ]; then
+    export PATH="/Applications/Docker.app/Contents/Resources/bin:$PATH"
 fi
-# shellcheck source=/dev/null
-. /etc/os-release
-case "$ID:$VERSION_ID" in
-    ubuntu:24.04|debian:12) ;;
-    *) echo 'Supported server systems: Ubuntu 24.04, Debian 12.' >&2; exit 1 ;;
-esac
-case "$(uname -m)" in
-    x86_64|aarch64|arm64) ;;
-    *) echo 'Supported server architectures: amd64 and arm64 (64-bit).' >&2; exit 1 ;;
-esac
-
-if ! command -v python3 >/dev/null 2>&1 || ! command -v curl >/dev/null 2>&1; then
-    apt-get update
-    apt-get install -y --no-install-recommends python3 curl ca-certificates
+if ! command -v docker >/dev/null 2>&1; then
+    echo 'Docker is required. Installing Docker using its official installer.'
+    docker_stage=$(mktemp -d)
+    setup_log="$docker_stage/setup.log"
+    (umask 077; : > "$setup_log")
+    if [ "$(uname -s)" = Darwin ]; then
+        arch=arm64; [ "$(uname -m)" != x86_64 ] || arch=amd64
+        curl -fL --proto '=https' --tlsv1.2 "https://desktop.docker.com/mac/main/$arch/Docker.dmg" -o "$docker_stage/Docker.dmg"
+        mkdir "$docker_stage/mount"
+        hdiutil attach "$docker_stage/Docker.dmg" -nobrowse -mountpoint "$docker_stage/mount"
+        if ! spctl --assess --type execute "$docker_stage/mount/Docker.app"; then
+            hdiutil detach "$docker_stage/mount"; return 1
+        fi
+        if ! sudo "$docker_stage/mount/Docker.app/Contents/MacOS/install"; then
+            hdiutil detach "$docker_stage/mount"; return 1
+        fi
+        hdiutil detach "$docker_stage/mount"
+    else
+        curl -fsSL --proto '=https' https://get.docker.com -o "$docker_stage/install-docker.sh"
+        if [ "$(id -u)" -eq 0 ]; then
+            dotobot_step "[--------------------] 0/5  Installing Docker" sh "$docker_stage/install-docker.sh"
+        else
+            dotobot_step "[--------------------] 0/5  Installing Docker" sudo sh "$docker_stage/install-docker.sh"
+        fi
+    fi
+    rm -rf "$docker_stage"
 fi
-MANIFEST="${HARNESS_RELEASE_MANIFEST:-https://releases.dotobot.com/harness/manifest.json}"
-STAGE=$(mktemp -d /tmp/dotobot-install.XXXXXXXX)
-trap 'rm -rf "$STAGE"' EXIT HUP INT TERM
-# Verify the archive before executing any code inside it. The bootstrap is
-# intentionally self-contained: neither git nor private repository access is used.
-python3 - "$MANIFEST" "$STAGE" <<'PY'
+docker_cmd=(docker)
+if ! docker info >/dev/null 2>&1; then
+    if [ "$(uname -s)" = Darwin ]; then
+        echo 'Starting Docker Desktop. Complete its license and permission prompts if shown.'
+        open -a Docker
+        for _attempt in {1..120}; do
+            docker info >/dev/null 2>&1 && break
+            sleep 2
+        done
+    elif sudo docker info >/dev/null 2>&1; then
+        docker_cmd=(sudo docker)
+    else
+        echo 'Docker is installed but unavailable. Start your Docker engine and rerun this command.' >&2
+        return 1
+    fi
+fi
+"${docker_cmd[@]}" info >/dev/null
+[ "$("${docker_cmd[@]}" info --format '{{.OSType}}')" = linux ] || { echo 'Docker must run Linux containers.' >&2; return 1; }
+# Bind mounts refer to the engine host, so reject remote contexts rather than
+# accidentally writing to a remote host with misleading local paths.
+endpoint=$("${docker_cmd[@]}" context inspect --format '{{.Endpoints.docker.Host}}')
+endpoint="${DOCKER_HOST:-$endpoint}"
+case "$endpoint" in unix://*) ;; *) echo 'Use a local Docker context; remote engines need an explicit deployment on that host.' >&2; return 1;; esac
+socket=${endpoint#unix://}
+if [ "$(uname -s)" = Darwin ]; then socket=/var/run/docker.sock; fi
+export DOTOBOT_DOCKER_SOCKET="$socket"
+root=${DOTOBOT_HOME:-$owner_home/.local/share/dotobot}
+case "$root" in /*) ;; *) echo 'DOTOBOT_HOME must be an absolute dedicated directory.' >&2; return 1;; esac
+case "$root" in /|"$HOME"|/root|/home|/Users|*','*|*':'*) echo 'Use a dedicated Dotobot directory without commas or colons.' >&2; return 1;; esac
+mkdir -p "$root"
+root=$(cd "$root" && pwd -P)
+chmod 700 "$root"
+maintenance=0
+for arg in "$@"; do case "$arg" in --link|--uninstall) maintenance=1;; esac; done
+if [ "$maintenance" -eq 1 ]; then
+    [ -f "$root/manager-image" ] || { echo 'No container installation found.' >&2; return 1; }
+    image=$(cat "$root/manager-image")
+    [[ "$image" =~ ^sha256:[a-f0-9]{64}$ ]] || { echo 'Invalid installed image record.' >&2; return 1; }
+    "${docker_cmd[@]}" run --rm --mount "type=bind,src=$root,dst=$root" --mount "type=bind,src=$socket,dst=/var/run/docker.sock" "$image" python deploy/container_install.py --root "$root" "$@"
+    return
+fi
+setup_log="$root/setup.log"
+(umask 077; : > "$setup_log")
+chmod 600 "$setup_log"
+stage=$(mktemp -d "$root/download.XXXXXXXX")
+# The release is downloaded and verified inside Python's container: the host
+# needs Docker, curl and Bash, not a particular Python or Linux distribution.
+manifest=${HARNESS_RELEASE_MANIFEST:-https://releases.dotobot.com/harness/manifest.json}
+dotobot_step "[####----------------] 1/5  Downloading and verifying the release" "${docker_cmd[@]}" run --rm -i --user "$(id -u):$(id -g)" --mount "type=bind,src=$stage,dst=$stage" python:3.12-slim python - "$manifest" "$stage" <<'PY'
 import hashlib
 import json
 from pathlib import Path, PurePosixPath
@@ -140,7 +248,12 @@ with tarfile.open(archive) as tar:
                 shutil.copyfileobj(source, output)
             target.chmod(member.mode & 0o755)
 (stage / 'manifest.json').write_text(json.dumps(manifest))
-if not (release / 'deploy/public_install.py').is_file():
-    raise SystemExit('This release predates the public installer. Try again after the self-hosted release is published.')
+if not (release / 'deploy/container_install.py').is_file():
+    raise SystemExit('This release predates the container installer. Try again after the self-hosted release is published.')
 PY
-python3 "$STAGE/release/deploy/public_install.py" --release-tree "$STAGE/release" --release-manifest "$STAGE/manifest.json" --manifest-url "$MANIFEST" "$@"
+dotobot_step "[########------------] 2/5  Building your server" "${docker_cmd[@]}" build --iidfile "$stage/server-image" -f "$stage/release/deploy/Dockerfile" "$stage/release"
+image=$(cat "$stage/server-image")
+"${docker_cmd[@]}" run --rm --mount "type=bind,src=$root,dst=$root" --mount "type=bind,src=$socket,dst=/var/run/docker.sock" -e "DOTOBOT_DOCKER_SOCKET=$socket" -e "DOTOBOT_SETUP_LOG=$setup_log" -e "DOTOBOT_INSTALL_TTY=$interactive" "$image" python deploy/container_install.py --root "$root" --source "$stage/release" --image "$image" "$@"
+rm -rf "$stage"
+}
+dotobot_install "$@"

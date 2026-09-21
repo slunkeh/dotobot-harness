@@ -17,17 +17,9 @@ mkdir -p "$OUT"
 TARBALL="$OUT/harness-$VERSION.tar.gz"
 SHA256=$(python3 deploy/public_export.py --archive "$TARBALL")
 
-cat > "$OUT/manifest.json" <<EOF
-{
-  "version": "$VERSION",
-  "url": "https://releases.example.com/harness/harness-$VERSION.tar.gz",
-  "sha256": "$SHA256",
-  "rollout_percent": 5,
-  "min_app_version": null,
-  "latest_app_version": null,
-  "app_download_url": null
-}
-EOF
+python3 deploy/release_manifest.py --version "$VERSION" --sha256 "$SHA256" \
+    --base https://releases.example.com/harness --rollout 5 --runtime-root . \
+    > "$OUT/manifest.json"
 
 echo "release: $TARBALL"
 echo "sha256:  $SHA256"

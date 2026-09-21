@@ -504,3 +504,53 @@ def test_elevenlabs_key_alone_does_not_make_auto_available(paths, upstream, monk
     assert voice.resolve_backend(paths) is None
     voice.set_voice_settings(paths, {"provider": "elevenlabs"})
     assert voice.voice_status(paths)["available"] is True
+
+
+@pytest.mark.parametrize("field", ["code", "status"])
+@pytest.mark.parametrize("code,expected", [
+    ("missing_permissions", "Enable Voices: Read"),
+    ("invalid_api_key", "API key rejected"),
+    ("quota_exceeded", "Quota exhausted"),
+    ("unrecognized", "Authentication failed"),
+])
+def test_connect_reports_safe_upstream_reason(paths, monkeypatch, field, code, expected):
+    def fail(req, **kwargs):
+        body = {"detail": {field: code, "message": "private-key secret-token"}}
+        raise urllib.error.HTTPError(req.full_url, 401, "private-key", {},
+                                     io.BytesIO(json.dumps(body).encode()))
+    monkeypatch.setattr(elevenlabs.urllib.request, "urlopen", fail)
+    with pytest.raises(voice.VoiceError, match=expected) as caught:
+        elevenlabs.connect(paths, "private-key")
+    assert "private-key" not in str(caught.value)
+    assert "secret-token" not in str(caught.value)
+    assert not elevenlabs.status(paths)["configured"]
+
+
+def test_unknown_failure_retains_http_status(paths, monkeypatch):
+    def fail(req, **kwargs):
+        raise urllib.error.HTTPError(req.full_url, 502, "secret", {}, io.BytesIO(b"secret"))
+    monkeypatch.setattr(elevenlabs.urllib.request, "urlopen", fail)
+    with pytest.raises(voice.VoiceError, match="HTTP 502"):
+        elevenlabs.connect(paths, "private-key")
+
+
+def test_voice_library_preserves_preview_and_descriptive_labels(paths, monkeypatch):
+    monkeypatch.setattr(elevenlabs, "request", lambda *a, **kw: {"voices": [
+        {"voice_id": "chosen", "name": "Alice", "preview_url": "https://example.com/preview.mp3",
+         "labels": {"accent": "British", "age": "young", "private": "omit", "gender": 7}},
+        {"voice_id": "legacy", "labels": "invalid"},
+    ]})
+    rows = elevenlabs.voices(paths)["voices"]
+    assert rows[0]["preview_url"] == "https://example.com/preview.mp3"
+    assert rows[0]["labels"] == {"accent": "British", "age": "young"}
+    assert rows[1]["preview_url"] is None
+    assert rows[1]["labels"] == {}
+
+
+def test_legacy_permission_status_beats_generic_authentication_code(paths, monkeypatch):
+    def rejected(*args, **kwargs):
+        raise urllib.error.HTTPError("https://api.elevenlabs.io", 401, "Unauthorized", {},
+            io.BytesIO(json.dumps({"detail": {"code": "unauthorized", "status": "missing_permissions"}}).encode()))
+    monkeypatch.setattr(elevenlabs.urllib.request, "urlopen", rejected)
+    with pytest.raises(voice.VoiceError, match="Enable Voices: Read"):
+        elevenlabs.request(paths, "/v2/voices", key="test-key")

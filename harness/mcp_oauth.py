@@ -357,7 +357,7 @@ def _register_tokens(connector_id: str, bundle: dict[str, Any]) -> None:
     """Tell the redaction registry about a connector's bearer tokens so a
     token that reaches a log line or error payload is sentinelised.
     Registration never changes what is written to disk."""
-    for field in ("access_token", "refresh_token"):
+    for field in ("access_token", "refresh_token", "capability"):
         value = bundle.get(field)
         if isinstance(value, str) and value:
             register_secret(value, f"connector_{connector_id}_{field}")
@@ -415,6 +415,8 @@ def access_token(
     if not stale:
         return access
     if not refresh:
+        if stale and data.get("token_endpoint") == "https://oauth2.googleapis.com/token":
+            raise OAuthError("Google access expired; reconnect the account")
         return access or None
     t = transport or Transport()
     form = {
@@ -532,11 +534,6 @@ def start_authorize(
             params["scope"] = " ".join(str(s) for s in extra if str(s).strip())
     except Exception:
         pass
-    authz = str(metadata.get("authorization_endpoint") or "")
-    if "accounts.google.com" in authz or "google.com/o/oauth2" in authz:
-        # Google only issues a refresh token with offline + consent.
-        params["access_type"] = "offline"
-        params["prompt"] = "consent"
     sep = "&" if "?" in metadata["authorization_endpoint"] else "?"
     authorize_url = metadata["authorization_endpoint"] + sep + urlencode(params)
 
@@ -605,6 +602,8 @@ def exchange(
         "code_verifier": flow["verifier"],
         "resource": flow["resource"],
     }
+    if not flow["resource"]:
+        form.pop("resource", None)
     if flow["client_secret"]:
         form["client_secret"] = flow["client_secret"]
     try:

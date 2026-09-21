@@ -75,7 +75,7 @@ def test_header_rewrite_in_place_does_not_shift_body(tmp_path):
     assert first.startswith("---\n")
     assert "status: running" in first
     # several ~50ms header cadences pass while the command sleeps
-    assert _wait_for(lambda: "exit_code: 0" in _read(path))
+    assert _wait_for(lambda: "exit_code: 0" in _read(path) and "status: succeeded" in _read(path))
     final = _read(path)
     assert final.index("body-marker") == marker_at
     assert "status: succeeded" in final
@@ -86,7 +86,8 @@ def test_footer_written_on_exit_with_code(tmp_path):
     mgr = _manager(tmp_path)
     info = mgr.spawn("echo out; exit 3")
     path = mgr.terminal_path(info.shell_id)
-    assert _wait_for(lambda: "exit_code: 3" in _read(path))
+    # Finalization appends the footer before rewriting the status header.
+    assert _wait_for(lambda: "exit_code: 3" in _read(path) and "status: failed" in _read(path))
     text = _read(path)
     assert "status: failed" in text
     assert "\n---\nexit_code: 3\n" in text

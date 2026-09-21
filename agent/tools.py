@@ -708,7 +708,7 @@ def _request_secret(ctx: ToolContext, args: dict[str, Any]) -> str:
         },
     )
     if ctx.writer is not None:
-        ctx.writer.secret_request(ctx.bot, name, reason, title=title)
+        ctx.writer.secret_request(ctx.bot, name, reason, title=title, prompt_id=pid)
     secret_payload = {"name": name, "title": title, "detail": reason}
     _persist_card(ctx, pid, "secret_request", secret_payload)
     try:

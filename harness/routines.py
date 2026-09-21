@@ -728,6 +728,13 @@ def fire_due(
     return fired
 
 
+def scheduled_bots(roster: Any) -> list[str]:
+    """Roster names the tick may fire for. A blocked bot (guideline 1.2) gets
+    no routine turn until it is unblocked, exactly as it gets no chat turn;
+    its routines stay stored and resume afterwards."""
+    return [b.name for b in roster.bots if not getattr(b, "blocked", False)]
+
+
 def start_scheduler(
     orch: Any,
     interval: float = 20.0,
@@ -738,7 +745,7 @@ def start_scheduler(
     def loop() -> None:
         while True:
             try:
-                names = list(orch.roster.names())
+                names = scheduled_bots(orch.roster)
                 fire_due(orch.paths, names, send=send)
             except Exception:
                 pass

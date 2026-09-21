@@ -1066,6 +1066,8 @@ class MachineBackend(IsolationBackend):
         log_fh = open(self.paths.log_file(bot), "a", encoding="utf-8")  # noqa: SIM115
         token = mint_generation_token()
         env = os.environ.copy()
+        release_root = str(Path(__file__).resolve().parents[1])
+        env["PYTHONPATH"] = release_root
         env["HARNESS_MACHINE_NAME"] = machine.name
         # own display per machine: a takeover of one bot must not pause others
         env["HARNESS_SHARED_DISPLAY"] = "0"
@@ -1079,6 +1081,7 @@ class MachineBackend(IsolationBackend):
             stderr=subprocess.STDOUT,
             start_new_session=True,
             env=env,
+            cwd=release_root,
         )
         return proc.pid, token
 
@@ -1115,7 +1118,10 @@ class MachineBackend(IsolationBackend):
     # -- run-file persistence ---------------------------------------------
     def _record(self, handle: BotHandle) -> None:
         self.paths.run.mkdir(parents=True, exist_ok=True)
+        from harness.runtime_identity import current_identity
         data = {
+            "identity": current_identity(),
+            "release_root": str(Path(__file__).resolve().parents[1]),
             "bot": handle.bot,
             "backend": handle.backend,
             "pid": handle.pid,
@@ -1143,6 +1149,8 @@ class MachineBackend(IsolationBackend):
             backend=self.id,
             pid=data.get("pid"),
             meta={
+                "identity": data.get("identity"),
+                "release_root": data.get("release_root"),
                 "machine": data.get("machine"),
                 "machine_id": data.get("machine_id"),
                 "token": data.get("token"),
@@ -1209,6 +1217,50 @@ class MachineBackend(IsolationBackend):
             except IsolationUnavailable:
                 return Status.UNKNOWN
         return Status.RUNNING
+
+    def update_healthy(self, handle: BotHandle) -> bool:
+        machine = handle.meta.get("machine")
+        if self.status(handle) != Status.RUNNING or not machine:
+            return False
+        result = engine.run("inspect", "--format", "{{.State.Health.Status}}", machine)
+        return result.returncode == 0 and result.stdout.strip() == "healthy"
+
+    def restart_for_update(self, handle: BotHandle, argv: list[str], target: dict) -> BotHandle:
+        """Keep this bot's computer and volume; never clone or flush peers.
+
+        Agent-only updates need no state transfer. Image changes take one
+        verified final snapshot and reattach the exact same named volume.
+        """
+        machine = next((m for m in self.pool.machines()
+                        if m.id == handle.meta.get("machine_id") and m.bot == handle.bot), None)
+        if machine is None:
+            raise IsolationUnavailable("Bot no longer owns its machine")
+        old = handle.meta.get("identity") or {}
+        image_changed = not target or old.get("machine") != target.get("machine")
+        if image_changed:
+            wanted_image = self._image_id(self.image)
+            if not wanted_image:
+                raise IsolationUnavailable("Target machine image is unavailable; bot retained")
+            self._quiesce_chrome(machine.name)
+            receipt = self._sync_up(machine.name, receipt="update")
+            sqlite = receipt.get("sqlite") or {}
+            if (not receipt.get("walk_complete") or receipt.get("oversized")
+                    or receipt.get("skipped") or sqlite.get("skipped") or sqlite.get("failed")):
+                raise IsolationUnavailable("State snapshot incomplete; update paused with original volume retained")
+        if handle.pid:
+            self._stop_agent(handle.pid)
+        if image_changed:
+            result = engine.run("stop", "-t", "30", machine.name, timeout=60)
+            if result.returncode != 0:
+                raise IsolationUnavailable("Could not stop bot machine; state retained")
+            self._ensure_container(machine)
+            if self._image_id(machine.name, container=True) != wanted_image:
+                raise IsolationUnavailable("Machine did not start the target image; volume retained")
+        pid, token = self._spawn_agent(handle.bot, argv, machine)
+        result = BotHandle(bot=handle.bot, backend=self.id, pid=pid, status=Status.RUNNING,
+                           meta={"machine": machine.name, "machine_id": machine.id, "token": token})
+        self._record(result)
+        return result
 
     def stop(self, handle: BotHandle) -> None:
         if handle.pid:

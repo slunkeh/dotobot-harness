@@ -209,6 +209,7 @@ class Orchestrator:
 
     def _start_bot(self, name: str) -> BotHandle:
         with self._lifecycle_lock(name):
+            (self.paths.run / f"{name}.stopped").unlink(missing_ok=True)
             handle = self.backend.spawn(name, self._agent_argv(name))
             self._clear_startup_error(name)
             return handle
@@ -303,6 +304,7 @@ class Orchestrator:
 
     def _stop_bot(self, name: str) -> None:
         with self._lifecycle_lock(name):
+            write_atomic(self.paths.run / f"{name}.stopped", "1")
             self._starting.pop(name, None)
             with self._restart_lock:
                 self._restarts.pop(name, None)
@@ -365,6 +367,7 @@ class Orchestrator:
                     if self._restarts.get(name, (None, None))[1] is not future:
                         return
                     self.roster.get(name)
+                    (self.paths.run / f"{name}.stopped").unlink(missing_ok=True)
                     self._starting.pop(name, None)
                     handle = self._handle(name)
                     if handle:
@@ -545,6 +548,8 @@ class Orchestrator:
         # Live profile field — the agent adopts it next turn, no restart.
         if "caveman" in fields:
             bot.caveman = caveman_flag(fields["caveman"])
+        if "blocked" in fields and fields["blocked"] is not None:
+            bot.blocked = bool(fields["blocked"])
         self._persist()
         self._reseed_soul(name, old_personality, (bot.personality or "").strip())
         # The cached server-side Memory holds the pre-update embedding route.
@@ -695,9 +700,37 @@ class Orchestrator:
         bot: str | None = None,
         room: Room | None = None,
     ) -> list[str]:
-        """Who should answer this turn (each uses their own memory/soul)."""
+        """Who should answer this turn (each uses their own memory/soul).
+
+        A blocked bot is never among them: it stays on the roster (memory,
+        settings, history) but gets no turn until the owner unblocks it.
+        """
         known = self.roster.names()
         mentions = resolve_mentions(text, known)
+        blocked = self.blocked_names()
+        if blocked:
+            recipients = self._recipients_unfiltered(text, known, mentions, bot=bot, room=room)
+            return [r for r in recipients if r not in blocked]
+        return self._recipients_unfiltered(text, known, mentions, bot=bot, room=room)
+
+    def blocked_names(self) -> set[str]:
+        """Roster bots the owner blocked (guideline 1.2). Every path that
+        hands a bot a turn — chat routing, the routine and dream ticks, a
+        routine test run — consults this, not just `recipients_for`."""
+        return {b.name for b in self.roster.bots if getattr(b, "blocked", False)}
+
+    def is_blocked(self, name: str) -> bool:
+        return name in self.blocked_names()
+
+    def _recipients_unfiltered(
+        self,
+        text: str,
+        known: list[str],
+        mentions: list[str],
+        *,
+        bot: str | None,
+        room: Room | None,
+    ) -> list[str]:
         if room is not None:
             members = [m for m in room.members if m in known]
             if has_everyone(text):

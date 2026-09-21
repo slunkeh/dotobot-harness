@@ -58,6 +58,8 @@ from .caveman import enabled_for as _caveman_enabled
 from .commands import find_skill, is_builtin, parse_slash
 from .compaction import maybe_compact
 from .computer import GatedComputer, HostComputer
+from .contentfilter import PROMPT as _CONTENT_FILTER_PROMPT
+from .contentfilter import enabled as _content_filter_enabled
 from .context import ConnectorCatalogue, protected_loop_tokens
 from .embeddings import recall_token_budget, resolve_embedder
 from .external import wrap_external
@@ -1180,6 +1182,9 @@ class Agent:
         # every turn so a toggle in either Settings lands on the next reply.
         if _caveman_enabled(self.bot, self.paths):
             parts.append(_CAVEMAN_PROMPT)
+        # Content filter: account-wide, on by default, re-read every turn.
+        if _content_filter_enabled(self.paths):
+            parts.append(_CONTENT_FILTER_PROMPT)
         if consult:
             parts.append(_CONSULT_PROMPT)
         parts.extend(_intent_prompts(incoming_text, room=room))
@@ -1496,6 +1501,10 @@ class Agent:
         return _connector_note(tools, text, connector_records, persona=persona)
 
     def _inject_room_handoffs(self, messages, context, *, before=None) -> bool:
+        with messaging.queue_lock(self.paths, self.bot.name):
+            return self._inject_room_handoffs_locked(messages, context, before=before)
+
+    def _inject_room_handoffs_locked(self, messages, context, *, before=None) -> bool:
         """Fold same-request peer mentions into one admitted turn, never user scope."""
         run = self._current_run()
         if (
@@ -1510,10 +1519,12 @@ class Agent:
             return False
         from harness.rooms import handoff_source_block
 
+        manual = set(messaging.queue_order(self.paths, self.bot.name))
         taken = [
             (path, msg)
             for path, msg in messaging.read_inbox(self.paths, self.bot.name)
-            if msg.id != context.turn_id
+            if msg.id not in manual
+            and msg.id != context.turn_id
             and msg.id not in run.room_handoff_ids
             and msg.reply_to is None
             and msg.origin == "room_handoff"
@@ -2979,13 +2990,17 @@ class Agent:
         lanes: dict[str, list[tuple]] = {lane: [] for lane in messaging.LANE_ORDER}
         for item in work:
             lanes[messaging.lane_of(item[1])].append(item)
+        ranks = {rid: i for i, rid in enumerate(messaging.queue_order(self.paths, self.bot.name))}
         now_work = [
             item
             for item in lanes[messaging.LANE_USER]
-            if item[1].now and item[1].id not in self.scheduler.deferred
+            if item[1].now and item[1].id not in ranks and item[1].id not in self.scheduler.deferred
         ]
         if now_work:
             return now_work[0]
+        explicit = [item for item in work if item[1].id in ranks]
+        if explicit:
+            return min(explicit, key=lambda item: ranks[item[1].id])
         for lane in messaging.LANE_ORDER:
             items = lanes[lane]
             if not items:
@@ -3011,11 +3026,15 @@ class Agent:
             quiet = now - getattr(run, "last_output", run.started)
             if quiet >= silence:
                 return "silence", quiet
+        from harness.update_state import held
+        if held(self.paths, self.bot.name):
+            return None, None
         waited: float | None = None
+        manual = set(messaging.queue_order(self.paths, self.bot.name))
         for m in messaging.pending(self.paths, self.bot.name):
             if m.id == run.msg_id or messaging.lane_of(m) != messaging.LANE_USER:
                 continue
-            if not m.now:
+            if not m.now or m.id in manual:
                 continue
             w = now - max(float(m.ts), run.started)
             if waited is None or w > waited:
@@ -3094,7 +3113,8 @@ class Agent:
         """End of the drain window: re-stamp anything still live and reject
         messages that arrived during the drain with an explicit restart error
         rather than queueing them into a dying process."""
-        if self._drain_ts is None:
+        from harness.update_state import held
+        if self._drain_ts is None or held(self.paths, self.bot.name):
             return
         recovery.stamp_shutdown(self.statestore, self.bot.name)
         rejected = recovery.reject_drain_arrivals(self.paths, self.bot.name, since=self._drain_ts)
@@ -3113,166 +3133,175 @@ class Agent:
             # Shutting down: no new admissions into a dying process.
             # Arrivals are answered with a restart error by drain_shutdown.
             return False
-        answers_queued = False
-        try:
-            messaging.queue_prompt_answers(self.paths, self.bot.name)
-            answers_queued = True
-        except Exception as exc:
-            self._log(f"could not queue answered prompts: {type(exc).__name__}")
-        paused = self.control.state(self.bot.name).paused
-        work: list[tuple] = []
-        for path, msg in messaging.read_inbox(self.paths, self.bot.name):
-            if msg.origin == "prompt_answer" and not answers_queued:
-                # The file can precede its decision commit. Retry dispatch
-                # before scope validation can mistake it for obsolete work.
-                continue
-            if msg.reply_to is not None:
-                if not msg.is_continuation:
-                    messaging.mark_processed(self.paths, self.bot.name, path)
+        with messaging.queue_lock(self.paths, self.bot.name):
+            from harness import update_state
+            if update_state.held(self.paths, self.bot.name) and self.scheduler.zombies:
+                return False  # Escaped workers must finish before acknowledging a safe restart.
+            if update_state.acknowledge(self.paths, self.bot.name):
+                return False
+            answers_queued = False
+            try:
+                messaging.queue_prompt_answers(self.paths, self.bot.name)
+                answers_queued = True
+            except Exception as exc:
+                self._log(f"could not queue answered prompts: {type(exc).__name__}")
+            paused = self.control.state(self.bot.name).paused
+            work: list[tuple] = []
+            for path, msg in messaging.read_inbox(self.paths, self.bot.name):
+                if msg.origin == "prompt_answer" and not answers_queued:
+                    # The file can precede its decision commit. Retry dispatch
+                    # before scope validation can mistake it for obsolete work.
                     continue
-                try:
-                    scope = messaging.continuation_scope(self.paths, self.bot.name, msg.resume)
-                except Exception:
-                    return False  # Keep the reply queued while task storage is unavailable.
-                if not scope:
-                    messaging.mark_processed(self.paths, self.bot.name, path)
-                    continue
-                if msg.origin != "prompt_answer":
-                    msg.origin = "colleague_reply"
-                msg.thread_id = msg.resume.get("thread_id")
+                if msg.reply_to is not None:
+                    if not msg.is_continuation:
+                        messaging.mark_processed(self.paths, self.bot.name, path)
+                        continue
+                    try:
+                        scope = messaging.continuation_scope(self.paths, self.bot.name, msg.resume)
+                    except Exception:
+                        return False  # Keep the reply queued while task storage is unavailable.
+                    if not scope:
+                        messaging.mark_processed(self.paths, self.bot.name, path)
+                        continue
+                    if msg.origin != "prompt_answer":
+                        msg.origin = "colleague_reply"
+                    msg.thread_id = msg.resume.get("thread_id")
 
-            if (msg.frm or "") == self.bot.name and echoguard.guard().is_echo(
-                msg.frm, echoguard.conversation_of(room=msg.room, to=msg.to), msg.id
-            ):
-                # A delayed copy of our own outbound message:
-                # archive it before session recording or dispatch so it can
-                # never start a reply loop. The `frm == us` gate keeps the
-                # process-shared guard from eating genuine deliveries when
-                # sender and recipient share one process (orchestrator, tests).
+                if (msg.frm or "") == self.bot.name and echoguard.guard().is_echo(
+                    msg.frm, echoguard.conversation_of(room=msg.room, to=msg.to), msg.id
+                ):
+                    # A delayed copy of our own outbound message:
+                    # archive it before session recording or dispatch so it can
+                    # never start a reply loop. The `frm == us` gate keeps the
+                    # process-shared guard from eating genuine deliveries when
+                    # sender and recipient share one process (orchestrator, tests).
+                    messaging.mark_processed(self.paths, self.bot.name, path)
+                    self._log(f"{self.bot.name}: suppressed echoed copy of own message {msg.id}")
+                    continue
+                self.scheduler.accept(msg.id, messaging.lane_of(msg))
+                work.append((path, msg))
+            if not work:
+                return False
+            path, msg = self._next_task(work)
+            clear_steered(self.paths, msg.id)
+            writer = StreamWriter(self.paths, msg.id, room=msg.room)
+            attempts = self._note_attempt(msg.id)
+            if attempts > 2:
                 messaging.mark_processed(self.paths, self.bot.name, path)
-                self._log(f"{self.bot.name}: suppressed echoed copy of own message {msg.id}")
-                continue
-            self.scheduler.accept(msg.id, messaging.lane_of(msg))
-            work.append((path, msg))
-        if not work:
-            return False
-        path, msg = self._next_task(work)
-        clear_steered(self.paths, msg.id)
-        writer = StreamWriter(self.paths, msg.id, room=msg.room)
-        attempts = self._note_attempt(msg.id)
-        if attempts > 2:
-            messaging.mark_processed(self.paths, self.bot.name, path)
-            self._clear_attempt(msg.id)
-            # The drop notice below is this turn's final outcome.
-            recovery.settle_turn(self.statestore, msg.id)
-            err = "(error: this message crashed the bot twice and was dropped)"
-            ComputerProgress(self.bot.name, msg.id).settle_if_running(
-                writer, self.memory, self.session_id
-            )
-            writer.final(err, self.bot.name)
-            self._reply(msg, err)
-            self._ledger().prune_turn(self.bot.name, msg.id)
-            if (msg.frm or "") == "user":
-                # The drop notice is a user-visible reply: the ack obligation
-                # for this request is met, don't redrive it later.
-                obligations.settle(self.paths, self.bot.name)
-            return True
-        # Delivery recovery: every turn consults the ledger before
-        # rerunning anything — not just `attempts > 1`, because the per-bot
-        # attempt file is single-slot and a newer chat overwrites it, so a
-        # deferred or crashed turn can come back with the counter reset. Rows
-        # can only exist for this id if a previous attempt wrote them (a first
-        # attempt reads an empty set). A confirmed terminal reply completes
-        # the turn without rerunning tools; an uncertain one is preserved as
-        # uncertain (warn on next contact, never a likely duplicate); stale
-        # pre-send intents are cleared so the replay is clean; and unresolved
-        # mid-turn sends put the replay in restricted mode.
-        ledger = self._ledger()
-        terminal = delivery.chat_target(msg.reply_recipient)
-        state = delivery.recovery_state(ledger.turn_rows(self.bot.name, msg.id), terminal)
-        if state.terminal_status == delivery.STATUS_SENT:
-            # The reply already reached the recipient before the crash:
-            # complete the turn without rerunning a single tool.
-            messaging.mark_processed(self.paths, self.bot.name, path)
-            self._clear_attempt(msg.id)
-            ComputerProgress(self.bot.name, msg.id).settle_if_running(
-                writer, self.memory, self.session_id
-            )
-            writer.final(
-                state.terminal_detail or "(this reply was delivered before a restart)",
+                self._clear_attempt(msg.id)
+                # The drop notice below is this turn's final outcome.
+                recovery.settle_turn(self.statestore, msg.id)
+                err = "(error: this message crashed the bot twice and was dropped)"
+                ComputerProgress(self.bot.name, msg.id).settle_if_running(
+                    writer, self.memory, self.session_id
+                )
+                writer.final(err, self.bot.name)
+                self._reply(msg, err)
+                self._ledger().prune_turn(self.bot.name, msg.id)
+                if (msg.frm or "") == "user":
+                    # The drop notice is a user-visible reply: the ack obligation
+                    # for this request is met, don't redrive it later.
+                    obligations.settle(self.paths, self.bot.name)
+                return True
+            # Delivery recovery: every turn consults the ledger before
+            # rerunning anything — not just `attempts > 1`, because the per-bot
+            # attempt file is single-slot and a newer chat overwrites it, so a
+            # deferred or crashed turn can come back with the counter reset. Rows
+            # can only exist for this id if a previous attempt wrote them (a first
+            # attempt reads an empty set). A confirmed terminal reply completes
+            # the turn without rerunning tools; an uncertain one is preserved as
+            # uncertain (warn on next contact, never a likely duplicate); stale
+            # pre-send intents are cleared so the replay is clean; and unresolved
+            # mid-turn sends put the replay in restricted mode.
+            ledger = self._ledger()
+            terminal = delivery.chat_target(msg.reply_recipient)
+            state = delivery.recovery_state(ledger.turn_rows(self.bot.name, msg.id), terminal)
+            if state.terminal_status == delivery.STATUS_SENT:
+                # The reply already reached the recipient before the crash:
+                # complete the turn without rerunning a single tool.
+                messaging.mark_processed(self.paths, self.bot.name, path)
+                self._clear_attempt(msg.id)
+                ComputerProgress(self.bot.name, msg.id).settle_if_running(
+                    writer, self.memory, self.session_id
+                )
+                writer.final(
+                    state.terminal_detail or "(this reply was delivered before a restart)",
+                    self.bot.name,
+                )
+                if (msg.frm or "") == "user":
+                    obligations.settle(self.paths, self.bot.name)
+                recovery.settle_turn(self.statestore, msg.id)
+                ledger.prune_turn(self.bot.name, msg.id)
+                self._log(f"{msg.id}: recovered after crash — reply already delivered")
+                return True
+            if state.terminal_status in (
+                delivery.STATUS_INFLIGHT,
+                delivery.STATUS_UNCERTAIN,
+            ):
+                # The reply may or may not have arrived. Never resend an
+                # uncertain send: settle the turn and warn on next contact.
+                messaging.mark_processed(self.paths, self.bot.name, path)
+                self._clear_attempt(msg.id)
+                ComputerProgress(self.bot.name, msg.id).settle_if_running(
+                    writer, self.memory, self.session_id
+                )
+                writer.final(
+                    "(a crash interrupted the previous reply to this message; "
+                    "it may or may not have been delivered, so it was not "
+                    "sent again)",
+                    self.bot.name,
+                )
+                push_turn_note(
+                    self.paths,
+                    self.bot.name,
+                    "Your previous reply was interrupted by a crash mid-send "
+                    "and may never have been delivered. Mention this and "
+                    "offer to repeat yourself if the other side saw nothing.",
+                )
+                if (msg.frm or "") == "user":
+                    obligations.settle(self.paths, self.bot.name)
+                recovery.settle_turn(self.statestore, msg.id)
+                ledger.prune_turn(self.bot.name, msg.id)
+                self._log(f"{msg.id}: recovered after crash — reply outcome unknown")
+                return True
+            ledger.clear_pending(self.bot.name, msg.id)
+            uncertain_sends: tuple[str, ...] = state.unresolved
+            if uncertain_sends:
+                self._log(
+                    f"{msg.id}: recovering with uncertain send(s) "
+                    f"{', '.join(uncertain_sends)} — side-effect tools withheld"
+                )
+            self._interrupted = False
+            from_bot = (msg.frm or "") not in {"", "user"}
+            # Full text, not a truncated prefix: the consult-relay poller paints
+            # this as the user's bubble on turns with no sending socket, and a
+            # clipped copy can never dedup against the real message in history.
+            preview = messaging.handoff_visible_text(msg.text) if from_bot else (msg.text or "")
+            self.control.set_busy(
                 self.bot.name,
+                msg.id,
+                frm=msg.frm or "",
+                preview="" if msg.origin == "prompt_answer" else preview,
+                origin=msg.origin or "",
+                room=msg.room or "",
+                message_id=msg.message_id or "",
+                thread_id=msg.thread_id or "",
             )
-            if (msg.frm or "") == "user":
-                obligations.settle(self.paths, self.bot.name)
-            recovery.settle_turn(self.statestore, msg.id)
-            ledger.prune_turn(self.bot.name, msg.id)
-            self._log(f"{msg.id}: recovered after crash — reply already delivered")
-            return True
-        if state.terminal_status in (
-            delivery.STATUS_INFLIGHT,
-            delivery.STATUS_UNCERTAIN,
-        ):
-            # The reply may or may not have arrived. Never resend an
-            # uncertain send: settle the turn and warn on next contact.
-            messaging.mark_processed(self.paths, self.bot.name, path)
-            self._clear_attempt(msg.id)
-            ComputerProgress(self.bot.name, msg.id).settle_if_running(
-                writer, self.memory, self.session_id
+            # Admission: one transaction records the input reference,
+            # the session marked running, and the recovery claim — before any
+            # provider call, so a crash from here on is recoverable.
+            recovery.admit_turn(
+                self.statestore,
+                bot=self.bot.name,
+                session=self.session_id,
+                msg=msg,
+                input_ref=path.name,
             )
-            writer.final(
-                "(a crash interrupted the previous reply to this message; "
-                "it may or may not have been delivered, so it was not "
-                "sent again)",
-                self.bot.name,
-            )
-            push_turn_note(
-                self.paths,
-                self.bot.name,
-                "Your previous reply was interrupted by a crash mid-send "
-                "and may never have been delivered. Mention this and "
-                "offer to repeat yourself if the other side saw nothing.",
-            )
-            if (msg.frm or "") == "user":
-                obligations.settle(self.paths, self.bot.name)
-            recovery.settle_turn(self.statestore, msg.id)
-            ledger.prune_turn(self.bot.name, msg.id)
-            self._log(f"{msg.id}: recovered after crash — reply outcome unknown")
-            return True
-        ledger.clear_pending(self.bot.name, msg.id)
-        uncertain_sends: tuple[str, ...] = state.unresolved
-        if uncertain_sends:
-            self._log(
-                f"{msg.id}: recovering with uncertain send(s) "
-                f"{', '.join(uncertain_sends)} — side-effect tools withheld"
-            )
-        self._interrupted = False
-        from_bot = (msg.frm or "") not in {"", "user"}
-        # Full text, not a truncated prefix: the consult-relay poller paints
-        # this as the user's bubble on turns with no sending socket, and a
-        # clipped copy can never dedup against the real message in history.
-        preview = messaging.handoff_visible_text(msg.text) if from_bot else (msg.text or "")
-        self.control.set_busy(
-            self.bot.name,
-            msg.id,
-            frm=msg.frm or "",
-            preview="" if msg.origin == "prompt_answer" else preview,
-            origin=msg.origin or "",
-            room=msg.room or "",
-            message_id=msg.message_id or "",
-            thread_id=msg.thread_id or "",
-        )
-        # Admission: one transaction records the input reference,
-        # the session marked running, and the recovery claim — before any
-        # provider call, so a crash from here on is recoverable.
-        recovery.admit_turn(
-            self.statestore,
-            bot=self.bot.name,
-            session=self.session_id,
-            msg=msg,
-            input_ref=path.name,
-        )
-        run = self.scheduler.begin(msg.id, messaging.lane_of(msg), enqueued_ts=msg.ts)
-        run.began_paused = paused
+            run = self.scheduler.begin(msg.id, messaging.lane_of(msg), enqueued_ts=msg.ts)
+            run.began_paused = paused
+            order = messaging.queue_order(self.paths, self.bot.name)
+            if msg.id in order:
+                messaging.save_queue_order(self.paths, self.bot.name, [i for i in order if i != msg.id])
         outcome: dict = {}
 
         def _turn() -> None:

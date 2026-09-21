@@ -133,6 +133,22 @@ def test_paused_or_busy_bot_does_not_dream(tmp_path, monkeypatch):
     assert dreaming.fire_due(paths, [bot], now=1_000_800.0, control=control) == ["atlas"]
 
 
+def test_blocked_bot_does_not_dream(tmp_path, monkeypatch):
+    """Guideline 1.2: Block bot means no turn of any origin. A blocked bot
+    with dreaming on is skipped by the tick (not armed, not fired, no inbox
+    write) and dreams again once the owner unblocks it."""
+    monkeypatch.setenv("HARNESS_DREAM_MIN_SECS", "600")
+    paths = _paths(tmp_path)
+    bot = _bot(dreaming=True, blocked=True)
+    assert dreaming.fire_due(paths, [bot], now=1_000_000.0) == []
+    assert dreaming.fire_due(paths, [bot], now=1_000_700.0) == []
+    assert not (paths.home / "dreams" / "atlas.json").exists()
+    assert list(paths.inbox("atlas").glob("*.json")) == []
+    bot.blocked = False
+    assert dreaming.fire_due(paths, [bot], now=1_000_700.0) == []  # armed now
+    assert dreaming.fire_due(paths, [bot], now=1_001_400.0) == ["atlas"]
+
+
 def test_daily_budget_suspends_dreams(tmp_path, monkeypatch):
     monkeypatch.setenv("HARNESS_DREAM_MIN_SECS", "600")
     monkeypatch.setenv("HARNESS_DREAM_TOKENS", "1000")

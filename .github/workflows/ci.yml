@@ -2,6 +2,7 @@ name: CI
 
 on:
   push:
+    branches: [main]
   pull_request:
   workflow_dispatch:
 
@@ -38,3 +39,33 @@ jobs:
         run: python -m pytest
       - name: CLI smoke check
         run: python -m harness --help
+      - name: The whole runtime imports on a bare interpreter
+        run: |
+          python -S - <<'EOF'
+          import sys
+          before = set(sys.modules)
+          import agent.govern, agent.policy, agent.runtime, agent.tools
+          import channels.base, channels.desktop, channels.viewmodel
+          import connectors.github, connectors.gmail, connectors.linear, connectors.mcp, connectors.registry
+          import harness.rooms, harness.routines, harness.server, harness.workflows, harness.ws
+          import isolation.container, isolation.machines, isolation.vm
+          import providers.anthropic, providers.grok, providers.openai
+          local = {"agent", "channels", "connectors", "harness", "isolation", "providers"}
+          third = sorted(
+              name
+              for name in {m.split(".")[0] for m in set(sys.modules) - before}
+              if name not in sys.stdlib_module_names
+              and name not in local
+              and not name.startswith("_")
+          )
+          if third:
+              sys.exit(f"third-party imports in the runtime: {third}")
+          print("runtime is stdlib-only across", len(local), "packages")
+          EOF
+
+      - name: Installer syntax
+        if: matrix.python-version == '3.12'
+        run: |
+          bash -n install.sh
+          shellcheck -s bash install.sh
+          bash install.sh --help

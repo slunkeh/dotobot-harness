@@ -1,14 +1,6 @@
-"""Gmail connector runtime over IMAP and SMTP with a Google app password.
+"""Gmail connector using Google OAuth over IMAP and SMTP.
 
-Google OAuth needs a Cloud project, a consent screen, a web client with a
-registered redirect and (past a handful of test users) app verification —
-all to read one mailbox. An app password needs none of that: the user
-turns on 2-Step Verification, mints a 16-character password under Google
-Account → Security → App passwords, and pastes it here with the address.
-Each inbox is one connector record (address in `config.email`, app
-password as the record's secret), so a second address is just a second
-record and the registry namespaces the tools (`gmail_<account>_*`) when
-several share the type.
+Each inbox has its own OAuth grant and connector record.
 
 Stdlib only: imaplib against imap.gmail.com (Gmail's X-GM-* extensions
 give Gmail-syntax search plus stable message and thread ids) and smtplib
@@ -40,16 +32,6 @@ IMAP_HOST = "imap.gmail.com"
 IMAP_PORT = 993
 SMTP_HOST = "smtp.gmail.com"
 SMTP_PORT = 465
-#: Conventional env-style secret name so headless setups can skip the UI.
-FALLBACK_SECRET = "GMAIL_APP_PASSWORD"
-#: Where the user mints an app password (needs 2-Step Verification on).
-APP_PASSWORDS_URL = "https://myaccount.google.com/apppasswords"
-#: The steps, worded for a bot to relay in chat verbatim.
-APP_PASSWORD_STEPS = (
-    "turn on 2-Step Verification for the Google account, open "
-    f"{APP_PASSWORDS_URL}, create an app password named Dotobot, and paste "
-    "the 16-character password it shows"
-)
 _TIMEOUT = 30
 _MAX_RESULTS = 20
 _MAX_BODY = 4000
@@ -71,74 +53,58 @@ class GmailError(RuntimeError):
 # -- credentials -------------------------------------------------------------
 
 
-def normalize_app_password(value: str) -> str:
-    """Google shows an app password as four spaced groups; the password is
-    the 16 characters, so whitespace pasted along with it is dropped."""
-    return re.sub(r"\s+", "", str(value or ""))
-
-
 def _account(ctx: ConnectorContext) -> tuple[str, str]:
-    """(address, app password) for this record, or a GmailError whose text
-    tells the bot how to get what is missing."""
+    """Return the account address and current OAuth access token."""
     name = str(ctx.record.get("name") or ctx.record.get("type") or "Gmail")
-    address = ctx.config("email") or ctx.config("address")
+    from harness import mcp_oauth
+
+    address = str((mcp_oauth.load_tokens(ctx.paths, ctx.record["id"]) or {}).get("email") or "")
     if not address:
         raise GmailError(
-            f"connector {name!r} has no Gmail address yet; the user adds it in "
-            "Manage > Plugins (the Gmail address field)."
+            f"Reconnect {name!r} through Dotobot to choose a Google account."
         )
-    password = normalize_app_password(ctx.secret(fallback=FALLBACK_SECRET) or "")
-    if not password:
-        raise GmailError(
-            f"connector {name!r} has no app password yet. Call request_secret with "
-            f"name {ctx.secret_name!r} and title 'Gmail app password for {address}', "
-            f"and tell the user the steps: {APP_PASSWORD_STEPS}. They can also paste "
-            f"it in Manage > Plugins or store it as {FALLBACK_SECRET}."
-        )
-    return address, password
+    from harness import delegated_oauth, mcp_oauth
 
-
-def _auth_failure(address: str, exc: Exception) -> str:
-    detail = re.sub(r"\s+", " ", str(exc)).strip()[:200]
-    return (
-        f"Gmail rejected the sign-in for {address}: {detail or 'authentication failed'}. "
-        "This must be a current app password, not the account password; to make one, "
-        f"{APP_PASSWORD_STEPS}. Then update it in Manage > Plugins or ask for the new "
-        "one with request_secret."
-    )
+    try:
+        token = delegated_oauth.token(ctx.paths, ctx.record)
+    except mcp_oauth.OAuthError as exc:
+        raise GmailError(str(exc)) from None
+    return address, token
 
 
 # -- connections (module-level so tests can monkeypatch them) ------------------
 
 
-def _connect_imap(address: str, password: str) -> imaplib.IMAP4:
+def _connect_imap(address: str, token: str) -> imaplib.IMAP4:
     """An authenticated IMAP session for `address`."""
     try:
         conn = imaplib.IMAP4_SSL(IMAP_HOST, IMAP_PORT, timeout=_TIMEOUT)
     except (OSError, imaplib.IMAP4.error) as exc:
         raise GmailError(f"could not reach Gmail IMAP ({IMAP_HOST}): {exc}") from exc
     try:
-        conn.login(address, password)
+        auth = f"user={address}\x01auth=Bearer {token}\x01\x01"
+        conn.authenticate("XOAUTH2", lambda challenge: b"" if challenge else auth.encode())
     except imaplib.IMAP4.error as exc:
         _shutdown(conn)
-        raise GmailError(_auth_failure(address, exc)) from exc
+        raise GmailError("Google rejected OAuth access; reconnect this Gmail account.") from exc
     except OSError as exc:
         _shutdown(conn)
         raise GmailError(f"could not sign in to Gmail IMAP: {exc}") from exc
     return conn
 
 
-def _connect_smtp(address: str, password: str) -> smtplib.SMTP:
+def _connect_smtp(address: str, token: str) -> smtplib.SMTP:
     """An authenticated SMTP session for `address`."""
     try:
         conn = smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT, timeout=_TIMEOUT)
     except (OSError, smtplib.SMTPException) as exc:
         raise GmailError(f"could not reach Gmail SMTP ({SMTP_HOST}): {exc}") from exc
     try:
-        conn.login(address, password)
+        auth = f"user={address}\x01auth=Bearer {token}\x01\x01"
+        conn.auth("XOAUTH2", lambda challenge=None: "" if challenge else auth)
     except smtplib.SMTPAuthenticationError as exc:
         _quit(conn)
-        raise GmailError(_auth_failure(address, exc)) from exc
+        raise GmailError("Google rejected OAuth access; reconnect this Gmail account.") from exc
     except (smtplib.SMTPException, OSError) as exc:
         _quit(conn)
         raise GmailError(f"could not sign in to Gmail SMTP: {exc}") from exc
@@ -159,8 +125,8 @@ def _quit(conn: Any) -> None:
         pass
 
 
-def _smtp_send(address: str, password: str, msg: EmailMessage) -> None:
-    conn = _connect_smtp(address, password)
+def _smtp_send(address: str, token: str, msg: EmailMessage) -> None:
+    conn = _connect_smtp(address, token)
     try:
         conn.send_message(msg, from_addr=address)
     except smtplib.SMTPRecipientsRefused as exc:
@@ -350,8 +316,8 @@ def _attrs(raw: bytes) -> frozenset[str]:
 
 
 @contextmanager
-def _mailbox(address: str, password: str) -> Iterator[_Mailbox]:
-    conn = _connect_imap(address, password)
+def _mailbox(address: str, token: str) -> Iterator[_Mailbox]:
+    conn = _connect_imap(address, token)
     try:
         yield _Mailbox(conn, address)
     finally:

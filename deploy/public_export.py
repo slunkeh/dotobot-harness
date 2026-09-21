@@ -26,10 +26,16 @@ PUBLIC_DEPLOY = {
     "machine-wallpaper.jpg",
     "terminal-icon.png",
     "updater.py",
+    "update_host.py",
+    "update_service.py",
+    "controller_supervisor.py",
     "bump_version.py",
     "release_manifest.py",
     "make_release.sh",
     "public_install.py",
+    "container_install.py",
+    "container_entrypoint.py",
+    "system_install.sh",
     "public_export.py",
     "public-files.txt",
     "public_README.md",
@@ -65,7 +71,11 @@ def permitted(path: str) -> bool:
         return len(parts) == 2 and parts[1].endswith(".py")
     if parts[0] == "deploy":
         return len(parts) == 2 and parts[1] in PUBLIC_DEPLOY
-    return path == "docs/research-hermes.md"
+    return path in {
+        "docs/research-hermes.md",
+        "docs/connector-rest-routes.md",
+        "docs/google-workspace-oauth.md",
+    }
 
 
 def public_jpeg(data: bytes) -> bytes:

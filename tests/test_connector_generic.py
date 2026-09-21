@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import urllib.request
-
 import pytest
 
 from connectors import generic
@@ -30,7 +28,8 @@ def test_stubs_are_api_key_and_implemented():
     for stub in STUBS:
         rec = by_type[stub["type"]]
         assert rec["mcp"] is False, stub["type"]
-        assert rec["auth"] == "api_key", stub["type"]
+        expected = "oauth" if rec.get("oauth_supported") else "api_key"
+        assert rec["auth"] == expected, stub["type"]
         assert rec["implemented"] is True, stub["type"]
         assert f"{stub['type']}_get" in rec["tools"]
         assert f"{stub['type']}_request" in rec["tools"]
@@ -58,7 +57,7 @@ def test_mailchimp_get_hits_the_dc_host(paths, monkeypatch):
                 return False
         return Resp()
 
-    monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
+    monkeypatch.setattr(generic, "_open", fake_urlopen)
     out = generic._get(ctx, {"path": "/lists"})
     assert seen["url"] == "https://us6.api.mailchimp.com/3.0/lists"
     assert seen["auth"] == "Bearer abc-us6"
@@ -83,8 +82,14 @@ def test_missing_secret_names_request_secret(paths):
     assert "connector_" in out
 
 
-def test_unknown_stub_without_a_host_does_not_guess(paths):
-    ctx = _ctx(paths, type_="360nrs", secret="k")
+def test_unknown_stub_without_a_host_does_not_guess(paths, monkeypatch):
+    from harness.connectors import _CATALOG_TYPES
+
+    ctx = _ctx(paths, type_="adhook", secret="k")
+    metadata = dict(_CATALOG_TYPES["adhook"])
+    metadata.pop("api_base", None)
+    metadata.pop("api_base_template", None)
+    monkeypatch.setitem(_CATALOG_TYPES, "adhook", metadata)
     out = generic._get(ctx, {"path": "/x"})
     assert "no REST host" in out
 
@@ -105,7 +110,7 @@ def test_zendesk_template_needs_subdomain(paths, monkeypatch):
                 return False
         return Resp()
 
-    monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
+    monkeypatch.setattr(generic, "_open", fake_urlopen)
     out = generic._get(ctx, {"path": "/tickets.json"})
     assert seen["url"] == "https://acme.zendesk.com/api/v2/tickets.json"
     assert "HTTP 200" in out
@@ -131,7 +136,7 @@ def test_twilio_uses_basic_auth(paths, monkeypatch):
                 return False
         return Resp()
 
-    monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
+    monkeypatch.setattr(generic, "_open", fake_urlopen)
     generic._get(ctx, {"path": "/2010-04-01/Accounts.json"})
     assert seen["url"].startswith("https://api.twilio.com/")
     assert seen["auth"].startswith("Basic ")
@@ -149,3 +154,11 @@ def test_tool_names_for_api_key_stub():
     assert tool_names("mailchimp") == ["mailchimp_get", "mailchimp_request"]
     assert "linear_create_issue" in tool_names("linear")
     assert tool_names("notion") == []  # MCP, names come from the server
+
+
+def test_api_prefixed_path_is_not_duplicated():
+    from connectors.generic import _join
+    base = "https://www.googleapis.com/drive/v3"
+    assert _join(base, "/drive/v3/files") == base + "/files"
+    assert _join(base, "/files") == base + "/files"
+    assert _join(base, "https://attacker.invalid/files") is None

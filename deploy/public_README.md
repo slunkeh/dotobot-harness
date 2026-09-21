@@ -4,74 +4,115 @@ An Apache-2.0 self-hosted multi-bot agent runtime. You own the server, its data,
 provider accounts and operating costs. Dotobot's separately sold Mac and iOS apps
 are proprietary clients; the runtime and CLI do not require a Dotobot account.
 
-## Install on your server
+## Install with Docker
 
-Supported installer targets: Ubuntu 24.04, Debian 12, amd64/arm64. Use a
-server with enough memory and disk for your bots' browser computers and a public
-IPv4 or IPv6 address. Allow inbound TCP 80 and 443. This installer configures Caddy HTTPS
-and keeps the harness API on loopback. It does not change an existing harness or
-reverse proxy installation.
-
-```sh
-curl -fsSL https://dotobot.com/install.sh | sudo sh -s -- --ip YOUR_PUBLIC_IP
-```
-
-A domain is optional: use `--domain bots.example.com` instead if its DNS points
-to your server. With neither option, enter your public IP or domain at the prompt.
-The script installs Python, Docker, a checksum-verified official Caddy release,
-the bot-computer image and a systemd service, then checks HTTPS
-before printing a private link code. Paste it into **Add server** in the Dotobot
-app. Sign into the app to synchronize your linked servers across your devices.
-The server never needs your Dotobot account credentials.
-
-Public IP certificates renew automatically through Caddy using
-[Let's Encrypt's 160-hour profile](https://letsencrypt.org/docs/profiles/#shortlived).
-Keep the server and ports reachable so renewal can succeed. A changing
-IP requires updating the server address and linked connection. Private/LAN IPs
-and servers behind carrier-grade NAT need a reachable endpoint or your own secure
-network setup. Some third-party OAuth services reject IP-based callback addresses;
-those integrations may require a domain or a supported app callback.
-
-Your data lives in `/var/lib/harness`; releases live in `/opt/harness/releases`
-and `/opt/harness/current` selects the active release. Server settings are in
-`/etc/dotobot-server/server.env`. Local settings, state, link keys and Caddy
-configuration (`/etc/dotobot-server/Caddyfile`) are retained on installer reruns. View logs with
-`journalctl -u dotobot-server -u caddy`.
-
-Updates are manual by default:
+The harness runs in a controller container and manages a separate sandboxed
+computer container for each bot. Linux and macOS hosts need Docker with Linux
+container support on amd64 or arm64. The host does not need Python, Caddy or a
+particular Linux distribution when Docker is already available. This does not
+extend the security support lifetime of an end-of-life host OS.
 
 ```sh
-sudo dotobot-server --update
-sudo dotobot-server --link
-sudo dotobot-server --auto-update       # optional daily updates
-sudo dotobot-server --no-auto-update
+curl -fsSL https://dotobot.com/install.sh | bash
 ```
 
-Updates verify the release checksum, build the machine image before switching,
-and check API/HTTPS health. Failed updates select the previous release and
-image and check its health; failed recovery is reported for manual intervention. State is never rolled backward: releases that migrate SQLite may require
-an operator's compatible release or a backup to recover. Back up your server's
-state and Docker volumes before upgrading.
+The installer reuses a working local Docker engine. If Docker is missing, it
+uses Docker's official Linux installation script or downloads Docker Desktop on
+macOS. Administrator permission may be requested. On macOS, complete Docker
+Desktop's license and permission prompts; the installer does not accept its
+terms on your behalf. Docker Desktop has its own supported OS versions and
+licensing requirements. An installed engine that cannot be reached is not
+replaced. Remote Docker contexts are rejected because filesystem mounts would
+refer to a different host. On Windows, use a Linux shell with Docker Desktop
+integration; native PowerShell installation is not provided.
 
-Caddy's certificate renewal is always automatic, independently of your choice to
-update the Dotobot runtime manually or automatically. Caddy 2.10 or newer is
-required for [ACME profile support](https://github.com/caddyserver/caddy/releases/tag/v2.10.0);
-the installer verifies its pinned official release package when needed.
-
-Existing manual/LAN setups remain supported. Python 3.11+ is enough to run the
-stdlib-only API/CLI from a checkout. Full sandboxed computer use needs Linux and
-Docker/Podman with the machine image:
+By default, the API is available only at `http://127.0.0.1:8765`. The printed
+private link code connects an app on the same computer. For a remote server,
+supply a public address and allow incoming TCP 80/443:
 
 ```sh
-python3 -m harness --help
-python3 -m harness serve
-python3 -m harness link
+curl -fsSL https://dotobot.com/install.sh | bash -s -- --ip YOUR_PUBLIC_IP
 ```
 
-Behind your own HTTPS proxy, pass `--public-url https://bots.example.com` to
-`serve`/`link`, or set `HARNESS_PUBLIC_URL`. This is the address advertised to
-clients and used for OAuth callbacks; the listener can remain on localhost.
-Link codes carry a bearer credential: do not post them in issues or logs.
+A domain is optional: use `--domain bots.example.com` instead. This starts a
+separate Caddy HTTPS container; the API has no published plaintext port in this
+mode. Public IP certificates use Let's Encrypt's short-lived profile and renew
+automatically. A private LAN IP cannot receive a public IP certificate. A home
+router may need port forwarding; the installer does not provide a tunnel.
+
+Data and the install record live in `~/.local/share/dotobot`. Set `DOTOBOT_HOME`
+to choose another dedicated absolute directory, and use that same value for
+subsequent commands. The controller mounts its state at the same absolute path
+as the Docker host so each bot's read-only credential mount resolves correctly.
+The bot home and shared-workspace volumes stay in Docker. Back up both the
+installation directory and bot volumes for a complete recovery.
+
+**Trust boundary:** the controller can control the host Docker engine through
+its socket, which grants powerful host access. Never expose that socket to the
+network or mount it in a bot computer. Bots retain their existing dropped
+capabilities, separate homes, and explicitly granted script credentials.
+
+### Update, link and uninstall
+
+```sh
+curl -fsSL https://dotobot.com/install.sh | bash -s -- --update
+curl -fsSL https://dotobot.com/install.sh | bash -s -- --link
+curl -fsSL https://dotobot.com/install.sh | bash -s -- --uninstall
+# Permanently remove Dotobot state, bot homes and shared workspace too:
+curl -fsSL https://dotobot.com/install.sh | bash -s -- --uninstall --delete-data
+```
+
+Updates remain owner-controlled. Supported installations expose **Server updates**
+in the Mac/iPhone settings and accept the existing CLI update request. A durable
+operation prepares verified artifacts, reconnects the controller, then updates
+one affected bot at a time. Current tasks finish first; queued messages remain
+held until the bot confirms its runtime and health. Human control and approvals
+are never interrupted automatically. A failure pauses the rollout with progress
+and recovery details available after reconnecting.
+
+Compatible controller changes preserve running agents. Agent-only changes reuse
+the existing computer and its home without copying browser profiles. Image
+changes take a verified snapshot and retain the same persistent volume. The
+updater retains previous release artifacts; it never restores an old data
+snapshot over newer work.
+
+Legacy Docker controllers require an explicit bridge migration. Stop all bots
+through the normal lifecycle, then rerun the bootstrap with `--update
+--bridge-upgrades`. Recorded agents block the migration. Their state, volumes,
+network and address are retained, and stopped bots remain stopped. The new
+controller supervisor reloads the server without replacing its container; a
+separate, installation-owned worker executes update requests. Controller base-image
+or incompatible state/protocol changes require a stopped-fleet migration.
+
+The API advertises `harness_updates_v1`: authenticated `GET /api/updates/preview`
+and `GET /api/updates` provide availability and durable progress; `POST
+/api/updates/start` accepts the preview's `version`, and `POST /api/updates/retry`
+reconciles a paused operation. Old clients continue using existing endpoints.
+Release builders pass `--runtime-root` to `deploy/release_manifest.py` to include
+verified runtime fingerprints. Missing metadata cannot authorize skipping bot
+restarts or automatic rollback. Maintain `UPDATE_PROTOCOL` and `STATE_SCHEMA`
+in `harness/runtime_identity.py` when their compatibility contracts change.
+
+System-service installations add a request-polling timer without changing the
+existing automatic-release preference. `HARNESS_AUTO_ROLL=0` disables implicit
+rolls, while explicitly requested upgrades still proceed. `HARNESS_ROLL_SPACING`
+can add a delay between bots; the default is zero because readiness already
+serializes the rollout.
+
+Closing a client does not stop the server. Docker Desktop must be running on
+macOS. Uninstall retains data by default and never removes Docker or other
+services. Images/build cache may remain reusable; no broad Docker prune runs.
+`--port NUMBER` selects a different localhost port on first install.
+
+Existing system-service installations retain their original update commands
+(`sudo dotobot-server --update`) and data locations. The new bootstrap delegates
+to their installed updater; it does not migrate or adopt them. Existing source
+checkouts are also left unchanged. The legacy system bootstrap remains in
+`deploy/system_install.sh` for maintenance of that installation route.
+
+For development without Docker, Python 3.11+ can run the API/CLI from a checkout:
+`python3 -m harness --backend process serve`. This uses shared host processes,
+not the separate bot computers of the standard container installation.
 
 ## Develop
 

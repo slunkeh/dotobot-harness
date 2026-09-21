@@ -16,12 +16,6 @@ def card_payload(record: dict[str, Any]) -> dict[str, Any]:
     cat = next((c for c in CATALOG if c.get("type") == type_), {})
     title = str(record.get("name") or cat.get("name") or type_ or "Connector")
     desc = str(cat.get("description") or "")
-    if type_ == "google":
-        low = title.lower()
-        if "gmail" in low:
-            desc = "Read and send email, plus Calendar and Drive."
-        else:
-            desc = "Search, read, create, and share files."
     return {
         "title": title,
         "description": desc,

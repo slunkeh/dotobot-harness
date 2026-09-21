@@ -52,8 +52,10 @@ def test_connector_docs_cover_the_catalog():
     ac = by_type["activecampaign"]
     assert ac["publisher"] == "official"
     assert "developers.activecampaign.com" in ac["docs"]
-    assert "Official remote MCP" in ac["notes"]
-    assert by_type["360nrs"]["publisher"] == "none"
+    assert "api_domain" in ac["notes"]
+    assert "Api-Token" in ac["notes"]
+    assert by_type["360nrs"]["publisher"] == "official"
+    assert "username:apiPassword" in by_type["360nrs"]["notes"]
     assert by_type["n8n"]["docs"].startswith("https://docs.n8n.io")
     assert by_type["linear"]["docs"] == "https://linear.app/docs/mcp"
 
@@ -88,7 +90,7 @@ def test_heymarcus_stubs_are_api_key_http():
         rec = by_type[stub["type"]]
         assert rec["mcp"] is False
         assert rec["implemented"] is True
-        assert rec["auth"] == "api_key"
+        assert rec["auth"] == ("oauth" if rec.get("oauth_supported") else "api_key")
 
 
 def test_catalog_linear_has_runtime_tools():
@@ -256,12 +258,10 @@ def test_enabled_for_scopes_tools_to_named_bots(paths):
     assert connector_tools(paths, "nova")
 
 
-def test_oauth_type_without_mcp_url_offers_a_connect_stub(paths):
-    """Google has no MCP URL and no static runtime; bots get the sign-in stub
-    because auth is oauth, not a silent empty tool list."""
-    Connectors(paths).add("google", "Google")
-    bound = connector_tools(paths, "atlas")
-    assert list(bound) == ["google_connect"]
+@pytest.mark.parametrize("kind", ["google", "google_ads", "google_ad_manager", "google_analytics"])
+def test_retired_google_catalog_entries_cannot_be_added(paths, kind):
+    with pytest.raises(ValueError, match="unknown connector type"):
+        Connectors(paths).add(kind, "Google")
 
 
 def test_unconnected_cloudflare_offers_a_connect_stub(paths):
@@ -1175,15 +1175,15 @@ def test_connector_card_is_noop_without_writer(paths):
 
 
 def test_google_connector_offers_a_sign_in_card(paths):
-    Connectors(paths).add("google", "Google Drive")
+    record = Connectors(paths).add("google_docs", "Google Docs")
     cards: list[tuple[str, dict]] = []
-    bound = tools_for_bot(paths, "atlas", emit_card=lambda t, p: cards.append((t, p)) or "cid")
-    assert "google_connect" in bound
-    out = bound["google_connect"][1]({})
+    from connectors.authorize import connect_stub
+    ctx = ConnectorContext(paths, "atlas", record, emit_card=lambda t, p: cards.append((t, p)) or "cid")
+    out = connect_stub("google_docs", "Google Docs").handler(ctx, {})
     assert "sign-in card" in out
     assert cards and cards[0][0] == "connector"
     payload = cards[0][1]
-    assert payload["title"] == "Google Drive"
-    assert "share files" in payload["description"]
-    assert payload["type"] == "google"
+    assert payload["title"] == "Google Docs"
+    assert "documents" in payload["description"]
+    assert payload["type"] == "google_docs"
     assert payload["connector_id"]

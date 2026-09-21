@@ -31,6 +31,9 @@ Endpoints (all under /api unless noted):
                                          context (logs, bot state, stream, audit)
     GET  /reports[/<id>]              -> newest-first summaries (?limit=50) / one report
     DELETE /reports/<id>              -> remove one
+    GET  /bots/<b>/queue              -> full waiting queue (running task excluded)
+    PATCH /bots/<b>/queue {ids:[...]}  -> persist complete waiting order; stale IDs: 409
+    DELETE /bots/<b>/queue/<id>       -> remove waiting work only; admitted item: 409
     POST /bots/<b>/restart            -> stop+spawn that bot (inbox kept)
     POST /chat            {bot,text}  -> text/event-stream of stream events
                                          (optional client_nonce: idempotent
@@ -148,7 +151,16 @@ from .mcp_oauth import OAuthError as MCPOAuthError
 from .netguard import install_safe_redirects
 from .orchestrator import Orchestrator
 from .persona import PersonaError
-from .prefs import account_prefs, caveman_default, set_caveman, set_llm_defaults, set_user_avatar
+from .prefs import (
+    ConsentError,
+    account_prefs,
+    caveman_default,
+    record_consents,
+    set_caveman,
+    set_content_filter,
+    set_llm_defaults,
+    set_user_avatar,
+)
 from .readiness import provider_readiness
 from .recipes import RecipeError
 from .recipes import catalog as recipe_catalog
@@ -367,6 +379,7 @@ class WSHub:
     def __init__(self) -> None:
         self._lock = threading.Lock()
         self._clients: list = []
+        self.push_relay = None
 
     def add(self, handler) -> None:
         with self._lock:
@@ -378,6 +391,11 @@ class WSHub:
             self._clients = [h for h in self._clients if h is not handler]
 
     def broadcast(self, frame: dict) -> None:
+        if self.push_relay is not None:
+            try:
+                self.push_relay.enqueue(frame)
+            except Exception:
+                pass  # Push persistence must never interrupt chat delivery.
         with self._lock:
             clients = list(self._clients)
         dead = []
@@ -658,10 +676,20 @@ class _Handler(BaseHTTPRequestHandler):
                     "bots": self.orch.roster.names(),
                     "version": __version__,
                     "boot_id": getattr(self, "boot_id", None),
+                    "capabilities": ["harness_updates_v1"],
                     "started_at": getattr(self, "started_at", None),
                     **app_release(self.orch.paths),
                 }
             )
+        if path == "/api/updates":
+            from .updates import snapshot
+            return self._send_json(snapshot(self.orch))
+        if path == "/api/updates/preview":
+            from .update_api import preview
+            try:
+                return self._send_json(preview(self.orch))
+            except Exception as exc:
+                return self._send_json({"error": scrub_secrets(str(exc))}, 503)
         if path == "/api/bots":
             return self._send_json(self._bots())
         if path == "/api/logs":
@@ -723,6 +751,11 @@ class _Handler(BaseHTTPRequestHandler):
             return self._get_recipe(rid)
         if path.startswith("/api/connectors/") and path.endswith("/oauth/status"):
             cid = path[len("/api/connectors/") : -len("/oauth/status")].strip("/")
+            from . import delegated_oauth
+            from .connectors import WORKSPACE_TYPES
+            record = next((r for r in Connectors(self.orch.paths).list() if r.get("id") == cid), None)
+            if record and record["type"] in WORKSPACE_TYPES:
+                return self._send_json({"connector": cid, "status": "connected" if delegated_oauth.connected(self.orch.paths, cid) else "idle"})
             return self._send_json(mcp_oauth.status(self.orch.paths, cid))
         if path == "/api/prompts":
             return self._get_prompts()
@@ -763,8 +796,27 @@ class _Handler(BaseHTTPRequestHandler):
         path = urlparse(self.path).path.rstrip("/")
         if path == "/api/jev" or path.startswith("/api/jev/"):
             return self._jev("POST")
+        if path == "/api/push/subscriptions":
+            relay = getattr(self.orch.ws_hub, "push_relay", None)
+            if relay is None:
+                return self._send_json({"error": "push_not_configured"}, 503)
+            try:
+                relay.register(self._read_json())
+            except ValueError:
+                return self._send_json({"error": "invalid_push_subscription"}, 400)
+            return self._send_json({"registered": True})
         if path.startswith("/api/voice/elevenlabs/"):
             return self._elevenlabs("POST")
+        if path in {"/api/updates/start", "/api/updates/retry"}:
+            from . import update_api, updates
+            try:
+                if path.endswith("retry"):
+                    result = updates.retry(self.orch)
+                else:
+                    result = update_api.start(self.orch, self._read_json().get("version"))
+                return self._send_json(result, 202)
+            except Exception as exc:
+                return self._send_json({"error": scrub_secrets(str(exc))}, 409)
         if path == "/api/chat":
             return self._chat()
         if path == "/api/reports":
@@ -813,6 +865,9 @@ class _Handler(BaseHTTPRequestHandler):
         if path.startswith("/api/rooms/") and path.endswith("/messages"):
             rid = path[len("/api/rooms/") : -len("/messages")].strip("/")
             return self._post_room_message(rid)
+        if path.startswith("/api/connectors/") and path.endswith("/delegated-auth"):
+            cid = path[len("/api/connectors/") : -len("/delegated-auth")].strip("/")
+            return self._install_delegated_auth(cid)
         if path == "/api/connectors/oauth/exchange":
             return self._connector_oauth_exchange()
         if path.startswith("/api/connectors/") and path.endswith("/oauth/start"):
@@ -840,6 +895,8 @@ class _Handler(BaseHTTPRequestHandler):
         if not self._authed():
             return self._send_json({"error": "unauthorized"}, 401)
         path = urlparse(self.path).path.rstrip("/")
+        if path.startswith("/api/bots/") and path.endswith("/queue"):
+            return self._edit_queue(path[len("/api/bots/"):-len("/queue")].strip("/"))
         if path.startswith("/api/rooms/"):
             return self._patch_room(path[len("/api/rooms/") :])
         if path.startswith("/api/bots/") and path.endswith("/soul"):
@@ -883,6 +940,13 @@ class _Handler(BaseHTTPRequestHandler):
                 # Every bot that follows the account just changed its
                 # effective flag: re-fan the roster so both apps repaint.
                 self._push_lists(bots=True)
+            if "content_filter" in data:
+                set_content_filter(self.orch.paths, bool(data.get("content_filter")))
+            if "consents" in data:
+                try:
+                    record_consents(self.orch.paths, data.get("consents"))
+                except ConsentError as exc:
+                    return self._send_json({"error": str(exc)}, 400)
             return self._send_json(account_prefs(self.orch.paths))
         return self._send_json({"error": "not found", "path": path}, 404)
 
@@ -908,6 +972,9 @@ class _Handler(BaseHTTPRequestHandler):
         path = urlparse(self.path).path.rstrip("/")
         if path == "/api/jev" or path.startswith("/api/jev/"):
             return self._jev("DELETE")
+        if path.startswith("/api/bots/") and "/queue/" in path:
+            name, _, rid = path[len("/api/bots/"):].partition("/queue/")
+            return self._edit_queue(name, remove_id=rid)
         if path.startswith("/api/voice/elevenlabs/"):
             return self._elevenlabs("DELETE")
         if path.startswith("/api/rooms/"):
@@ -961,6 +1028,8 @@ class _Handler(BaseHTTPRequestHandler):
                     # legacy key for app builds from the idle-think release
                     "idle_think": bool(getattr(b, "dreaming", False)),
                     "private_browser": bool(getattr(b, "private_browser", False)),
+                    # Blocked by the owner: on the roster, never dispatched.
+                    "blocked": bool(getattr(b, "blocked", False)),
                     # Caveman mode: the bot's own tri-state override (null =
                     # follow the account) and what that resolves to today.
                     "caveman": caveman_own,
@@ -1717,6 +1786,8 @@ class _Handler(BaseHTTPRequestHandler):
         bot, rid = parsed
         try:
             self.orch.roster.get(bot)
+            if self.orch.is_blocked(bot):
+                return self._send_json({"error": f"{bot} is blocked; unblock it first"}, 409)
             row = run_now(
                 self.orch.paths,
                 bot,
@@ -1820,7 +1891,10 @@ class _Handler(BaseHTTPRequestHandler):
         return self._send_json(record)
 
     def _remove_connector(self, connector_id: str):
-        removed = Connectors(self.orch.paths).remove(connector_id)
+        try:
+            removed = Connectors(self.orch.paths).remove(connector_id)
+        except MCPOAuthError as exc:
+            return self._send_json({"error": str(exc)}, 502)
         return self._send_json({"removed": connector_id, "ok": removed})
 
     # -- connector OAuth (remote MCP servers) --------------------------------
@@ -1842,6 +1916,9 @@ class _Handler(BaseHTTPRequestHandler):
         )
         if record is None:
             return self._send_json({"error": f"no connector {connector_id!r}"}, 404)
+        from .connectors import WORKSPACE_TYPES
+        if record.get("type") in WORKSPACE_TYPES:
+            return self._send_json({"status": "unavailable", "message": "Connect this account through Dotobot's account service. Update your app if needed."}, 409)
         url = connector_mcp_url(str(record.get("type", "")), record.get("config"))
         if not url:
             return self._send_json(
@@ -1900,7 +1977,30 @@ class _Handler(BaseHTTPRequestHandler):
             _oauth_page(ok=True, message="You can close this window and return to the app.")
         )
 
+    def _install_delegated_auth(self, connector_id: str):
+        from . import delegated_oauth
+        from .connectors import WORKSPACE_TYPES
+        records = Connectors(self.orch.paths)
+        record = next((r for r in records.list() if r["id"] == connector_id), None)
+        if not record or record["type"] not in WORKSPACE_TYPES:
+            return self._send_json({"error": "Unsupported delegated connector"}, 400)
+        try:
+            email = delegated_oauth.install(self.orch.paths, record, self._read_json())
+            records.update(connector_id, name=email or record["name"], config={"email": email})
+            return self._send_json({"status": "connected"})
+        except MCPOAuthError as exc:
+            return self._send_json({"error": str(exc)}, 400)
+
     def _delete_connector_oauth(self, connector_id: str):
+        from . import delegated_oauth
+        from .connectors import WORKSPACE_TYPES
+        record = next((r for r in Connectors(self.orch.paths).list() if r["id"] == connector_id), None)
+        if record and record["type"] in WORKSPACE_TYPES:
+            try:
+                delegated_oauth.disconnect(self.orch.paths, record)
+            except MCPOAuthError as exc:
+                return self._send_json({"error": str(exc)}, 502)
+
         removed = mcp_oauth.clear_tokens(self.orch.paths, connector_id)
         try:
             from connectors import mcp as mcp_runtime
@@ -2138,14 +2238,32 @@ class _Handler(BaseHTTPRequestHandler):
             bot = self.orch.roster.get(name)
         except RosterError as exc:
             return self._send_json({"error": str(exc)}, 404)
-        return self._send_json(
-            messaging.queue_state(
-                self.orch.paths,
-                bot.name,
-                busy=self.orch.control.is_busy(bot.name),
-                current_id=self.orch.control.busy_request(bot.name),
-            )
-        )
+        with messaging.queue_lock(self.orch.paths, bot.name):
+            busy, current = self.orch.control.busy_state(bot.name)
+            state = messaging.queue_state(self.orch.paths, bot.name, busy=busy, current_id=current)
+        return self._send_json(state)
+
+    def _edit_queue(self, name: str, remove_id: str | None = None):
+        try:
+            bot = self.orch.roster.get(name)
+        except RosterError as exc:
+            return self._send_json({"error": str(exc)}, 404)
+        data = self._read_json() if remove_id is None else {}
+        ids = data.get("ids") if isinstance(data, dict) else None
+        if remove_id is None and (not isinstance(ids, list) or not all(isinstance(i, str) for i in ids)):
+            return self._send_json({"error": "ids must be a list of request IDs"}, 400)
+        with messaging.queue_lock(self.orch.paths, bot.name):
+            busy, current = self.orch.control.busy_state(bot.name)
+            try:
+                if remove_id is not None:
+                    if not messaging.remove_queued(self.orch.paths, bot.name, remove_id, current_id=current):
+                        return self._send_json({"error": "This item is no longer waiting. Refresh the queue."}, 409)
+                else:
+                    messaging.reorder_queue(self.orch.paths, bot.name, ids, current_id=current)
+            except ValueError as exc:
+                return self._send_json({"error": str(exc)}, 409)
+            state = messaging.queue_state(self.orch.paths, bot.name, busy=busy, current_id=current)
+        return self._send_json(state)
 
     def _history_page(self) -> tuple[float | None, int]:
         qs = parse_qs(urlparse(self.path).query)
@@ -2989,6 +3107,7 @@ class _Handler(BaseHTTPRequestHandler):
                 "type": "hello",
                 "version": __version__,
                 "boot_id": getattr(self, "boot_id", None),
+                    "capabilities": ["harness_updates_v1"],
                 **app_release(self.orch.paths),
             }
         )
@@ -4134,6 +4253,20 @@ def make_server(
 ):
     if getattr(orch, "ws_hub", None) is None:
         orch.ws_hub = WSHub()
+    from .push import PushRelay, configured_url
+    push_url = configured_url(orch.paths.home)
+    if push_url and orch.ws_hub.push_relay is None:
+        def notification_titles(bot, room):
+            try:
+                author = orch.roster.get(bot).display_name()
+            except (KeyError, ValueError):
+                author = bot
+            try:
+                title = get_room(orch.paths, room).title if room else author
+            except (KeyError, ValueError, OSError):
+                title = room or author
+            return title, author
+        orch.ws_hub.push_relay = PushRelay(orch.paths.home, push_url, notification_titles)
     # The fencing epoch IS the boot id: one uuid per server instance, so an
     # epoch change tells clients their sequence state is from a dead server.
     boot_id = uuid.uuid4().hex
@@ -4150,7 +4283,17 @@ def make_server(
         },
     )
     advertised = advertised_url(host, port, public_url, home=orch.paths.home)
-    httpd = ThreadingHTTPServer((host, port), handler)
+    class PushHTTPServer(ThreadingHTTPServer):
+        def server_close(self):
+            relay = getattr(orch.ws_hub, "push_relay", None)
+            if relay is not None:
+                relay.close()
+                orch.ws_hub.push_relay = None
+            super().server_close()
+
+    httpd = PushHTTPServer((host, port), handler)
+    if orch.ws_hub.push_relay is not None:
+        orch.ws_hub.push_relay.start()
     httpd.public_url = (
         advertised_url(host, httpd.server_address[1], public_url, home=orch.paths.home)
         if port == 0
@@ -4362,7 +4505,17 @@ def serve(
 
         def _bring_up() -> None:
             try:
-                for h in orch.up():
+                from .update_state import read
+                operation = read(orch.paths)
+                if operation.get("running_before") is not None:
+                    names = [n for n in orch.roster.names()
+                             if (n in operation["running_before"] or
+                                 ((h := orch._handle(n)) and h.status.value == "running"))
+                             and not (orch.paths.run / f"{n}.stopped").exists()]
+                    handles = [orch._start_bot(n) for n in names]
+                else:
+                    handles = orch.up()
+                for h in handles:
                     print(f"started {h.bot} pid={h.pid}", flush=True)
             except Exception as exc:  # noqa: BLE001 - a sick spawn must not kill serve
                 print(f"bot bring-up failed: {exc}", file=sys.stderr, flush=True)
@@ -4381,7 +4534,9 @@ def serve(
         if hub is not None:
             hub.shutdown(retry_in=2.0)
         flush = getattr(orch.backend, "flush", None)
-        if flush is not None:
+        from .update_state import read
+        managed_update = read(orch.paths).get("stage") == "installing_controller"
+        if flush is not None and not managed_update:
             for name in orch.roster.names():
                 try:
                     flush(name)

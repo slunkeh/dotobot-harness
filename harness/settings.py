@@ -101,6 +101,7 @@ SETTINGS: tuple[Setting, ...] = (
     Setting(
         "HARNESS_PUBLIC_URL", "str", "", "public HTTPS origin for link codes and OAuth callbacks"
     ),
+    Setting("HARNESS_PUSH_RELAY_URL", "str", "", "optional HTTPS notification relay; overrides push-relay.json"),
     Setting("HARNESS_BOT", "str", "", "bot name, set by the orchestrator on each agent"),
     # -- the model turn ---------------------------------------------------
     Setting("HARNESS_HISTORY_TOKENS", "int", 8000, "per-turn history budget", minimum=0),
@@ -283,7 +284,8 @@ SETTINGS: tuple[Setting, ...] = (
     ),
     # -- updates ----------------------------------------------------------
     Setting("HARNESS_AUTO_ROLL", "bool", False, "roll agents automatically on update"),
-    Setting("HARNESS_ROLL_SPACING", "float", 30.0, "seconds between agent rolls", minimum=0),
+    Setting("HARNESS_ROLL_SPACING", "float", 0.0, "seconds between agent rolls", minimum=0),
+    Setting("HARNESS_RELEASE_ROOT", "path", "/opt/harness", "mounted immutable release directory for the persistent controller"),
     Setting("HARNESS_RELEASE_MANIFEST", "str", "", "release manifest URL"),
     Setting(
         "HARNESS_RELEASE_ALLOW_INSECURE",

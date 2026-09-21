@@ -514,14 +514,13 @@ def test_record_reports_oauth_and_cached_tools(paths):
     assert listed["tools"] == ["notion_search"]
 
 
-def test_gmail_listing_reports_the_app_password_and_static_tools(paths):
-    """An app-password inbox is `secret_configured`, never OAuth, and lists
-    the IMAP/SMTP runtime's tools."""
+def test_gmail_listing_ignores_old_password_and_reports_static_tools(paths):
+    """Old app passwords never make a Gmail connection look authorized."""
     Connectors(paths).add("gmail", "Gmail", {"email": "ada@example.com"}, secret="abcd")
     listed = Connectors(paths).list()[0]
-    assert listed["secret_configured"] is True
+    assert listed["secret_configured"] is False
     assert listed["oauth_configured"] is False
-    assert listed["name"] == "ada@example.com"
+    assert listed["name"] == "Gmail"
     assert listed["config"] == {"email": "ada@example.com"}
     assert "gmail_send" in listed["tools"]
     assert "gmail_send_draft" in listed["tools"]
@@ -562,20 +561,16 @@ def test_catalog_marks_mcp_types():
     # no MCP server and no OAuth client, one record per inbox.
     assert by_type["gmail"]["mcp"] is False
     assert "mcp_url" not in by_type["gmail"]
-    assert by_type["gmail"]["auth"] == "api_key"
-    assert by_type["gmail"]["fields"] == ["email"]
+    assert by_type["gmail"]["auth"] == "oauth"
+    assert by_type["gmail"]["fields"] == []
     assert by_type["gmail"]["implemented"] is True
     assert by_type["github"]["prefer_static"] is True
     assert by_type["github"]["auth"] == "api_key"
     assert by_type["gmail"]["multi_account"] is True
     assert "gmail_search_threads" in by_type["gmail"]["tools"]
-    # The plugin page must say what to do and link to the app-passwords page.
-    assert by_type["gmail"]["docs"] == "https://myaccount.google.com/apppasswords"
-    notes = by_type["gmail"]["notes"]
-    assert "2-Step Verification" in notes
-    assert "16-character" in notes
-    assert "app password" in notes.lower()
-    assert "Add another account" in notes
+    assert by_type["gmail"]["oauth_supported"] is True
+    assert by_type["gmail"]["docs"].endswith("/xoauth2-protocol")
+    assert "OAuth" in by_type["gmail"]["notes"]
     assert by_type["n8n"]["mcp"] is True
     assert by_type["n8n"]["mcp_url_template"] == "https://{instance_host}/mcp-server/http"
     assert by_type["triggerdev"]["mcp"] is False
@@ -733,3 +728,25 @@ def test_oauth_start_without_mcp_url_is_501(server):
     with pytest.raises(urllib.error.HTTPError) as err:
         _req(f"{base}/api/connectors/{record['id']}/oauth/start", "POST", {})
     assert err.value.code == 501
+
+
+@pytest.mark.parametrize("kind", ["gmail", "google_calendar", "google_drive", "google_sheets", "google_docs"])
+def test_workspace_uses_delegation_not_native_google_oauth(server, monkeypatch, kind):
+    from harness import delegated_oauth
+    base, orch, fake = server
+    record = _req(f"{base}/api/connectors", "POST", {"type": kind, "name": kind})
+    cid = record["id"]
+    with pytest.raises(urllib.error.HTTPError) as error:
+        _req(f"{base}/api/connectors/{cid}/oauth/start", "POST", {})
+    assert error.value.code == 409
+    mcp_oauth.save_tokens(orch.paths, cid, {"access_token": "legacy", "refresh_token": "legacy-refresh"})
+    assert _req(f"{base}/api/connectors/{cid}/oauth/status")["status"] == "idle"
+    monkeypatch.setattr(delegated_oauth, "request", lambda *args: {
+        "access_token": "short-lived", "email": "test@example.com", "service": kind})
+    _req(f"{base}/api/connectors/{cid}/delegated-auth", "POST", {
+        "broker_url": "https://broker.example/integrations", "grant_id": "grant", "capability": "opaque"})
+    assert _req(f"{base}/api/connectors")[0]["oauth_configured"] is True
+    assert _req(f"{base}/api/connectors/{cid}/oauth/status")["status"] == "connected"
+    _req(f"{base}/api/connectors/{cid}/oauth", "DELETE")
+    assert _req(f"{base}/api/connectors")[0]["oauth_configured"] is False
+    assert _req(f"{base}/api/connectors/{cid}/oauth/status")["status"] == "idle"

@@ -469,6 +469,107 @@ def test_caveman_account_default_and_per_bot_override(server):
     assert _req(f"{base}/api/settings")["caveman"] is True
 
 
+def test_content_filter_defaults_on_round_trips_and_reaches_the_prompt(server):
+    """Guideline 1.2: a filter the owner can switch, on by default, and a
+    system-prompt line every bot carries while it is on."""
+    from agent.contentfilter import PROMPT
+    from agent.memory import Memory
+    from agent.runtime import Agent
+    from harness.control import Control
+    from harness.roster import Bot
+    from providers.echo import EchoProvider
+
+    base, orch = server
+    assert _req(f"{base}/api/settings")["content_filter"] is True
+    agent = Agent(
+        paths=orch.paths,
+        bot=Bot(name="atlas", role="assistant", provider="echo"),
+        provider=EchoProvider(),
+        memory=Memory(paths=orch.paths, bot="atlas"),
+        control=Control(orch.paths),
+    )
+    assert PROMPT in agent.system_prompt("hello")
+    assert (
+        _req(f"{base}/api/settings", "PATCH", {"content_filter": False})["content_filter"] is False
+    )
+    assert PROMPT not in agent.system_prompt("hello"), "read every turn, no restart"
+    # a PATCH of another setting never flips it back
+    _req(f"{base}/api/settings", "PATCH", {"caveman": True})
+    assert _req(f"{base}/api/settings")["content_filter"] is False
+    settings = json.loads((orch.paths.home / "settings.json").read_text())
+    assert settings["content_filter"] is False
+
+
+def test_consents_round_trip_and_survive_reload(server):
+    """Guideline 5.1.2(i): the consent to send content to a third-party AI is
+    recorded per provider / connector, never refused server-side."""
+    base, orch = server
+    assert _req(f"{base}/api/settings")["consents"] == {}
+    out = _req(f"{base}/api/settings", "PATCH", {"consents": {"provider:claude": 1_800_000_000}})
+    assert out["consents"] == {"provider:claude": 1_800_000_000}
+    out = _req(f"{base}/api/settings", "PATCH", {"consents": {"connector:linear": "1800000001"}})
+    assert out["consents"] == {"provider:claude": 1_800_000_000, "connector:linear": 1_800_000_001}
+    # withdrawing removes the entry; a bad key is a 400 that changes nothing
+    out = _req(f"{base}/api/settings", "PATCH", {"consents": {"provider:claude": None}})
+    assert out["consents"] == {"connector:linear": 1_800_000_001}
+    code, body = _req_error(f"{base}/api/settings", "PATCH", {"consents": {"bogus": 1}})
+    assert code == 400 and "consent" in body["error"]
+    code, _ = _req_error(f"{base}/api/settings", "PATCH", {"consents": ["provider:x"]})
+    assert code == 400
+    assert _req(f"{base}/api/settings")["consents"] == {"connector:linear": 1_800_000_001}
+    # a provider key still saves without a consent entry (soft gate)
+    _req(f"{base}/api/providers/echo/key", "POST", {"api_key": "irrelevant"})
+    settings = json.loads((orch.paths.home / "settings.json").read_text())
+    assert settings["consents"] == {"connector:linear": 1800000001}
+
+
+def test_blocked_bot_stays_on_the_roster_but_never_gets_a_turn(server):
+    """Guideline 1.2: Block bot beside Report. The bot keeps its memory and
+    settings; the harness just never dispatches it until it is unblocked."""
+    base, orch = server
+    atlas = next(b for b in _req(f"{base}/api/bots") if b["name"] == "atlas")
+    assert atlas["blocked"] is False
+    assert orch.recipients_for("hello", bot="atlas") == ["atlas"]
+    out = _req(f"{base}/api/bots/atlas", "PATCH", {"blocked": True})
+    assert out["blocked"] is True
+    assert orch.recipients_for("hello", bot="atlas") == []
+    assert orch.recipients_for("@atlas hello", bot=None) == []
+    code, body = _req_error(f"{base}/api/chat", "POST", {"bot": "atlas", "text": "hi"})
+    assert code in (400, 404, 409, 500) and "no bots" in body["error"]
+    store = json.loads((orch.paths.home / "roster.json").read_text())
+    assert next(b for b in store["bots"] if b["name"] == "atlas")["blocked"] is True
+    # unblocking restores the turn; a PATCH of another field never flips it
+    _req(f"{base}/api/bots/atlas", "PATCH", {"role": "a helper"})
+    assert orch.recipients_for("hello", bot="atlas") == []
+    _req(f"{base}/api/bots/atlas", "PATCH", {"blocked": False})
+    assert orch.recipients_for("hello", bot="atlas") == ["atlas"]
+
+
+def test_blocked_bot_gets_no_routine_or_dream_turn_either(server, monkeypatch):
+    """Chat routing is not the only way a bot gets a turn: the routine tick,
+    a routine test run and the dream tick all honour the block too."""
+    from harness import dreaming
+    from harness.routines import add_routine, scheduled_bots
+
+    base, orch = server
+    monkeypatch.setenv("HARNESS_DREAM_MIN_SECS", "600")
+    routine = add_routine(
+        orch.paths, "atlas", title="Ping", prompt="say hi", when="8am", enabled=True
+    )
+    _req(f"{base}/api/bots/atlas", "PATCH", {"blocked": True, "dreaming": True})
+    assert orch.is_blocked("atlas")
+    assert "atlas" not in scheduled_bots(orch.roster)
+    atlas = orch.roster.get("atlas")
+    assert dreaming.fire_due(orch.paths, [atlas], now=1_000_000.0) == []
+    assert dreaming.fire_due(orch.paths, [atlas], now=1_000_700.0) == []
+    code, body = _req_error(f"{base}/api/bots/atlas/routines/{routine['id']}/run", "POST", {})
+    assert code == 409 and "blocked" in body["error"]
+    assert list(orch.paths.inbox("atlas").glob("*.json")) == []
+    _req(f"{base}/api/bots/atlas", "PATCH", {"blocked": False})
+    assert not orch.is_blocked("atlas")
+    assert "atlas" in scheduled_bots(orch.roster)
+
+
 def test_restart_bot_respawns_and_keeps_the_inbox(server):
     from agent import messaging
 
@@ -602,7 +703,7 @@ def test_duplicate_uses_validated_routine_snapshot(server, monkeypatch):
 def test_connectors_catalog_and_crud(server):
     base, orch = server
     catalog = {c["type"]: c for c in _req(f"{base}/api/connectors/catalog")}
-    assert {"slack", "github", "google", "linear"} <= set(catalog)
+    assert {"slack", "github", "google_docs", "linear"} <= set(catalog)
     # gallery metadata for the plugin-store UI
     assert catalog["linear"]["category"] == "Project Management"
     assert catalog["linear"]["icon"]

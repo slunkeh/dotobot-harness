@@ -24,6 +24,7 @@ from harness.routines import (
     parse_schedule,
     parse_when,
     run_now,
+    scheduled_bots,
     update_routine,
 )
 from harness.server import make_server
@@ -151,6 +152,40 @@ def test_draft_routine_and_test_run(tmp_path):
     assert ran["history"][-1]["kind"] == "test"
     inbox = list(paths.inbox("atlas").glob("*.json"))
     assert inbox
+
+
+def test_scheduled_bots_skips_a_blocked_bot():
+    """Guideline 1.2: a blocked bot keeps its routines but the tick never
+    fires them until it is unblocked; a PATCH of another field never flips it."""
+    from harness.roster import Roster
+
+    atlas, nova = Bot(name="atlas", blocked=True), Bot(name="nova")
+    roster = Roster(bots=[atlas, nova])
+    assert scheduled_bots(roster) == ["nova"]
+    atlas.blocked = False
+    assert scheduled_bots(roster) == ["atlas", "nova"]
+
+
+def test_scheduler_tick_fires_only_unblocked_bots(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+
+    from harness import routines
+    from harness.roster import Roster
+
+    paths = _paths(tmp_path)
+    roster = Roster(bots=[Bot(name="atlas", blocked=True), Bot(name="nova")])
+    seen: list[list[str]] = []
+    ticked = threading.Event()
+
+    def fake_fire_due(_paths, bots, *, send=None, **_kw):
+        seen.append(list(bots))
+        ticked.set()
+        return []
+
+    monkeypatch.setattr(routines, "fire_due", fake_fire_due)
+    routines.start_scheduler(SimpleNamespace(paths=paths, roster=roster), interval=3600)
+    assert ticked.wait(5)
+    assert seen[0] == ["nova"]
 
 
 def test_disabled_routine_does_not_fire(tmp_path):
