@@ -200,6 +200,7 @@ Compatible Mac/iPhone settings expose each supported feature separately.
 | `completion` | Compare a final reply with this turn's original tool receipts. Append an explicit unverified-outcomes note for confidently unsupported action-completion claims. A model judgment is not proof of success or failure. |
 | `handoffs` | Offer `recommend_handoff(task)` to the bot. Compare the task with roster roles and the requesting bot's pending handoffs in this conversation; group chats restrict candidates to members. Recommend a bot and flag possible duplicates. Never send, suppress, reroute or authorize a handoff. |
 | `notifications` | Classify the final reply's attention needs to order pending push delivery. Approval/input prompts retain top priority. Every notification remains queued; nothing is suppressed. Existing notification preferences and relay payloads remain unchanged. |
+| `browser` | Offer `computer_browser(goal, max_steps)` for ordinary HTML navigation and forms. Send the bounded goal, visible page text, controls and recent actions to TypeSafe. Jev selects the operation and compatible target together; the bot's configured model generates literal field text only when needed. Every action passes existing permissions. |
 
 All checks use the owner's key, redact registered secrets, and retain the existing
 48 KB request bound and four-second HTTP timeout. There are no paid background
@@ -210,6 +211,44 @@ Thresholds are conservative starting policies, not measured accuracy guarantees.
 The offline suite uses fake judgments; live quality, latency and savings still
 need evaluation on representative user tasks. Tool filtering is intentionally
 limited to structured result lists, not arbitrary command output or screenshots.
+
+### Fast browser actions (Beta)
+
+Enable **Fast browser actions** in Jev settings, or PATCH `/api/jev` with
+`{"features":{"browser":true}}`. It defaults off, requires the main Jev switch
+and uses the existing TypeSafe key. Field text uses the bot's configured provider
+and its normal usage accounting; no additional API key or browser dependency is needed.
+
+The server must also have `HARNESS_CHROME_CDP=1`. Restart the harness with that
+setting, then reopen Chrome so it starts with its loopback debugging endpoint.
+`GET /api/jev` reports `browser.cdp_enabled`; this is configuration, not proof of
+a live connection. The tool checks the bot's existing profile and connection at
+execution time, preserving bot session isolation. It never launches another profile.
+
+The main agent opens the web page and supplies a bounded goal. Each decision
+batches operation and compatible-target questions in one TypeSafe request. An
+isolated-world DOM snapshot keeps actual node references; actions consume that
+observation once, recheck page/field/option state and reject covered or replaced
+controls. Page content and history remain untrusted; registered secrets are redacted
+before model calls, and password, payment-autofill and file inputs are excluded.
+
+Runs default to eight decisions (maximum twelve) and stop starting work after
+30 seconds; an in-flight provider/browser call can finish after that deadline.
+Stops, changed task instructions, permissions and disabling the feature are
+checked between steps and after model/approval waits. Failed or uncertain inputs
+are never automatically replayed. The result distinguishes dispatched inputs,
+fallback and an unknown input outcome. Jev's DONE asks the main agent to verify
+the result independently, not claim success.
+
+This first version uses semantic HTML clicks and value changes. Frames, shadow
+DOM, canvas, rich editors, uploads, oversized pages and widgets requiring trusted
+physical input return to normal visual computer use. It does not handle browser
+pop-up tabs or nested scrolling. There are no measured speed or reliability claims.
+
+Design references: [jev-ultrafast](https://github.com/browser-use/jev-ultrafast)
+for batched operation/target selection and text-only generation, and
+[agent-desktop](https://github.com/lahfir/agent-desktop) for observation-scoped
+references, bounded observations and explicit recovery. Neither is a dependency.
 
 Use the harness linking key as the bearer credential and HTTPS outside a trusted
 local connection. Keys use the existing private credential store (0600 files),

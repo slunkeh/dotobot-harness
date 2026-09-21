@@ -296,6 +296,12 @@ class HostComputer:
         except Exception:
             return None
 
+    def browser_session(self, *, guard=lambda: None):
+        from harness.browser_dom import Browser
+
+        self._note_activity()
+        return Browser(machine=self.machine, user_data_dir=self._chrome_profile(), guard=guard)
+
     def _chrome_profile(self) -> str | None:
         if self.machine:
             from isolation.machines import MACHINE_HOME
@@ -442,6 +448,9 @@ class GatedComputer:
         if not callable(fn):
             return None
         return fn()
+
+    def browser_session(self):
+        return self.inner.browser_session(guard=lambda: self._gate("browser"))
 
     def chrome_snapshot(self) -> str | None:
         self._gate("screenshot")

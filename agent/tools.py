@@ -197,6 +197,9 @@ class ToolContext:
     task_revision_changed: bool = False
     delivery_error: str = ""
     offered_connector_tools: set[str] = field(default_factory=set)
+    browser_authorize: Callable[[str, dict], str | None] | None = None
+    browser_check: Callable[[], str | None] | None = None
+    browser_text: Callable[[str], str] | None = None
 
 
 def _from_colleague(ctx: ToolContext) -> bool:
@@ -1877,6 +1880,14 @@ def _computer_open(ctx: ToolContext, args: dict[str, Any]) -> str:
     return _computer(ctx, "open", args)
 
 
+def _computer_browser(ctx: ToolContext, args: dict[str, Any]) -> str:
+    from .jev_browser import run
+
+    if err := _computer_display_error(ctx):
+        return err
+    return run(ctx, args)
+
+
 def _computer_click(ctx: ToolContext, args: dict[str, Any]) -> str:
     return _computer(ctx, "click", args)
 
@@ -3383,6 +3394,25 @@ def _build_default_tools() -> dict[str, Tool]:
                 },
             ),
             _computer_type_secret,
+        ),
+        "computer_browser": Tool(
+            ToolSpec(
+                name="computer_browser",
+                description=(
+                    "Use Jev for a bounded goal on the currently open web page. Prefer this for "
+                    "ordinary HTML navigation and forms when available. Reuses this bot's Chrome. "
+                    "Jev chooses observed actions; your configured model writes field text. "
+                    "No passwords, uploads, frames or canvas. Returns actions and page state; "
+                    "verify the result with computer_screenshot before claiming success. "
+                    "On fallback/uncertain, inspect the page and continue with standard computer tools; "
+                    "never blindly repeat a submitted action."
+                ),
+                parameters={"type": "object", "properties": {
+                    "goal": {"type": "string"},
+                    "max_steps": {"type": "integer", "minimum": 1, "maximum": 12},
+                }, "required": ["goal"]},
+            ),
+            _computer_browser,
         ),
         "computer_open": Tool(
             ToolSpec(

@@ -140,6 +140,7 @@ EFFECTS: dict[str, Effect] = {
     # so that a single deny rule closes all three, which is the whole reason
     # `intent` exists rather than matching on tool names.
     "computer_click": Effect(INTENT_ACTIVATE, _coords),
+    "computer_browser": Effect(INTENT_ACTIVATE, lambda a: _arg(a, "goal")),
     "computer_move": Effect(INTENT_ACTIVATE, _coords),
     "computer_drag": Effect(INTENT_ACTIVATE, _drag_target),
     "computer_key": Effect(INTENT_ACTIVATE, lambda a: _arg(a, "key", "keys")),
@@ -267,7 +268,7 @@ EXPOSURE_WEB = "web"
 #: `run_command` (curl) is a known residual channel, deliberately not here —
 #: most shell output is the bot's own tooling, and tainting every `ls` would
 #: hold the whole harness hostage; see SECURITY.md.
-EXPOSURE_SOURCES = frozenset({"computer_screenshot", "preview_link"})
+EXPOSURE_SOURCES = frozenset({"computer_screenshot", "computer_browser", "preview_link"})
 
 #: Intents escalated once this turn has seen web content, when the policy
 #: decided by *default* — an operator's explicit rule (e.g. one matching

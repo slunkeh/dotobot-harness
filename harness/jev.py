@@ -58,6 +58,7 @@ def _request(key, state, questions):
 
 
 def status(paths):
+    from . import cdp
     from .jev_features import settings
 
     return {
@@ -65,6 +66,7 @@ def status(paths):
         "enabled": prefs.load(paths).get("jev_enabled") is True,
         "configured": bool(get_secret(KEY, paths)),
         "source": secret_source(KEY, paths),
+        "browser": {"cdp_enabled": cdp.enabled()},
     }
 
 

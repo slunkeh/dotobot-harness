@@ -10,7 +10,7 @@ from . import jev, prefs
 from .redaction import scrub as scrub_secrets
 from .secrets import get_secret
 
-FEATURES = ("compaction", "memory", "tool_results", "completion", "handoffs", "notifications")
+FEATURES = ("compaction", "memory", "tool_results", "completion", "handoffs", "notifications", "browser")
 
 
 def settings(paths):
