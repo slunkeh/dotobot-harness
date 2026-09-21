@@ -43,6 +43,32 @@ def test_model_text_is_a_literal_cdp_argument_and_action_is_never_retried():
     assert params["arguments"][-1] == {"value": text}
 
 
+def test_selects_visible_tab_and_refuses_ambiguous_windows(monkeypatch):
+    states = {"/first": "hidden", "/second": "visible"}
+
+    class Session:
+        def __init__(self, machine, port, path):
+            self.path = path
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            pass
+
+        def call(self, *a, **kw):
+            return {"result": {"value": states[self.path]}}
+
+    monkeypatch.setattr(cdp, "_Session", Session)
+    pages = [
+        {"type": "page", "url": "https://example.test", "webSocketDebuggerUrl": p} for p in states
+    ]
+    assert browser_dom._visible_page_path(None, 123, pages) == "/second"
+    states["/first"] = "visible"
+    with pytest.raises(cdp.CdpError, match="ambiguous"):
+        browser_dom._visible_page_path(None, 123, pages)
+
+
 _HTML = b"""<!doctype html><html><head><title>Browser guard fixture</title></head><body>
 <label for="city">City</label><input id="city"><input type="password" value="never-observe-this">
 <input autocomplete="cc-number" value="never-observe-card">

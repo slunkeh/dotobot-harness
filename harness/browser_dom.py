@@ -70,6 +70,7 @@ _SCRIPT = r"""(() => {
             if (value) text += value + '\n';
         }
         const data = {url: location.href, title: document.title.slice(0, 240), text: text.slice(0, 6000),
+            visibility: document.visibilityState,
             elements, unsupported, scroll_up: scrollY > 0,
             scroll_down: scrollY + innerHeight < document.documentElement.scrollHeight - 2};
         // Full field values and option identities stay local, including text past the model's cap.
@@ -85,7 +86,7 @@ _SCRIPT = r"""(() => {
             if (!previous) return 'stale';
             const old = previous; previous = null; // consume before any side effect
             const current = read();
-            if (old.signature !== current.signature || old.nodes.length !== current.nodes.length ||
+            if (current.data.visibility !== 'visible' || old.signature !== current.signature || old.nodes.length !== current.nodes.length ||
                 old.nodes.some((e, i) => e !== current.nodes[i] || !e.isConnected)) return 'stale';
             if (operation === 'WAIT') return 'ok';
             if (operation === 'SCROLL_UP' || operation === 'SCROLL_DOWN') {
@@ -134,12 +135,7 @@ class Browser:
         if port is None:
             raise cdp.CdpError("Reopen Chrome with browser access enabled")
         tabs = cdp._http_json(self.machine, port, "/json/list")
-        page = cdp._pick_page(tabs) if isinstance(tabs, list) else None
-        if not page or not str(page.get("url", "")).startswith(("http://", "https://")):
-            raise cdp.CdpError("Open a web page first")
-        path = cdp._ws_path(page.get("webSocketDebuggerUrl", ""))
-        if not path:
-            raise cdp.CdpError("Browser connection unavailable")
+        path = _visible_page_path(self.machine, port, tabs)
         try:
             self.session = cdp._Session(self.machine, port, path)
             self.session.__enter__()
@@ -194,6 +190,8 @@ class Browser:
             data = self._call("function() { return this.observe(); }")
         if not isinstance(data, dict) or not isinstance(data.get("elements"), list):
             raise cdp.CdpError("Invalid browser observation")
+        if data.get("visibility") != "visible":
+            raise cdp.CdpError("Browser tab changed; observe the active page")
         return data
 
     def act(self, operation, target=None, text=None):
@@ -208,3 +206,38 @@ class Browser:
     def __exit__(self, *exc):
         if self.session:
             self.session.close()
+
+
+def _visible_page_path(machine, port, tabs):
+    pages = (
+        [
+            p
+            for p in tabs
+            if isinstance(p, dict)
+            and p.get("type") == "page"
+            and str(p.get("url", "")).startswith(("http://", "https://"))
+        ]
+        if isinstance(tabs, list)
+        else []
+    )
+    if not 1 <= len(pages) <= 8:
+        raise cdp.CdpError("Open a web page in a browser with at most eight web tabs")
+    paths = [cdp._ws_path(p.get("webSocketDebuggerUrl", "")) for p in pages]
+    if not all(paths):
+        raise cdp.CdpError("Browser connection unavailable")
+    if len(paths) == 1:
+        return paths[0]
+    visible = []
+    for path in paths:
+        with cdp._Session(machine, port, path) as session:
+            result = (
+                session.call(
+                    "Runtime.evaluate", expression="document.visibilityState", returnByValue=True
+                )
+                or {}
+            )
+            if result.get("result", {}).get("value") == "visible":
+                visible.append(path)
+    if len(visible) != 1:
+        raise cdp.CdpError("Active browser tab is ambiguous; use standard computer tools")
+    return visible[0]

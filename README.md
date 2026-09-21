@@ -224,6 +224,8 @@ setting, then reopen Chrome so it starts with its loopback debugging endpoint.
 `GET /api/jev` reports `browser.cdp_enabled`; this is configuration, not proof of
 a live connection. The tool checks the bot's existing profile and connection at
 execution time, preserving bot session isolation. It never launches another profile.
+With multiple tabs, it selects the sole visible web tab (up to eight candidates);
+ambiguous windows or a tab switch return control without guessing a target.
 
 The main agent opens the web page and supplies a bounded goal. Each decision
 batches operation and compatible-target questions in one TypeSafe request. An
