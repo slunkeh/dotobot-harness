@@ -1154,3 +1154,46 @@ def test_failed_replacement_cannot_reuse_another_bots_secret_mount(tmp_path, mon
     with pytest.raises(IsolationUnavailable, match="replace"):
         backend._ensure_container(Machine(0, "harness-machine-0", bot="other"))
     assert not any(line.startswith(("start ", "run ")) for line in log.read_text().splitlines())
+
+
+@pytest.mark.parametrize("direction", ["start", "up"])
+def test_sync_discards_interrupted_snapshots_only_under_lock(tmp_path, monkeypatch, direction):
+    from isolation import state_sync
+    from isolation.machines import Machine
+
+    backend, paths, machine_root = _fake_cp_backend(tmp_path, monkeypatch)
+    paths.run.mkdir(parents=True, exist_ok=True)
+    abandoned = paths.run / ".machine-home-interrupted.tar"
+    abandoned.write_bytes(b"interrupted snapshot")
+    unrelated = paths.run / "saved.tar"
+    unrelated.write_bytes(b"keep")
+    durable = machine_root / "note.txt"
+    durable.write_text("keep this fact")
+    original = backend._discard_abandoned_snapshots
+    held = []
+    real_lock = state_sync.canonical_lock
+
+    class ObservedLock:
+        def __enter__(self):
+            self.lock = real_lock(paths)
+            self.lock.__enter__()
+            held.append(True)
+
+        def __exit__(self, *args):
+            held.pop()
+            self.lock.__exit__(*args)
+
+    monkeypatch.setattr(state_sync, "canonical_lock", lambda _: ObservedLock())
+
+    def discard():
+        assert held, "Never discard another sync's active snapshot"
+        original()
+
+    monkeypatch.setattr(backend, "_discard_abandoned_snapshots", discard)
+    if direction == "start":
+        backend._sync_session_start(Machine(id=0, name="harness-machine-0"))
+    else:
+        backend._sync_up("harness-machine-0")
+    assert not abandoned.exists()
+    assert unrelated.read_bytes() == b"keep"
+    assert durable.read_text() == "keep this fact"

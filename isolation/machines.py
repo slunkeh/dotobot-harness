@@ -759,6 +759,17 @@ class MachineBackend(IsolationBackend):
             )
 
     # -- state sync (host-mediated docker cp tar streams) ------------------
+    def _discard_abandoned_snapshots(self) -> None:
+        """Caller holds canonical_lock: no sync can still own a snapshot.
+
+        Interrupted controller processes cannot execute the snapshot finally
+        block. These generated copies are safe to discard; machine volumes and
+        the canonical home remain the durable sources.
+        """
+        for path in self.paths.run.glob(".machine-home-*.tar"):
+            if path.is_file() and not path.is_symlink():
+                path.unlink(missing_ok=True)
+
     def _machine_tar(self, machine_name: str) -> Path:
         """Snapshot the machine home as a local tar (cache-excluded).
 
@@ -795,6 +806,7 @@ class MachineBackend(IsolationBackend):
         canonical.mkdir(parents=True, exist_ok=True)
         dirty = self.paths.machine_dirty_file(machine.id)
         with state_sync.canonical_lock(self.paths):
+            self._discard_abandoned_snapshots()
             tar_path = self._machine_tar(machine.name)
             try:
                 with open(tar_path, "rb") as fh:
@@ -857,6 +869,7 @@ class MachineBackend(IsolationBackend):
         canonical = self.paths.canonical_home()
         canonical.mkdir(parents=True, exist_ok=True)
         with state_sync.canonical_lock(self.paths):
+            self._discard_abandoned_snapshots()
             tar_path = self._machine_tar(machine_name)
             try:
                 with open(tar_path, "rb") as fh:

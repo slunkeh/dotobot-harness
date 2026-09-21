@@ -14,6 +14,18 @@ import time
 from pathlib import Path
 
 
+def heartbeat(home: Path, pid: int) -> bool:
+    # A full/read-only disk must not kill PID 1 and all its agent children.
+    # The old timestamp naturally expires, so host health checks fail closed.
+    tmp = home / ".controller-supervisor.tmp"
+    try:
+        tmp.write_text(json.dumps({"time": time.time(), "controller_pid": pid}))
+        tmp.replace(home / "controller-supervisor.json")
+    except OSError:
+        return False
+    return True
+
+
 def main():
     root = Path(os.environ.get("HARNESS_RELEASE_ROOT", "/opt/harness"))
     home = Path(os.environ["HARNESS_HOME"])
@@ -27,6 +39,7 @@ def main():
     signal.signal(signal.SIGINT, shutdown)
     child = None
     reloading = False
+    heartbeat_ok = True
     mailbox = home / "controller-reload"
     stamp = mailbox.read_text() if mailbox.exists() else None
     while not stop:
@@ -46,9 +59,10 @@ def main():
             if current and not reloading:
                 child.terminate()
                 reloading = True
-        tmp = home / ".controller-supervisor.tmp"
-        tmp.write_text(json.dumps({"time": time.time(), "controller_pid": child.pid}))
-        tmp.replace(home / "controller-supervisor.json")
+        written = heartbeat(home, child.pid)
+        if not written and heartbeat_ok:
+            print("controller heartbeat unavailable; keeping agents alive", file=sys.stderr)
+        heartbeat_ok = written
         time.sleep(1)
     if child and child.poll() is None:
         # An explicit container stop retains the existing final-sync lifecycle.
