@@ -63,6 +63,57 @@ def test_continuation_survives_restart_and_keeps_human_source(scope_home):
     assert continued["objective"] == first["objective"]
 
 
+@pytest.mark.parametrize(
+    "text", ["Ok continue", "OK, please continue.", "Try it", "Yes, try it again"]
+)
+def test_natural_short_followup_preserves_scope_and_revision(scope_home, text):
+    paths, _ = scope_home
+    first = start(paths, "Use Notion to find the brief", "first")
+    second = start(HarnessPaths.resolve(paths.home), text, "second")
+    assert second["task_id"] == first["task_id"]
+    assert second["revision"] == first["revision"]
+    assert second["connector_ids"] == first["connector_ids"]
+    assert second["provenance"] == first["provenance"]
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Ok so use it to write",
+        "Please use that connector to create the issue",
+        "Use it for the shorter version",
+        "Try that with the other title",
+    ],
+)
+def test_referential_followup_keeps_scope_but_revalidates_actions(scope_home, text):
+    paths, _ = scope_home
+    first = start(paths, "Use Notion to draft the brief", "first")
+    second = start(paths, text, "second")
+    assert second["task_id"] == first["task_id"]
+    assert second["connector_ids"] == first["connector_ids"]
+    assert second["provenance"] == first["provenance"]
+    assert second["revision"] > first["revision"]
+    assert second["latest_instruction"] == text
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "OK, explain photosynthesis",
+        "Try Python for this new project",
+        "Use this photograph to identify the bird",
+        "New task: use it to write",
+        'Summarize: "use it to write"',
+    ],
+)
+def test_new_subject_or_quoted_followup_does_not_inherit(scope_home, text):
+    paths, _ = scope_home
+    first = start(paths, "Use Notion", "first")
+    second = start(paths, text, "second")
+    assert second["task_id"] != first["task_id"]
+    assert second["connector_ids"] == []
+
+
 def test_unrelated_input_does_not_inherit_previous_chat_tools(scope_home):
     paths, _ = scope_home
     first = start(paths, "Use Notion", "first")
@@ -94,11 +145,12 @@ def test_live_correction_removes_connector_and_invalidates_old_revision(scope_ho
     assert "Stop using Notion" in task_context(revised)
 
 
-def test_connector_disable_is_honoured_on_continuation(scope_home):
+@pytest.mark.parametrize("text", ["continue", "Try it", "Ok so use it to write"])
+def test_connector_disable_is_honoured_on_continuation(scope_home, text):
     paths, records = scope_home
     first = start(paths, "Use Notion", "first")
     records[0]["enabled_for"] = ["other-bot"]
-    second = start(paths, "continue", "second")
+    second = start(paths, text, "second")
     assert second["connector_ids"] == []
     assert second["revision"] > first["revision"]
 

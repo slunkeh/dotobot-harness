@@ -22,11 +22,21 @@ from .statestore import store_for
 
 _CONTINUE = re.compile(
     r"(?:yes|yep|yeah|ok(?:ay)?|sure|continue|resume|go ahead|carry on|proceed|"
-    r"do it|try again|retry|keep going|keep working)(?:[.!?\s]*)",
+    r"do (?:it|that)|try (?:again|(?:it|that)(?: again)?)|retry|keep going|keep working)(?:[.!?\s]*)",
     re.IGNORECASE,
 )
 _CONTINUE_WITH = re.compile(
     r"(?:continue|resume|carry on|keep working)\s+(?:with|on|the)\b", re.IGNORECASE
+)
+# Strip conversational acknowledgements, not arbitrary subject matter. This
+# keeps "OK, explain photosynthesis" a new task while "OK, continue" resumes.
+_FOLLOWUP_PREFIX = re.compile(
+    r"^(?:(?:yes|yep|yeah|ok(?:ay)?|sure|please|so|then)[,\s]+)+", re.IGNORECASE
+)
+_REFERENTIAL_FOLLOWUP = re.compile(
+    r"(?:use|try|check|do|run)\s+(?:it|that|this)(?:\s+(?:connector|tool))?"
+    r"(?:[.!?\s]*$|\s+(?:to|for|with|again|instead)\b)",
+    re.IGNORECASE,
 )
 _STOP = re.compile(r"/?stop[.!?\s]*", re.IGNORECASE)
 MAX_TASK_INSTRUCTIONS = 8
@@ -79,9 +89,17 @@ def tool_still_selected(
     return current.get(prefix) == cid
 
 
+def _followup_text(text: str) -> str:
+    return _FOLLOWUP_PREFIX.sub("", instruction_text(text).strip())
+
+
 def is_continuation(text: str) -> bool:
-    clean = instruction_text(text).strip()
-    return bool(_CONTINUE.fullmatch(clean) or _CONTINUE_WITH.match(clean))
+    clean = _followup_text(text)
+    return bool(
+        _CONTINUE.fullmatch(clean)
+        or _CONTINUE_WITH.match(clean)
+        or _REFERENTIAL_FOLLOWUP.match(clean)
+    )
 
 
 def read_task(paths: HarnessPaths, bot: str, conversation: str) -> dict | None:
@@ -243,9 +261,7 @@ def begin_task(
         previous = json.loads(row["data"]) if row else None
         clean_instruction = scrub(instruction_text(text)) if trusted_user else ""
         continuation = trusted_user and is_continuation(text)
-        short_continuation = trusted_user and bool(
-            _CONTINUE.fullmatch(instruction_text(text).strip())
-        )
+        short_continuation = trusted_user and bool(_CONTINUE.fullmatch(_followup_text(text)))
         same = bool(previous and trusted_user and (active_followup or continuation))
         all_records = Connectors(paths).list()
         records = [

@@ -316,7 +316,11 @@ _CONNECTOR_PROMPT = (
     "unless the user asked to visit the site, drive the screen, or the "
     "connector failed. A service the user names that is not connected is a "
     "plugin to add (add_connector after asking with ask_user_choice) or to "
-    "sign in to (its <type>_connect card) — never a bot to create."
+    "sign in to (its <type>_connect card) — never a bot to create. "
+    "Missing tools are not evidence of missing authentication. Check the saved "
+    "connector status and task selection before requesting sign-in. Do not add a duplicate connector "
+    "or request credentials merely because its tools are absent. A missing tool does not "
+    "invalidate a successful tool result from an earlier turn; report each accurately."
 )
 
 
@@ -619,7 +623,10 @@ def _connector_note(
         ]
         if not specs:
             parts.append(
-                f"{name}'s MCP tools are not available this turn. Do not invent a bot or a tool."
+                f"{name}'s credentials are configured, but its MCP tools are not available this turn. "
+                "This is a tool-availability problem, not evidence of missing authentication. "
+                "Do not add a duplicate connector or request credentials without an explicit "
+                "authentication failure. Do not invent a bot or a tool."
             )
             continue
         lines = [f"{name} tools (from the MCP server, live):"]
@@ -638,6 +645,31 @@ def _connector_note(
     if catalog_only:
         parts.append(_catalog_note(catalog_only))
     return "\n\n".join(parts)
+
+
+def _unselected_connector_note(records: list[dict], selected_ids: set[str], bot: str) -> str:
+    """Describe existing accounts without granting their tools to this task."""
+    from harness.connectors import is_connected_record
+
+    lines = []
+    for record in records:
+        if record.get("id") in selected_ids or not is_connected_record(record):
+            continue
+        enabled = record.get("enabled_for")
+        if isinstance(enabled, list) and bot not in enabled:
+            continue
+        name = str(record.get("name") or record.get("type") or "Connector")
+        lines.append(f"- {name}: credentials configured; not selected for this task.")
+    if not lines:
+        return ""
+    return (
+        "Existing connectors outside the current task scope (status only, no tool access):\n"
+        + "\n".join(lines)
+        + "\nThese accounts already exist. Do not add a duplicate connector or ask for credentials. "
+        "If needed for this task, ask the user to select the existing connector. "
+        "Configured credentials do not prove current read or write permissions; "
+        "only an actual authentication failure establishes a need to sign in again."
+    )
 
 
 def _room_mention_note(paths, bot: str, text: str) -> str:
@@ -2299,6 +2331,10 @@ class Agent:
                     catalog_types=taskscope.pending_catalog_types(
                         task, connector_records, bot=self.bot.name
                     ),
+                )
+                + "\n\n"
+                + _unselected_connector_note(
+                    connector_records, set(task.get("connector_ids") or []), self.bot.name
                 )
                 + "\n\nCurrent task state (saved by the harness):\n"
                 + details

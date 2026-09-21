@@ -1,5 +1,7 @@
 """Saved task state drives actual model/tool turns and context admission."""
 
+import pytest
+
 from agent import messaging, runtime
 from agent.context import ConnectorCatalogue, schema_tokens
 from agent.runtime import build_agent
@@ -37,6 +39,84 @@ def test_runtime_continuation_reuses_only_user_selected_connectors(tmp_path, mon
     restarted._produce("user", "Explain photosynthesis", turn_id="third")
     assert fetched == [{"n"}, {"n"}]
     assert read_task(paths, "atlas", "peer:user")["connector_ids"] == []
+
+
+def test_github_followups_keep_tools_after_restart(tmp_path, monkeypatch):
+    agent, paths = make_agent(tmp_path)
+    records = [{"id": "a1b2c3d4", "type": "github", "name": "GitHub", "secret_configured": True}]
+    monkeypatch.setattr(Connectors, "list", lambda self: records)
+    monkeypatch.setattr(Connectors, "records", lambda self: records)
+    fetched = []
+
+    def fetch(*a, record_ids=None, **kw):
+        fetched.append(record_ids)
+        return {
+            "github_list_repos": Tool(
+                ToolSpec("github_list_repos", "List repositories"), lambda c, a: "ok"
+            )
+        }
+
+    monkeypatch.setattr(runtime, "connector_tools", fetch)
+
+    class CheckTools(Provider):
+        n = 0
+
+        def complete(self, messages, tools=None, **kw):
+            assert "github_list_repos" in {s.name for s in tools}
+            self.n += 1
+            if self.n == 1:
+                return Completion(tool_calls=[ToolCall("list", "github_list_repos", {})])
+            assert messages[-1].role == "tool"
+            assert messages[-1].content == "ok"
+            return Completion(text="Ready.")
+
+    for i, text in enumerate(
+        ["Use @connector:a1b2c3d4", "Try it", "Ok so use it to write", "Ok continue"]
+    ):
+        agent = build_agent(paths, Bot(name="atlas", provider="echo"), stream_delay=0)
+        agent.provider = CheckTools("test")
+        assert agent._produce("user", text, turn_id=str(i)) == "Ready."
+        current = read_task(paths, "atlas", "peer:user")
+        if i == 0:
+            original = current
+        assert current["task_id"] == original["task_id"]
+        assert current["provenance"] == original["provenance"]
+    assert fetched == [{"a1b2c3d4"}] * 4
+
+
+@pytest.mark.parametrize("selected", [False, True])
+def test_missing_tools_are_not_reported_as_missing_auth(tmp_path, monkeypatch, selected):
+    agent, _ = make_agent(tmp_path)
+    records = [
+        {"id": "a1b2c3d4", "type": "github", "name": "GitHub", "secret_configured": True},
+        {
+            "id": "other",
+            "type": "notion",
+            "name": "Hidden account",
+            "oauth_configured": True,
+            "enabled_for": ["other-bot"],
+        },
+    ]
+    monkeypatch.setattr(Connectors, "list", lambda self: records)
+    monkeypatch.setattr(Connectors, "records", lambda self: records)
+    monkeypatch.setattr(runtime, "connector_tools", lambda *a, **kw: {})
+
+    class CheckStatus(Provider):
+        def complete(self, messages, tools=None, **kw):
+            system = kw["system"]
+            assert "GitHub" in system
+            assert "not evidence of missing authentication" in system
+            assert "Do not add a duplicate connector" in system
+            assert "Hidden account" not in system
+            if selected:
+                assert "credentials are configured, but its MCP tools are not available" in system
+            else:
+                assert "GitHub: credentials configured; not selected for this task" in system
+            assert not any(t.name.startswith("github_") for t in tools)
+            return Completion(text="Tools unavailable; authentication has not failed.")
+
+    agent.provider = CheckStatus("test")
+    agent._produce("user", "Use GitHub" if selected else "Hello", turn_id="first")
 
 
 def test_new_user_correction_prevents_remaining_batch_actions(tmp_path, monkeypatch):
