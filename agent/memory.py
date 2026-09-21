@@ -421,6 +421,7 @@ class Memory:
         limit: int = 5,
         session_cutoff: float | None = None,
         token_budget: int | None = None,
+        select_context=None,
     ) -> str:
         """Render a short memory context for the system prompt."""
         items = (
@@ -430,6 +431,8 @@ class Memory:
             if query
             else self.facts()[-limit:]
         )
+        if items and select_context is not None:
+            items = select_context(items)
         if not items:
             return ""
         lines = []
