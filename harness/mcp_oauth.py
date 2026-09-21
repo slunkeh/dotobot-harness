@@ -357,7 +357,7 @@ def _register_tokens(connector_id: str, bundle: dict[str, Any]) -> None:
     """Tell the redaction registry about a connector's bearer tokens so a
     token that reaches a log line or error payload is sentinelised.
     Registration never changes what is written to disk."""
-    for field in ("access_token", "refresh_token"):
+    for field in ("access_token", "refresh_token", "capability"):
         value = bundle.get(field)
         if isinstance(value, str) and value:
             register_secret(value, f"connector_{connector_id}_{field}")
@@ -471,7 +471,6 @@ def start_authorize(
     *,
     client_id: str = "",
     client_secret: str = "",
-    google_scopes: list[str] | None = None,
 ) -> dict[str, Any]:
     """Begin the connect flow: discovery + registration + authorize URL.
 
@@ -483,20 +482,9 @@ def start_authorize(
     connector_id = str(record.get("id") or "")
     if not connector_id:
         raise OAuthError("connector record has no id")
-    if google_scopes and redirect_uri == "com.dotobot.ios:/oauth/google":
-        pass
-    else:
-        _require_safe_url(redirect_uri, "redirect_uri")
+    _require_safe_url(redirect_uri, "redirect_uri")
     t = transport or Transport()
-    metadata = (
-        {
-            "authorization_endpoint": "https://accounts.google.com/o/oauth2/v2/auth",
-            "token_endpoint": "https://oauth2.googleapis.com/token",
-            "scopes": " ".join(google_scopes),
-        }
-        if google_scopes
-        else discover(mcp_url, t)
-    )
+    metadata = discover(mcp_url, t)
 
     static = resolve_oauth_client(paths, record, client_id=client_id, client_secret=client_secret)
     # Reuse the client registration from a previous connect when it targeted
@@ -532,8 +520,6 @@ def start_authorize(
         "code_challenge_method": "S256",
         "resource": mcp_url,
     }
-    if google_scopes:
-        params.pop("resource", None)
     if metadata["scopes"]:
         params["scope"] = metadata["scopes"]
     try:
@@ -548,11 +534,6 @@ def start_authorize(
             params["scope"] = " ".join(str(s) for s in extra if str(s).strip())
     except Exception:
         pass
-    authz = str(metadata.get("authorization_endpoint") or "")
-    if "accounts.google.com" in authz or "google.com/o/oauth2" in authz:
-        # Google only issues a refresh token with offline + consent.
-        params["access_type"] = "offline"
-        params["prompt"] = "consent"
     sep = "&" if "?" in metadata["authorization_endpoint"] else "?"
     authorize_url = metadata["authorization_endpoint"] + sep + urlencode(params)
 
@@ -571,7 +552,6 @@ def start_authorize(
             "client_id": client["client_id"],
             "client_secret": client["client_secret"],
             "resource": mcp_url,
-            "google_scopes": google_scopes,
             "created": now,
         }
     return {
@@ -637,14 +617,6 @@ def exchange(
         with _lock:
             _errors[connector_id] = f"token exchange failed: {desc}"
         raise OAuthError(f"token exchange failed: {desc}")
-    if flow.get("google_scopes"):
-        granted = set(str(payload.get("scope", " ".join(flow["google_scopes"]))).split())
-        if not set(flow["google_scopes"]).issubset(granted):
-            raise OAuthError(
-                "Google access was not fully granted; reconnect and approve the requested access."
-            )
-        if not str(payload.get("refresh_token") or "").strip():
-            raise OAuthError("Google did not grant offline access; reconnect this account.")
     save_tokens(
         paths,
         connector_id,

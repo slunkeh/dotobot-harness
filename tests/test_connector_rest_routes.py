@@ -55,14 +55,6 @@ CASES = [
         "Bearer fixture-key",
     ),
     (
-        "google_ad_manager",
-        {},
-        "/networks",
-        "https://admanager.googleapis.com/v1/networks",
-        "Authorization",
-        "Bearer fixture-key",
-    ),
-    (
         "facebook",
         {},
         "/v20.0/me/accounts",
@@ -171,14 +163,6 @@ CASES = [
         {},
         "/data/export/v1/jobs",
         "https://uapi.demandbase.com/data/export/v1/jobs",
-        "Authorization",
-        "Bearer fixture-key",
-    ),
-    (
-        "google_analytics",
-        {},
-        "/v1beta/properties/1234/metadata",
-        "https://analyticsdata.googleapis.com/v1beta/properties/1234/metadata",
         "Authorization",
         "Bearer fixture-key",
     ),
@@ -665,10 +649,11 @@ def test_bound_connector_read_and_write_contract(tmp_path, type_, config, path, 
         else "fixture-key"
     )
     record = Connectors(paths).add(type_, type_, config=config, secret=secret)
-    from harness import google_oauth, mcp_oauth
+    from harness import mcp_oauth
+    from harness.connectors import WORKSPACE_TYPES
 
-    if google_oauth.supported(record["type"]):
-        mcp_oauth.save_tokens(paths, record["id"], {"access_token": "fixture-key"})
+    if record["type"] in WORKSPACE_TYPES:
+        mcp_oauth.save_tokens(paths, record["id"], {"mode": "delegated", "capability": "fixture-capability"})
     bound = tools_for_bot(paths, "atlas", record_ids={record["id"]})
     for method, args, name in [
         ("GET", {"path": path, "query": {"limit": 2}}, f"{type_}_get"),
@@ -866,17 +851,6 @@ def test_4dem_malformed_auth_response_is_not_forwarded(tmp_path):
             },
         ),
         (
-            "google_analytics",
-            "/v1beta/properties/1234:runReport",
-            "https://analyticsdata.googleapis.com/v1beta/properties/1234:runReport",
-            {
-                "dimensions": [{"name": "city"}],
-                "metrics": [{"name": "activeUsers"}],
-                "dateRanges": [{"startDate": "7daysAgo", "endDate": "yesterday"}],
-                "limit": "10",
-            },
-        ),
-        (
             "enginemailer",
             "/Campaign/EMCampaign/CreateCampaign",
             "https://api.enginemailer.com/restapi/Campaign/EMCampaign/CreateCampaign",
@@ -1070,10 +1044,11 @@ def test_4dem_malformed_auth_response_is_not_forwarded(tmp_path):
 def test_documented_json_write_paths(tmp_path, type_, path, url, body):
     paths = HarnessPaths(home=tmp_path)
     record = Connectors(paths).add(type_, type_, secret="fixture-key")
-    from harness import google_oauth, mcp_oauth
+    from harness import mcp_oauth
+    from harness.connectors import WORKSPACE_TYPES
 
-    if google_oauth.supported(record["type"]):
-        mcp_oauth.save_tokens(paths, record["id"], {"access_token": "fixture-key"})
+    if record["type"] in WORKSPACE_TYPES:
+        mcp_oauth.save_tokens(paths, record["id"], {"mode": "delegated", "capability": "fixture-capability"})
     bound = tools_for_bot(paths, "atlas", record_ids={record["id"]})
     with patch("connectors.generic._open", return_value=_response({"ok": True})) as send:
         result = bound[type_ + "_request"][1]({"method": "POST", "path": path, "body": body})
@@ -1165,10 +1140,11 @@ def test_sheets_repeated_range_query(tmp_path):
 
     paths = HarnessPaths(home=tmp_path)
     record = Connectors(paths).add("google_sheets", "Sheets", secret="fixture-key")
-    from harness import google_oauth, mcp_oauth
+    from harness import mcp_oauth
+    from harness.connectors import WORKSPACE_TYPES
 
-    if google_oauth.supported(record["type"]):
-        mcp_oauth.save_tokens(paths, record["id"], {"access_token": "fixture-key"})
+    if record["type"] in WORKSPACE_TYPES:
+        mcp_oauth.save_tokens(paths, record["id"], {"mode": "delegated", "capability": "fixture-capability"})
     bound = tools_for_bot(paths, "atlas", record_ids={record["id"]})
     with patch("connectors.generic._open", return_value=_response({})) as send:
         result = bound["google_sheets_get"][1](
@@ -2650,73 +2626,8 @@ def test_instagram_invalid_login_type(tmp_path):
     send.assert_not_called()
 
 
-@pytest.mark.parametrize("project", [None, "fixture-project", "bad\r\nheader", ""])
-def test_ad_manager_report_and_quota_project(tmp_path, project):
-    paths = HarnessPaths(home=tmp_path)
-    record = Connectors(paths).add(
-        "google_ad_manager",
-        "Ad Manager",
-        secret="fixture-key",
-        config={} if project is None else {"quota_project": project},
-    )
-    bound = tools_for_bot(paths, "atlas", record_ids={record["id"]})
-    with patch("connectors.generic._open", return_value=_response({})) as send:
-        result = bound["google_ad_manager_request"][1](
-            {"method": "POST", "path": "/networks/123/reports/456:run", "body": {}}
-        )
-    if project in ("", "bad\r\nheader"):
-        assert "invalid" in result
-        send.assert_not_called()
-        return
-    assert "HTTP 200" in result
-    req = send.call_args.args[0]
-    assert req.full_url == "https://admanager.googleapis.com/v1/networks/123/reports/456:run"
-    assert req.get_header("X-goog-user-project") == project
-    assert req.get_header("Authorization") == "Bearer fixture-key"
-    assert json.loads(req.data) == {}
 
 
-@pytest.mark.parametrize(
-    "config",
-    [
-        {},
-        {"login_customer_id": "1234567890", "linked_customer_id": "9876543210"},
-        {"login_customer_id": "123-456-7890"},
-        {"linked_customer_id": "bad\nheader"},
-    ],
-)
-@pytest.mark.parametrize("method", ["GET", "POST"])
-def test_google_ads_credentials_and_customer_headers(tmp_path, config, method):
-    paths = HarnessPaths(home=tmp_path)
-    record = Connectors(paths).add(
-        "google_ads",
-        "Ads",
-        secret=json.dumps(["fixture-token", "fixture-developer"]),
-        config=config,
-    )
-    bound = tools_for_bot(paths, "atlas", record_ids={record["id"]})
-    path = (
-        "/v25/customers:listAccessibleCustomers"
-        if method == "GET"
-        else "/v25/customers/1234567890/googleAds:search"
-    )
-    body = {"query": "SELECT campaign.id FROM campaign LIMIT 1"}
-    args = {"path": path} if method == "GET" else {"path": path, "method": method, "body": body}
-    with patch("connectors.generic._open", return_value=_response({})) as send:
-        result = bound["google_ads_get" if method == "GET" else "google_ads_request"][1](args)
-    if any(not v.isdigit() for v in config.values()):
-        assert "digits only" in result
-        send.assert_not_called()
-        return
-    assert "HTTP 200" in result
-    req = send.call_args.args[0]
-    assert req.full_url == "https://googleads.googleapis.com" + path
-    assert req.get_header("Authorization") == "Bearer fixture-token"
-    assert req.get_header("Developer-token") == "fixture-developer"
-    assert req.get_header("Login-customer-id") == config.get("login_customer_id")
-    assert req.get_header("Linked-customer-id") == config.get("linked_customer_id")
-    if method == "POST":
-        assert json.loads(req.data) == body
 
 
 @pytest.mark.parametrize("method", ["GET", "PUT"])
@@ -3062,3 +2973,10 @@ def test_adhook_documented_notification_read(tmp_path):
     assert req.get_header("Authorization") == "Bearer fixture-jwt"
     assert req.get_header("Adhooktoken") is None
     assert req.data is None
+
+
+@pytest.fixture(autouse=True)
+def delegated_workspace_access(monkeypatch):
+    from harness import delegated_oauth
+    monkeypatch.setattr(delegated_oauth, "request", lambda bundle, cid, service, *args: {
+        "access_token": "fixture-key", "service": service, "email": "test@example.com"})

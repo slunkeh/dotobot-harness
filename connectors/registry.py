@@ -238,7 +238,7 @@ def tools_for_bot(
             else:
                 from . import generic
 
-                bound = generic.tools(type_)
+                bound = _namespace_static(generic.tools(type_), type_, prefix, account)
         except Exception:  # skip a broken record, keep the rest
             continue
         for tool in bound:
