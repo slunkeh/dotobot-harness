@@ -68,6 +68,7 @@ from harness.approvals import (
     VERDICT_REFUSED,
     VERDICT_SATURATED,
     ApprovalStore,
+    is_user_chat,
 )
 from harness.control import Control
 from harness.envscrub import scrub_ambient_authority
@@ -910,7 +911,7 @@ def _confirm(ctx: ToolContext, args: dict[str, Any], *, subject: dict | None = N
     detail = str(args.get("detail", "")).strip()
     if detail:
         payload["detail"] = detail
-    for key in ("confirm_label", "cancel_label"):
+    for key in ("confirm_label", "cancel_label", "allow_all_label"):
         label = str(args.get(key, "")).strip()
         if label:
             payload[key] = label
@@ -991,6 +992,71 @@ def _confirmation_result(value: str) -> str:
     return f"user replied: {value}"
 
 
+def _standing_issue_repo(ctx: ToolContext, tool_name: str, arguments: dict | None) -> str:
+    """Only an explicit owner/repo can define a durable permission boundary."""
+    if tool_name != "github_create_issue" or not is_user_chat(ctx.task_conversation):
+        return ""
+    repo = str((arguments or {}).get("repo") or "").strip().casefold()
+    return repo if len(repo.split("/")) == 2 and all(repo.split("/")) else ""
+
+
+def _list_chat_permissions(ctx: ToolContext, _args: dict[str, Any]) -> str:
+    if ctx.approvals is None or not is_user_chat(ctx.task_conversation):
+        return "error: no current chat permission store"
+    try:
+        rows = ctx.approvals.standing_permissions(ctx.task_conversation)
+    except Exception as exc:
+        return f"error: chat permissions could not be read: {exc}"
+    if not rows:
+        return "No standing permissions in this chat."
+    return "\n".join(
+        f"{row['id']}: Always allow creating GitHub issues in {row['repo']}"
+        for row in rows if row.get("tool") == "github_create_issue"
+    )
+
+
+def _request_chat_issue_permission(ctx: ToolContext, args: dict[str, Any]) -> str:
+    if (ctx.approvals is None or ctx.sender != "user" or
+        not is_user_chat(ctx.task_conversation)):
+        return "error: a current user chat is required for standing permission"
+    repo = str(args.get("repo") or "").strip().casefold()
+    if len(repo.split("/")) != 2 or not all(repo.split("/")):
+        return "error: repo must be owner/repository"
+    if ctx.approvals.standing_permissions(ctx.task_conversation):
+        for row in ctx.approvals.standing_permissions(ctx.task_conversation):
+            if row.get("tool") == "github_create_issue" and row.get("repo") == repo:
+                return f"Already allowed to create GitHub issues in {repo} from this chat."
+    out = _confirm(ctx, {
+        "question": f"Always allow GitHub issue creation in {repo} from this chat?",
+        "detail": "Applies to this chat and repository only. Inspect or revoke it here at any time.",
+        "confirm_label": "Always allow",
+        "cancel_label": "Don't allow",
+    })
+    if out != "user confirmed":
+        return out if out.startswith(("error:", "interrupted:")) else "Permission was not granted."
+    if not _approval_task_current(ctx):
+        return "error: the task changed while awaiting permission; nothing was granted"
+    try:
+        ctx.approvals.grant_standing_issue_creation(ctx.task_conversation, repo)
+    except Exception as exc:
+        return f"error: chat permission could not be saved: {exc}"
+    return f"Always allowed to create GitHub issues in {repo} from this chat."
+
+
+def _revoke_chat_permission(ctx: ToolContext, args: dict[str, Any]) -> str:
+    if (ctx.approvals is None or ctx.sender != "user" or
+        not is_user_chat(ctx.task_conversation)):
+        return "error: a current user chat is required to revoke permission"
+    permission_id = str(args.get("id") or "").strip()
+    if not permission_id:
+        return "error: revoke_chat_permission needs 'id'"
+    try:
+        removed = ctx.approvals.revoke_standing(ctx.task_conversation, permission_id)
+    except Exception as exc:
+        return f"error: chat permission could not be revoked: {exc}"
+    return "Permission revoked." if removed else "error: no permission with that id in this chat"
+
+
 def action_subject(
     action: str, target: str, *, tool_name: str = "", tool_arguments: dict | None = None
 ) -> dict:
@@ -1025,6 +1091,7 @@ def require_approval(
     """
     if ctx.approvals is None:
         return None  # approval gate not wired on this host; other gates still apply
+    standing_repo = _standing_issue_repo(ctx, tool_name, tool_arguments)
     subject = action_subject(action, target, tool_name=tool_name, tool_arguments=tool_arguments)
     if tool_name:
         detail = (
@@ -1041,7 +1108,11 @@ def require_approval(
     try:
         if not _approval_task_current(ctx):
             return "error: the task changed or stopped; this action needs a current proposal"
-        verdict, _approval = checked(action, target, tool_call_id=ctx.tool_call_id)
+        verdict, _approval = checked(
+            action, target, tool_call_id=ctx.tool_call_id,
+            conversation=ctx.task_conversation if standing_repo else "",
+            tool_name=tool_name, repo=standing_repo,
+        )
         if verdict == VERDICT_ALLOW:
             return None
         if verdict == VERDICT_SATURATED:
@@ -1049,6 +1120,11 @@ def require_approval(
         if verdict == VERDICT_REFUSED:
             return f"error: {gate.approval_refused_earlier(action)}"
         # VERDICT_ASK: the confirm card is the ask surface.
+        if standing_repo:
+            detail = (detail + "\n\n" if detail else "") + (
+                f"Always allow applies only to creating issues in {standing_repo} "
+                "from this chat. You can inspect and revoke it here later."
+            )
         out = _confirm(
             ctx,
             {
@@ -1057,6 +1133,7 @@ def require_approval(
                 "confirm_label": "Allow",
                 "cancel_label": "Don't allow",
                 "allow_all": True,
+                "allow_all_label": "Always allow" if standing_repo else "Allow all",
             },
             subject=subject,
         )
@@ -1072,7 +1149,12 @@ def require_approval(
                 resource_path=resource_path,
             )
             if out == "user confirmed all":
-                gate.fail_closed("approval")(ctx.approvals.grant_all)()
+                if standing_repo:
+                    gate.fail_closed("approval")(ctx.approvals.grant_standing_issue_creation)(
+                        ctx.task_conversation, standing_repo
+                    )
+                else:
+                    gate.fail_closed("approval")(ctx.approvals.grant_all)()
             return None
         if out.startswith("interrupted:"):
             return out  # a newer user message preempted the ask; nothing recorded
@@ -3087,6 +3169,42 @@ def _build_default_tools() -> dict[str, Tool]:
                 },
             ),
             _confirm,
+        ),
+        "list_chat_permissions": Tool(
+            ToolSpec(
+                name="list_chat_permissions",
+                description="List standing permissions granted in this chat, including IDs for revocation.",
+                parameters={"type": "object", "properties": {}},
+            ),
+            _list_chat_permissions,
+        ),
+        "request_chat_issue_permission": Tool(
+            ToolSpec(
+                name="request_chat_issue_permission",
+                description=(
+                    "When the user asks to always allow GitHub issue reporting in this chat, "
+                    "show a scope-specific confirmation for one owner/repository. "
+                    "Call this before claiming permission is saved."
+                ),
+                parameters={
+                    "type": "object",
+                    "properties": {"repo": {"type": "string", "description": "owner/repository"}},
+                    "required": ["repo"],
+                },
+            ),
+            _request_chat_issue_permission,
+        ),
+        "revoke_chat_permission": Tool(
+            ToolSpec(
+                name="revoke_chat_permission",
+                description="Revoke one standing permission in this chat by ID when the user asks.",
+                parameters={
+                    "type": "object",
+                    "properties": {"id": {"type": "string"}},
+                    "required": ["id"],
+                },
+            ),
+            _revoke_chat_permission,
         ),
         "show_table": Tool(
             ToolSpec(
