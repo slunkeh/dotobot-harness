@@ -390,6 +390,35 @@ def test_pointer_window_parses_shell_output(monkeypatch):
     assert hostinput._pointer_window() is None
 
 
+def test_pointer_window_uses_client_inside_openbox_frame(monkeypatch):
+    """Openbox can report its frame under the pointer instead of Chrome."""
+    calls = []
+
+    def run(argv, **kwargs):
+        calls.append(argv)
+        output = (
+            b"X=640\nY=496\nWINDOW=6292298\n"
+            if argv[0] == "xdotool"
+            else b'''  56 children:\n     0x800004 "Google - Google Chrome": ("google-chrome" "Google-chrome") 1280x724+0+0\n     0x600396 (has no name): () 1x1+0+0\n'''
+        )
+        return type("R", (), {"returncode": 0, "stdout": output})()
+
+    monkeypatch.setattr(hostinput.subprocess, "run", run)
+    assert hostinput._pointer_window() == str(0x800004)
+    assert calls[1] == ["xwininfo", "-id", "6292298", "-children"]
+
+    def root_run(argv, **kwargs):
+        output = (
+            b"X=640\nY=496\nWINDOW=543\n"
+            if argv[0] == "xdotool"
+            else b"Root window id: 0x21f\nParent window id: 0x0 (none)\n"
+        )
+        return type("R", (), {"returncode": 0, "stdout": output})()
+
+    monkeypatch.setattr(hostinput.subprocess, "run", root_run)
+    assert hostinput._pointer_window() is None
+
+
 def test_type_and_click_focus_window_under_pointer(monkeypatch):
     """XTEST clicks do not give Chrome keyboard focus; we must activate."""
     sent: list[tuple] = []
