@@ -631,6 +631,29 @@ def _pointer_window(machine: str | None = None) -> str | None:
             wid = line.split("=", 1)[1].strip()
             # 0 is the root window — activating it does not give keys to Chrome.
             if wid and wid != "0":
+                # Openbox reports its undecorated frame under the pointer.
+                # Activating that frame returns success but leaves keyboard
+                # focus on Openbox; its direct child is the actual app client.
+                try:
+                    tree = subprocess.run(
+                        [*prefix, "xwininfo", "-id", wid, "-children"],
+                        capture_output=True,
+                        timeout=0.6,
+                        check=False,
+                    )
+                except (OSError, subprocess.SubprocessError):
+                    return wid
+                if tree.returncode == 0:
+                    listing = tree.stdout.decode("utf-8", "replace")
+                    if "Parent window id: 0x0 (none)" in listing:
+                        return None
+                    for child in listing.splitlines():
+                        match = re.match(
+                            r'^\s+(0x[0-9a-fA-F]+) .*: \("[^"]+" "[^"]+"\)',
+                            child,
+                        )
+                        if match:
+                            return str(int(match.group(1), 16))
                 return wid
             return None
     return None

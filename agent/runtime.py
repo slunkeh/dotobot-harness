@@ -2021,7 +2021,9 @@ class Agent:
 
         if not jev_enabled(self.paths, "handoffs"):
             tools.pop("recommend_handoff", None)
-        if not jev_enabled(self.paths, "browser"):
+        from harness import cdp
+
+        if not jev_enabled(self.paths, "browser") or not cdp.enabled():
             tools.pop("computer_browser", None)
         if not room:
             tools.pop("stay_silent", None)

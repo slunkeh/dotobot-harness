@@ -274,6 +274,7 @@ def test_runtime_offers_only_when_enabled_and_accounts_for_text_model(
     agent, paths = _agent(tmp_path, Model(model="test"))
     set_secret(jev.KEY, "runtime-browser-test-key", paths)
     jev_features.configure(paths, {"enabled": True, "features": {"browser": enabled}})
+    monkeypatch.setenv("HARNESS_CHROME_CDP", "1")
     monkeypatch.setattr(runtime.HostComputer, "display_ready", lambda self: True)
     monkeypatch.setattr(runtime.HostComputer, "browser_session", lambda self, **kw: browser)
     judgment(monkeypatch, "TYPE_TEXT", "2")
@@ -282,3 +283,23 @@ def test_runtime_offers_only_when_enabled_and_accounts_for_text_model(
     assert sum(r["requests"] for r in records) == (3 if enabled else 1)
     if enabled:
         assert sum(r["output_tokens"] for r in records) == 7
+
+
+def test_runtime_hides_fast_browser_when_chrome_debugging_is_off(tmp_path, monkeypatch):
+    from agent import runtime
+    from providers.base import Completion, Provider
+    from tests.test_compaction import _agent
+
+    class Model(Provider):
+        id = "test"
+
+        def complete(self, messages, **kwargs):
+            assert "computer_browser" not in {t.name for t in kwargs.get("tools", [])}
+            return Completion(text="Use visual browser tools", finish_reason="stop")
+
+    agent, paths = _agent(tmp_path, Model(model="test"))
+    set_secret(jev.KEY, "runtime-browser-test-key", paths)
+    jev_features.configure(paths, {"enabled": True, "features": {"browser": True}})
+    monkeypatch.setenv("HARNESS_CHROME_CDP", "0")
+    monkeypatch.setattr(runtime.HostComputer, "display_ready", lambda self: True)
+    assert agent._produce("user", "Use the browser") == "Use visual browser tools"
