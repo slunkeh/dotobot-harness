@@ -308,6 +308,80 @@ def test_require_approval_allow_all_skips_later_cards(tmp_path):
     assert list_prompts(paths) == []
 
 
+def test_standing_issue_permission_survives_turns_and_is_exactly_scoped(tmp_path):
+    paths = _paths(tmp_path)
+    store = ApprovalStore(paths, "atlas")
+    store.begin_turn()
+    permission_id = store.grant_standing_issue_creation("thread:one", "Acme/Repo")
+    store.begin_turn()
+    reopened = ApprovalStore(paths, "atlas")
+    kwargs = {"conversation": "thread:one", "tool_name": "github_create_issue", "repo": "acme/repo"}
+    assert reopened.check("github_create_issue", "new body", **kwargs)[0] == VERDICT_ALLOW
+    assert reopened.check("github_create_issue", "new body", **{**kwargs, "conversation": "thread:two"})[0] == VERDICT_ASK
+    assert reopened.check("github_create_issue", "new body", **{**kwargs, "repo": "acme/other"})[0] == VERDICT_ASK
+    assert reopened.check("github_comment", "new body", **{**kwargs, "tool_name": "github_comment"})[0] == VERDICT_ASK
+    assert reopened.check("github_merge_pull", "new body", **{**kwargs, "tool_name": "github_merge_pull"})[0] == VERDICT_ASK
+    assert ApprovalStore(paths, "nova").check("github_create_issue", "new body", **kwargs)[0] == VERDICT_ASK
+    assert reopened.revoke_standing("thread:two", permission_id) is False
+    assert reopened.revoke_standing("thread:one", permission_id) is True
+    assert reopened.check("github_create_issue", "new body", **kwargs)[0] == VERDICT_ASK
+
+
+def test_standing_issue_permission_requires_explicit_chat_and_repository(tmp_path):
+    store = ApprovalStore(_paths(tmp_path), "atlas")
+    with pytest.raises(ValueError):
+        store.grant_standing_issue_creation("peer:user", "acme/repo")
+    with pytest.raises(ValueError):
+        store.grant_standing_issue_creation("thread:one", "repo")
+
+
+def test_github_issue_always_allow_card_grants_chat_permission(tmp_path):
+    from agent.tools import _list_chat_permissions, _revoke_chat_permission
+
+    paths = _paths(tmp_path)
+    store = ApprovalStore(paths, "atlas")
+    ctx = _ctx(paths, approvals=store, timeout=5.0)
+    ctx.task_conversation = "thread:one"
+    ctx.tool_call_id = "first"
+    args = {"repo": "Acme/Repo", "title": "First"}
+    thread = _answer_next_confirm(paths, "allow_all")
+    assert require_approval(ctx, "github_create_issue", "github_create_issue",
+                            tool_name="github_create_issue", tool_arguments=args) is None
+    thread.join()
+    rows = list_prompts(paths, include_resolved=True)
+    payload = rows[-1]["payload"]
+    assert payload["allow_all_label"] == "Always allow"
+    assert "acme/repo" in payload["detail"] and "this chat" in payload["detail"]
+    store.end_scope("first")
+    store.begin_turn()
+    ctx.tool_call_id = "second"
+    assert require_approval(ctx, "github_create_issue", "github_create_issue",
+                            tool_name="github_create_issue",
+                            tool_arguments={"repo": "Acme/Repo", "title": "Second"}) is None
+    assert list_prompts(paths) == []
+    assert store.check("run-command", "anything")[0] == VERDICT_ASK
+    listing = _list_chat_permissions(ctx, {})
+    permission_id = listing.split(":", 1)[0]
+    assert "acme/repo" in listing
+    assert _revoke_chat_permission(ctx, {"id": permission_id}) == "Permission revoked."
+    assert store.standing_permissions("thread:one") == []
+
+
+def test_explicit_chat_permission_request_uses_confirmation(tmp_path):
+    from agent.tools import _request_chat_issue_permission
+
+    paths = _paths(tmp_path)
+    store = ApprovalStore(paths, "atlas")
+    ctx = _ctx(paths, approvals=store, timeout=5.0)
+    ctx.task_conversation = "thread:one"
+    thread = _answer_next_confirm(paths, "confirm")
+    result = _request_chat_issue_permission(ctx, {"repo": "Acme/Repo"})
+    thread.join()
+    assert "Always allowed" in result
+    assert store.standing_permissions("thread:one")[0]["repo"] == "acme/repo"
+    assert "Always allow" in list_prompts(paths, include_resolved=True)[-1]["payload"]["confirm_label"]
+
+
 def test_require_approval_decline_is_remembered(tmp_path):
     paths = _paths(tmp_path)
     store = ApprovalStore(paths, "atlas")

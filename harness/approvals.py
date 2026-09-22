@@ -101,7 +101,7 @@ class ApprovalStore:
         base.update(data)
         if not isinstance(base.get("approvals"), list) or not isinstance(
             base.get("refusals"), dict
-        ):
+        ) or not isinstance(base.get("standing"), list):
             raise ValueError(f"approvals store {self.file} has a malformed shape")
         return base
 
@@ -111,6 +111,7 @@ class ApprovalStore:
             "epoch": 0,
             "saturated_epoch": -1,
             "approvals": [],
+            "standing": [],
             "refusals": {},
         }
 
@@ -153,6 +154,43 @@ class ApprovalStore:
         data = self._load()
         data["allow_all_epoch"] = int(data.get("epoch", 0))
         self._save(data)
+
+    def grant_standing_issue_creation(self, conversation: str, repo: str) -> str:
+        """Remember consent for creating issues in one repo in one human chat."""
+        if not conversation.startswith(("thread:", "room:")) or not conversation.split(":", 1)[1]:
+            raise ValueError("a chat is required for standing permission")
+        repo = repo.strip().casefold()
+        if len(repo.split("/")) != 2 or not all(repo.split("/")):
+            raise ValueError("an owner/repository is required for standing permission")
+        data = self._load()
+        for row in data["standing"]:
+            if row.get("conversation") == conversation and row.get("repo") == repo:
+                return str(row["id"])
+        permission_id = uuid.uuid4().hex[:12]
+        data["standing"].append({
+            "id": permission_id,
+            "conversation": conversation,
+            "tool": "github_create_issue",
+            "repo": repo,
+            "epoch": int(data.get("epoch", 0)),
+            "granted": time.time(),
+        })
+        self._save(data)
+        return permission_id
+
+    def standing_permissions(self, conversation: str) -> list[dict[str, Any]]:
+        return [row.copy() for row in self._load()["standing"] if row.get("conversation") == conversation]
+
+    def revoke_standing(self, conversation: str, permission_id: str) -> bool:
+        data = self._load()
+        keep = [row for row in data["standing"] if not (
+            row.get("conversation") == conversation and row.get("id") == permission_id
+        )]
+        if len(keep) == len(data["standing"]):
+            return False
+        data["standing"] = keep
+        self._save(data)
+        return True
 
     def grant(
         self,
@@ -293,6 +331,9 @@ class ApprovalStore:
         *,
         tool_call_id: str | None = None,
         scope_epoch: int | None = None,
+        conversation: str = "",
+        tool_name: str = "",
+        repo: str = "",
     ) -> tuple[str, Approval | None]:
         """One-stop decision: `(VERDICT_*, approval-or-None)`.
 
@@ -306,6 +347,13 @@ class ApprovalStore:
         epoch = int(data.get("epoch", 0)) if scope_epoch is None else scope_epoch
         if int(data.get("allow_all_epoch", -1)) >= epoch:
             return VERDICT_ALLOW, None
+        if tool_name == "github_create_issue" and conversation and repo:
+            for row in data["standing"]:
+                if (row.get("conversation") == conversation
+                    and row.get("tool") == tool_name
+                    and row.get("repo") == repo.strip().casefold()
+                    and int(row.get("epoch", 0)) <= epoch):
+                    return VERDICT_ALLOW, None
         approval = self.approval_covering(
             action, target, tool_call_id=tool_call_id, scope_epoch=scope_epoch
         )

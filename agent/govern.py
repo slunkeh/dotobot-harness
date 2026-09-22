@@ -205,6 +205,9 @@ EFFECTS: dict[str, Effect] = {
     "show_chart": Effect(INTENT_UI, lambda a: _arg(a, "title", "kind")),
     "show_progress": Effect(INTENT_UI, lambda a: _arg(a, "title")),
     "confirm": Effect(INTENT_UI, lambda a: _arg(a, "question")),
+    "list_chat_permissions": Effect(INTENT_READ, lambda a: "current chat permissions"),
+    "request_chat_issue_permission": Effect(INTENT_UI, lambda a: _arg(a, "repo")),
+    "revoke_chat_permission": Effect(INTENT_WRITE_STATE, lambda a: _arg(a, "id")),
     "ask_user_choice": Effect(INTENT_UI, lambda a: _arg(a, "question")),
     "ask_human": Effect(INTENT_UI, lambda a: _arg(a, "reason")),
 }
