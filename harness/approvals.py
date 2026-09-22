@@ -62,6 +62,12 @@ def _normalize_path(path: str | None) -> str | None:
     return path.replace("\\", "/").rstrip("/") or "/"
 
 
+def is_user_chat(conversation: str) -> bool:
+    return conversation == "peer:user" or (
+        conversation.startswith(("thread:", "room:")) and bool(conversation.split(":", 1)[1])
+    )
+
+
 @dataclass
 class Approval:
     """One recorded approval; `target_sha256` stands in for the raw target."""
@@ -157,7 +163,7 @@ class ApprovalStore:
 
     def grant_standing_issue_creation(self, conversation: str, repo: str) -> str:
         """Remember consent for creating issues in one repo in one human chat."""
-        if not conversation.startswith(("thread:", "room:")) or not conversation.split(":", 1)[1]:
+        if not is_user_chat(conversation):
             raise ValueError("a chat is required for standing permission")
         repo = repo.strip().casefold()
         if len(repo.split("/")) != 2 or not all(repo.split("/")):

@@ -68,6 +68,7 @@ from harness.approvals import (
     VERDICT_REFUSED,
     VERDICT_SATURATED,
     ApprovalStore,
+    is_user_chat,
 )
 from harness.control import Control
 from harness.envscrub import scrub_ambient_authority
@@ -993,14 +994,14 @@ def _confirmation_result(value: str) -> str:
 
 def _standing_issue_repo(ctx: ToolContext, tool_name: str, arguments: dict | None) -> str:
     """Only an explicit owner/repo can define a durable permission boundary."""
-    if tool_name != "github_create_issue" or not ctx.task_conversation.startswith(("thread:", "room:")):
+    if tool_name != "github_create_issue" or not is_user_chat(ctx.task_conversation):
         return ""
     repo = str((arguments or {}).get("repo") or "").strip().casefold()
     return repo if len(repo.split("/")) == 2 and all(repo.split("/")) else ""
 
 
 def _list_chat_permissions(ctx: ToolContext, _args: dict[str, Any]) -> str:
-    if ctx.approvals is None or not ctx.task_conversation.startswith(("thread:", "room:")):
+    if ctx.approvals is None or not is_user_chat(ctx.task_conversation):
         return "error: no current chat permission store"
     try:
         rows = ctx.approvals.standing_permissions(ctx.task_conversation)
@@ -1016,7 +1017,7 @@ def _list_chat_permissions(ctx: ToolContext, _args: dict[str, Any]) -> str:
 
 def _request_chat_issue_permission(ctx: ToolContext, args: dict[str, Any]) -> str:
     if (ctx.approvals is None or ctx.sender != "user" or
-        not ctx.task_conversation.startswith(("thread:", "room:"))):
+        not is_user_chat(ctx.task_conversation)):
         return "error: a current user chat is required for standing permission"
     repo = str(args.get("repo") or "").strip().casefold()
     if len(repo.split("/")) != 2 or not all(repo.split("/")):
@@ -1044,7 +1045,7 @@ def _request_chat_issue_permission(ctx: ToolContext, args: dict[str, Any]) -> st
 
 def _revoke_chat_permission(ctx: ToolContext, args: dict[str, Any]) -> str:
     if (ctx.approvals is None or ctx.sender != "user" or
-        not ctx.task_conversation.startswith(("thread:", "room:"))):
+        not is_user_chat(ctx.task_conversation)):
         return "error: a current user chat is required to revoke permission"
     permission_id = str(args.get("id") or "").strip()
     if not permission_id:

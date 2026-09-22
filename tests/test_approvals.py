@@ -317,6 +317,8 @@ def test_standing_issue_permission_survives_turns_and_is_exactly_scoped(tmp_path
     reopened = ApprovalStore(paths, "atlas")
     kwargs = {"conversation": "thread:one", "tool_name": "github_create_issue", "repo": "acme/repo"}
     assert reopened.check("github_create_issue", "new body", **kwargs)[0] == VERDICT_ALLOW
+    reopened.grant_standing_issue_creation("peer:user", "acme/repo")
+    assert reopened.check("github_create_issue", "new body", **{**kwargs, "conversation": "peer:user"})[0] == VERDICT_ALLOW
     assert reopened.check("github_create_issue", "new body", **{**kwargs, "conversation": "thread:two"})[0] == VERDICT_ASK
     assert reopened.check("github_create_issue", "new body", **{**kwargs, "repo": "acme/other"})[0] == VERDICT_ASK
     assert reopened.check("github_comment", "new body", **{**kwargs, "tool_name": "github_comment"})[0] == VERDICT_ASK
@@ -330,7 +332,7 @@ def test_standing_issue_permission_survives_turns_and_is_exactly_scoped(tmp_path
 def test_standing_issue_permission_requires_explicit_chat_and_repository(tmp_path):
     store = ApprovalStore(_paths(tmp_path), "atlas")
     with pytest.raises(ValueError):
-        store.grant_standing_issue_creation("peer:user", "acme/repo")
+        store.grant_standing_issue_creation("peer:nova", "acme/repo")
     with pytest.raises(ValueError):
         store.grant_standing_issue_creation("thread:one", "repo")
 
@@ -341,7 +343,7 @@ def test_github_issue_always_allow_card_grants_chat_permission(tmp_path):
     paths = _paths(tmp_path)
     store = ApprovalStore(paths, "atlas")
     ctx = _ctx(paths, approvals=store, timeout=5.0)
-    ctx.task_conversation = "thread:one"
+    ctx.task_conversation = "peer:user"
     ctx.tool_call_id = "first"
     args = {"repo": "Acme/Repo", "title": "First"}
     thread = _answer_next_confirm(paths, "allow_all")
@@ -364,7 +366,7 @@ def test_github_issue_always_allow_card_grants_chat_permission(tmp_path):
     permission_id = listing.split(":", 1)[0]
     assert "acme/repo" in listing
     assert _revoke_chat_permission(ctx, {"id": permission_id}) == "Permission revoked."
-    assert store.standing_permissions("thread:one") == []
+    assert store.standing_permissions("peer:user") == []
 
 
 def test_explicit_chat_permission_request_uses_confirmation(tmp_path):
