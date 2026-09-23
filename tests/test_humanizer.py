@@ -1,5 +1,6 @@
 """Default humanizer system block: always on, never a user-facing skill."""
 
+from agent.caveman import PROMPT as CAVEMAN_PROMPT
 from agent.humanizer import PROMPT as HUMANIZER_PROMPT
 from agent.memory import Memory
 from agent.runtime import Agent
@@ -48,6 +49,20 @@ def test_humanizer_is_embedded_mode():
 
 
 def test_humanizer_keeps_chat_replies_short():
-    assert "This is a chat" in HUMANIZER_PROMPT
-    assert "short, concise, and succinct" in HUMANIZER_PROMPT
-    assert "Quoted material" in HUMANIZER_PROMPT
+    assert "shortest answer that fully addresses" in HUMANIZER_PROMPT
+    assert "one to three sentences" in HUMANIZER_PROMPT
+    assert "Include technical details only when requested" in HUMANIZER_PROMPT
+    assert "complete sentences" in HUMANIZER_PROMPT
+    assert "as complete as the task requires" in HUMANIZER_PROMPT
+    assert "Keep every claim" not in HUMANIZER_PROMPT
+
+
+def test_caveman_remains_an_optional_style_override(tmp_path):
+    agent, _ = _agent(tmp_path)
+    default = agent.system_prompt("hello")
+    assert HUMANIZER_PROMPT in default
+    assert CAVEMAN_PROMPT not in default
+    agent.bot.caveman = True
+    enabled = agent.system_prompt("hello")
+    assert enabled.index(HUMANIZER_PROMPT) < enabled.index(CAVEMAN_PROMPT)
+    assert "When Caveman mode is enabled" in HUMANIZER_PROMPT
