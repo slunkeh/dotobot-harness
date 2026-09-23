@@ -12,7 +12,8 @@ The clock is one file per bot, `run/<bot>.computer-active`, touched by every
 computer action the bot takes (`agent.computer.HostComputer`) and by every
 human input event on its screen (`harness.server` WS `input`). Absence means
 "never used": nothing to close. A bot whose control a human holds (takeover /
-teach) is never swept — the human may be mid-login. Closing goes through
+teach) or with an open user decision is never swept — the browser may hold
+a login, context or draft needed after the person answers. Closing goes through
 `MachineBackend.close_browser`, which merges the machine's state up first so
 the logins Chrome wrote are in the canonical store before the process dies;
 the next `computer_open` relaunches on the same profile.
@@ -97,11 +98,17 @@ def sweep(
     bots whose browser was actually closed. A failure on one bot never stops
     the pass."""
     closed: list[str] = []
+    from agent.streaming import list_prompts
+
     for bot in bots:
         try:
             if not is_idle(paths, bot, limit_s=limit_s, now=now):
                 continue
             if control_held(bot):
+                continue
+            # A decision can take hours; the browser still contains the
+            # context or draft the bot must use once the person answers.
+            if list_prompts(paths, bot):
                 continue
             if close_browser(bot):
                 closed.append(bot)

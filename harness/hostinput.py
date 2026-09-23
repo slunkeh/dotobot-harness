@@ -659,6 +659,43 @@ def _pointer_window(machine: str | None = None) -> str | None:
     return None
 
 
+def _top_app_window(machine: str | None, docks: set[str]) -> str | None:
+    """Recover the foreground app when a launcher holds X keyboard focus."""
+    prefix = _machine_prefix(machine)
+    try:
+        stack = subprocess.run(
+            [*prefix, "xprop", "-root", "_NET_CLIENT_LIST_STACKING"],
+            capture_output=True,
+            timeout=0.6,
+            check=False,
+        )
+        if stack.returncode != 0:
+            return None
+        for raw in reversed(re.findall(r"0x[0-9a-fA-F]+", stack.stdout.decode("utf-8", "replace"))):
+            wid = str(int(raw, 16))
+            if wid in docks:
+                continue
+            props = subprocess.run(
+                [*prefix, "xprop", "-id", raw, "_NET_WM_WINDOW_TYPE", "WM_STATE"],
+                capture_output=True,
+                timeout=0.6,
+                check=False,
+            )
+            value = props.stdout.decode("utf-8", "replace")
+            if (
+                props.returncode == 0
+                and "window state: Normal" in value
+                and not any(
+                    kind in value
+                    for kind in ("_NET_WM_WINDOW_TYPE_DOCK", "_NET_WM_WINDOW_TYPE_DESKTOP")
+                )
+            ):
+                return wid
+    except (OSError, subprocess.SubprocessError):
+        pass
+    return None
+
+
 def _focus_pointer_window(machine: str | None = None) -> bool:
     """Give the window under the pointer X keyboard focus.
 
@@ -669,6 +706,15 @@ def _focus_pointer_window(machine: str | None = None) -> bool:
     if not wid:
         return False
     key = machine or ""
+    docks = {rect[0] for rect in _dock_rects(machine)}
+    if wid in docks:
+        # Launching Chrome leaves the pointer on tint2. Never focus the
+        # launcher for typing: use the visible app it raised instead.
+        # A cached app id does not prove it still owns X keyboard focus.
+        _focused_wid.pop(key, None)
+        wid = _top_app_window(machine, docks)
+        if not wid:
+            return False
     if _focused_wid.get(key) == wid:
         return True
     session = session_for(machine)
