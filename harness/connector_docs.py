@@ -1088,9 +1088,9 @@ _ROWS: list[tuple[str, str, str, str]] = [
     ),
     (
         "pipedrive",
-        "aggregator",
-        "https://composio.dev/toolkits/pipedrive",
-        "Dotobot uses mcp.pipedrive.com/mcp.",
+        "official",
+        "https://support.pipedrive.com/en/article/mcp-claude",
+        "Dotobot uses mcp.pipedrive.ai/mcp.",
     ),
     (
         "quickbooks",

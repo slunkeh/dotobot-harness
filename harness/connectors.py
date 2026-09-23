@@ -698,7 +698,7 @@ CATALOG: list[dict] = [
         "type": "pipedrive",
         "name": "Pipedrive",
         "auth": "oauth",
-        "mcp_url": "https://mcp.pipedrive.com/mcp",
+        "mcp_url": "https://mcp.pipedrive.ai/mcp",
         "fields": [],
         "category": "Sales And CRM",
         "description": "Search and update Pipedrive deals, people, and orgs.",
