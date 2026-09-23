@@ -724,3 +724,48 @@ def test_live_frames_stream_over_ws(server, monkeypatch):
             c.close()
     finally:
         del os.environ["HARNESS_SCREENSHOT_CMD"]
+
+
+def test_keyboard_after_dock_launch_targets_visible_app(monkeypatch):
+    """A pointer parked on a launcher must not steal keys back from its app."""
+    sent = []
+    monkeypatch.setattr(hostinput, "_pointer_window", lambda machine=None: "42")
+    monkeypatch.setattr(hostinput, "_dock_rects", lambda machine=None: [("42", 0, 700, 200, 60)])
+    monkeypatch.setattr(hostinput, "_clip_tool", lambda machine=None: None)
+    monkeypatch.setattr(hostinput._session, "send", lambda *args: sent.append(args) or True)
+    hostinput._focused_wid[""] = "99"  # stale cache from before the dock click
+
+    def run(argv, **kwargs):
+        if "-root" in argv:
+            output = b"_NET_CLIENT_LIST_STACKING(WINDOW): window id # 0x63, 0x64, 0x2a"
+        elif "0x64" in argv:
+            output = b"_NET_WM_WINDOW_TYPE_NORMAL\nWM_STATE: window state: Iconic"
+        else:
+            output = b"_NET_WM_WINDOW_TYPE_NORMAL\nWM_STATE: window state: Normal"
+        return type("R", (), {"returncode": 0, "stdout": output})()
+
+    monkeypatch.setattr(hostinput.subprocess, "run", run)
+    for action in (
+        lambda: hostinput.key("ctrl+l"),
+        lambda: hostinput.type_text("https://example.org"),
+        lambda: hostinput.key("Return"),
+    ):
+        sent.clear()
+        assert action()
+        assert ("windowfocus", "99") in sent
+        assert ("windowfocus", "42") not in sent
+
+
+def test_dock_without_visible_app_does_not_receive_keyboard_focus(monkeypatch):
+    sent = []
+    monkeypatch.setattr(hostinput, "_pointer_window", lambda machine=None: "42")
+    monkeypatch.setattr(hostinput, "_dock_rects", lambda machine=None: [("42", 0, 700, 200, 60)])
+    monkeypatch.setattr(hostinput._session, "send", lambda *args: sent.append(args) or True)
+    monkeypatch.setattr(
+        hostinput.subprocess,
+        "run",
+        lambda *a, **k: type("R", (), {"returncode": 0, "stdout": b"window id # 0x2a"})(),
+    )
+    hostinput._focused_wid.clear()
+    hostinput.key("ctrl+l")
+    assert not any(call[0] in {"windowfocus", "windowactivate"} for call in sent)

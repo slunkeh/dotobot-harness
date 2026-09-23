@@ -129,3 +129,30 @@ def test_sweep_timer_only_runs_on_the_machines_backend(monkeypatch):
     monkeypatch.setenv("HARNESS_BROWSER_IDLE_MINUTES", "30")
     server.start_browser_idle_sweep(_Orch("machines"))
     assert "browser-idle" in _threads()
+
+
+def test_idle_browser_survives_pending_decision_then_can_close(tmp_path):
+    from agent.streaming import resolve_prompt, write_prompt
+
+    paths = _paths(tmp_path)
+    browser_idle.touch(paths, "atlas", now=1000)
+    prompt = write_prompt(
+        paths,
+        {
+            "bot": "atlas",
+            "type": "card",
+            "card_type": "choice",
+            "payload": {"question": "Use this draft?", "options": ["Accept", "Decline"]},
+        },
+    )
+    closed = []
+    args = dict(
+        close_browser=lambda bot: closed.append(bot) or True,
+        control_held=lambda bot: False,
+        limit_s=1800,
+        now=10000,
+    )
+    assert browser_idle.sweep(paths, ["atlas"], **args) == []
+    assert closed == []
+    resolve_prompt(paths, prompt, {"state": "answered", "responded_value": "Decline"})
+    assert browser_idle.sweep(paths, ["atlas"], **args) == ["atlas"]
