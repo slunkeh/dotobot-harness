@@ -671,12 +671,17 @@ class Orchestrator:
         attachments: list[dict] | None = None,
         origin: str | None = None,
         task_scope: dict | None = None,
+        routine: dict | None = None,
     ) -> tuple[str, StreamReader]:
         """Send a message and return (request_id, StreamReader) for live events."""
         self.roster.get(name)
         msg = messaging.Msg(
-            to=name, frm=frm, text=text, attachments=attachments or [], origin=origin
+            to=name, frm=frm, text=text, attachments=attachments or [], origin=origin,
+            routine=routine,
         )
+        if routine is not None:
+            msg.id = routine["run_id"]
+            msg.ts = float(routine["scheduled_at"])
         # Server-owned sends expose the request id as their bubble/card id.
         # Keep that identity on both the live relay and persisted history.
         msg.message_id = msg.id
@@ -693,7 +698,7 @@ class Orchestrator:
                 inherited_scope=task_scope,
             )
         messaging.send(self.paths, msg)
-        if frm == "user":
+        if frm == "user" and origin in {None, "", "voice"}:
             obligations.record_send(self.paths, name, msg.id)
         return msg.id, StreamReader(self.paths, msg.id)
 

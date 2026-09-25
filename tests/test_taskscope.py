@@ -284,7 +284,9 @@ def test_unbound_routine_has_no_implicit_scope(scope_home):
     row = add_routine(paths, "atlas", prompt="Use Notion", when="8am")
     run_now(paths, "atlas", row["id"])
     queued = messaging.pending(paths, "atlas")[0]
-    assert scope_for_input(paths, "atlas", queued.id) is None
+    scope = scope_for_input(paths, "atlas", queued.id)
+    assert scope["connector_ids"] == []
+    assert scope["objective"] == ""
 
 
 def test_stale_task_cannot_bind_routine(scope_home):
@@ -349,7 +351,8 @@ def test_bound_routine_passes_scope_to_live_relay(scope_home):
     calls = []
     run_now(paths, "atlas", row["id"], send=lambda bot, text, **kw: calls.append((bot, text, kw)))
     assert calls[0][2]["task_scope"]["connector_ids"] == ["gw"]
-    assert calls[0][2]["task_scope"]["conversation"] == f"routine:{row['id']}"
+    occurrence = calls[0][2]["routine"]
+    assert calls[0][2]["task_scope"]["conversation"] == f"routine:{row['id']}:{occurrence['run_id']}"
 
 
 def test_ambiguous_input_id_does_not_select_an_arbitrary_conversation(scope_home):

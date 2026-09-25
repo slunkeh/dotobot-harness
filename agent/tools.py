@@ -122,6 +122,14 @@ from .terminals import (
 )
 
 
+class RoutineSuspended(Exception):
+    """A durable scheduled decision is waiting; release the bot's worker."""
+
+
+class RoutineExpired(Exception):
+    """The permitted execution window closed before another action began."""
+
+
 @dataclass
 class ToolContext:
     paths: HarnessPaths
@@ -166,6 +174,10 @@ class ToolContext:
     #: chat). The gate (`agent/govern.py`) holds side-effect intents back on
     #: dream turns.
     origin: str | None = None
+    routine: dict | None = None
+    pending_prompt_id: str | None = None
+    #: Runtime-only fingerprints of earlier routine actions; never raw arguments/results.
+    routine_receipts: list[dict] = field(default_factory=list)
     #: web content (a screenshot, an unfurled link) has entered this turn's
     #: transcript. Set by the dispatch loop, never by a handler; the gate
     #: (`agent/govern.py`) escalates sensitive default decisions while it is
@@ -201,6 +213,8 @@ class ToolContext:
     browser_authorize: Callable[[str, dict], str | None] | None = None
     browser_check: Callable[[], str | None] | None = None
     browser_text: Callable[[str], str] | None = None
+    #: Re-enter authorization after observing a composer, without claiming delivery twice.
+    outgoing_revalidate: Callable[[], str | None] | None = None
 
 
 def _from_colleague(ctx: ToolContext) -> bool:
@@ -212,13 +226,34 @@ def _from_colleague(ctx: ToolContext) -> bool:
     )
 
 
+def _resumable_prompt(payload: dict) -> bool:
+    return not payload.get("resolution") and (
+        payload.get("type") in {"choice", "secret_request"}
+        or (payload.get("type") == "card" and payload.get("card_type") == "confirm")
+    )
+
+
 def _open_prompt(ctx: ToolContext, payload: dict[str, Any]) -> str | None:
     """Persist a prompt row; room rides so resolution fan-out stays off 1:1."""
     if ctx.room:
         payload = {**payload, "room": ctx.room}
     if ctx.turn_id:
         payload = {**payload, "request_id": ctx.turn_id}
-    return write_prompt(ctx.paths, payload)
+    if ctx.thread_id:
+        payload = {**payload, "thread_id": ctx.thread_id}
+    if ctx.origin:
+        payload = {**payload, "origin": ctx.origin}
+    if ctx.task_id:
+        payload = {**payload, "task_id": ctx.task_id, "task_revision": ctx.task_revision,
+                   "task_conversation": ctx.task_conversation, "origin": ctx.origin,
+                   "thread_id": ctx.thread_id, "routine": ctx.routine}
+    if ctx.routine:
+        payload = {**payload, "routine_receipts": list(ctx.routine_receipts), "protected_context": True}
+    result = write_prompt(ctx.paths, payload)
+    # A control-return card (or an already answered decision) cannot resume
+    # through the durable answer queue. Never inherit an earlier prompt's id.
+    ctx.pending_prompt_id = str(payload.get("id") or "") if _resumable_prompt(payload) else None
+    return result
 
 
 def _decision_prompt(
@@ -248,6 +283,10 @@ def _decision_prompt(
             task_id=task, task_revision=ctx.task_revision, task_conversation=ctx.task_conversation
         )
     row.update(origin=ctx.origin, thread_id=ctx.thread_id)
+    if ctx.routine is not None:
+        row["routine"] = ctx.routine
+        row["routine_receipts"] = list(ctx.routine_receipts)
+        row["protected_context"] = True
     if ctx.room:
         row["room"] = ctx.room
     if subject is not None:
@@ -640,6 +679,27 @@ def _recall(ctx: ToolContext, args: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def _search_history(ctx: ToolContext, args: dict[str, Any]) -> str:
+    from .records import search
+
+    try:
+        values = {key: int(args.get(key, default)) for key, default in (
+            ("limit", 10), ("offset", 0), ("text_offset", 0), ("text_limit", 2000)
+        )}
+        for key in ("since", "before"):
+            if args.get(key):
+                stamp = datetime.fromisoformat(str(args[key]).replace("Z", "+00:00"))
+                if stamp.tzinfo is None:
+                    raise ValueError("dates require a UTC offset")
+                values[key] = stamp.timestamp()
+        result = search(ctx, query=str(args.get("query") or ""),
+                        source=str(args.get("source") or "all"),
+                        record_id=str(args.get("record_id") or ""), **values)
+        return json.dumps(result, ensure_ascii=False)
+    except (ValueError, TypeError, OverflowError) as exc:
+        return f"error: {exc}"
+
+
 _INPUT_POLL = 0.25
 
 
@@ -664,6 +724,21 @@ def _turn_preempted(ctx: ToolContext) -> bool:
 
 def _wait_for_human(ctx: ToolContext, done, *, status: str = "waiting") -> bool:
     """Poll until `done()` or timeout. Heartbeats keep the stream alive."""
+    if done():
+        return True
+    if ctx.origin == "routine" and ctx.task_id and ctx.pending_prompt_id:
+        from harness.statestore import store_for
+
+        store = store_for(ctx.paths)
+        prompt = store.prompt(ctx.pending_prompt_id) or {}
+        if (_resumable_prompt(prompt) and prompt.get("bot") == ctx.bot
+                and prompt.get("task_id") == ctx.task_id
+                and prompt.get("task_revision") == ctx.task_revision
+                and prompt.get("task_conversation") == ctx.task_conversation
+                and store.prompt_current(prompt)):
+            # The durable prompt mailbox owns this unresolved continuation.
+            raise RoutineSuspended()
+        ctx.pending_prompt_id = None
     deadline = time.time() + ctx.user_input_timeout
     beat = 0.0
     if ctx.writer is not None:
@@ -771,7 +846,7 @@ def _request_secret(ctx: ToolContext, args: dict[str, Any]) -> str:
             )
             return f"ok: secret {name!r} is now available (value is never shown)"
     finally:
-        if not lookup_secret(name, ctx.paths):
+        if not lookup_secret(name, ctx.paths) and not isinstance(sys.exc_info()[1], RoutineSuspended):
             # Unanswered: the box lives for the whole wait, then settles as
             # skipped (session log + stream) so history-only catch-up cannot
             # reopen it. Not a sweep — secrets stay out of turn-end expiry.
@@ -895,6 +970,8 @@ def _persist_card(
         payload=payload,
         frm=ctx.bot,
         resolution=resolution,
+        thread_id=ctx.thread_id,
+        origin=ctx.origin,
     )
 
 
@@ -920,6 +997,28 @@ def _confirm(ctx: ToolContext, args: dict[str, Any], *, subject: dict | None = N
     if bool(args.get("allow_all")):
         payload["allow_all"] = True
     proposal = args.get("proposed_action")
+    outgoing = args.get("outgoing_message")
+    if outgoing is not None:
+        from .outgoing import proposal as outgoing_proposal
+
+        if proposal is not None or subject is not None:
+            return "error: use outgoing_message for browser posting, or proposed_action for a connector action"
+        try:
+            message = outgoing_proposal(outgoing)
+        except ValueError as exc:
+            return f"error: {exc}"
+        payload["outgoing_message"] = message
+        payload.pop("allow_all", None)
+        payload.pop("allow_all_label", None)
+        # Legacy clients render question/detail. Keep source/context separate
+        # from the immutable text used by computer_submit_approved.
+        payload["question"] = "Post this exact message?"
+        payload["detail"] = (
+            f"Target: {message['target_url']}\n\nContext (not posted):\n{message['context']}"
+            f"\n\nExact message:\n{message['text']}"
+        )
+        payload["confirm_label"], payload["cancel_label"] = "Accept", "Decline"
+        subject = {"outgoing_message": {k: message[k] for k in ("target_url", "text")}}
     if proposal is not None:
         if not isinstance(proposal, dict) or not isinstance(proposal.get("arguments"), dict):
             return "error: proposed_action needs a tool and an arguments object"
@@ -939,12 +1038,18 @@ def _confirm(ctx: ToolContext, args: dict[str, Any], *, subject: dict | None = N
         )
     row, created = _decision_prompt(ctx, "confirm", payload, subject=subject)
     cid = row["id"]
+    def result(value):
+        answer = _confirmation_result(value)
+        if outgoing is not None and value == "confirm":
+            answer += f"\napproval_id: {cid}. Use computer_submit_approved for this exact proposal; do not submit with generic clicks or keys."
+        return answer
+
     resolution = row.get("resolution") or {}
     if resolution:
         if resolution.get("state") != "answered":
             return "error: this confirmation was skipped; do not assume approval"
         val = str(resolution.get("responded_value") or "")
-        return _confirmation_result(val)
+        return result(val)
     if created:
         _emit_card(ctx, "confirm", payload, card_id=cid)
     else:
@@ -962,7 +1067,7 @@ def _confirm(ctx: ToolContext, args: dict[str, Any], *, subject: dict | None = N
 
         if _wait_for_human(ctx, done):
             val = answered = str(picked["value"])
-            return _confirmation_result(val)
+            return result(val)
     finally:
         _settle_prompt(
             ctx,
@@ -1009,10 +1114,76 @@ def _list_chat_permissions(ctx: ToolContext, _args: dict[str, Any]) -> str:
         return f"error: chat permissions could not be read: {exc}"
     if not rows:
         return "No standing permissions in this chat."
-    return "\n".join(
-        f"{row['id']}: Always allow creating GitHub issues in {row['repo']}"
-        for row in rows if row.get("tool") == "github_create_issue"
+    lines = []
+    for row in rows:
+        if row.get("tool") == "github_create_issue":
+            lines.append(f"{row['id']}: Always allow creating GitHub issues in {row['repo']}")
+        elif row.get("tool") == "use_secret_file":
+            lines.append(f"{row['id']}: Allow credential file {row['credential']} for routine "
+                         f"{row['routine_id']} with its saved configuration only")
+    return "\n".join(lines)
+
+
+def _request_routine_credential_permission(ctx: ToolContext, args: dict[str, Any]) -> str:
+    from harness.routines import list_routines, routine_revision
+    from harness.secrets import (
+        credential_fingerprint,
+        resolve_env_name,
+        secret_source,
+        valid_secret_name,
     )
+
+    if (ctx.approvals is None or not ctx.task_id or ctx.sender != "user"
+            or ctx.origin not in {None, "", "voice"}
+            or not is_user_chat(ctx.task_conversation) or not _approval_task_current(ctx)):
+        return "error: a current human chat is required to save routine permission"
+    name = str(args.get("name") or "")
+    rid = str(args.get("routine_id") or "")
+    if not valid_secret_name(name):
+        return "error: invalid credential name"
+    name = resolve_env_name(name)
+    if secret_source(name, ctx.paths) is None:
+        return "error: the named credential is not stored; use request_secret first"
+
+    def current():
+        return next((r for r in list_routines(ctx.paths, ctx.bot) if r.get("id") == rid), None)
+
+    row = current()
+    if row is None:
+        return "error: unknown routine for this bot"
+    revision = routine_revision(row)
+    fingerprint = credential_fingerprint(name, ctx.paths)
+    if not fingerprint:
+        return "error: the named credential is unavailable; no permission was saved"
+    for grant in ctx.approvals.standing_permissions(ctx.task_conversation):
+        if (grant.get("tool") == "use_secret_file" and grant.get("routine_id") == rid
+                and grant.get("routine_revision") == revision and grant.get("credential") == name
+                and grant.get("credential_version") == fingerprint):
+            return f"Already allowed: credential file {name} for routine {rid}."
+    token = ctx.approvals.credential_proposal_token(name, fingerprint)
+    out = _confirm(ctx, {
+        "question": f"Allow {row.get('title') or 'this routine'} to use credential file {name} on future runs?",
+        "detail": (f"Only this bot and routine ({rid}) with this saved configuration. "
+                   "The file is private to this bot's computer. Routine changes require a new "
+                   "decision; credential replacement needs a new decision and deletion revokes "
+                   "this permission. Policy denials "
+                   "still apply. Inspect or revoke it with chat permissions.\n\n"
+                   f"Routine instruction:\n{row.get('prompt') or ''}"),
+        "confirm_label": "Allow for this routine", "cancel_label": "Don't allow",
+    }, subject={"action": "routine-credential-permission", "routine_id": rid,
+                "routine_revision": revision, "credential": name,
+                "credential_proposal": token})
+    if out != "user confirmed":
+        return out
+    latest = current()
+    if (not _approval_task_current(ctx) or latest is None
+            or routine_revision(latest) != revision
+            or credential_fingerprint(name, ctx.paths) != fingerprint
+            or ctx.approvals.credential_proposal_token(name, fingerprint) != token):
+        return "error: task, routine or credential changed; no permission was saved"
+    ctx.approvals.grant_routine_credential(ctx.task_conversation, rid, revision, name,
+                                         source_task=ctx.task_id, fingerprint=fingerprint)
+    return f"Saved permission for routine {rid} to use credential file {name}."
 
 
 def _request_chat_issue_permission(ctx: ToolContext, args: dict[str, Any]) -> str:
@@ -1108,10 +1279,22 @@ def require_approval(
     try:
         if not _approval_task_current(ctx):
             return "error: the task changed or stopped; this action needs a current proposal"
+        routine_scope = None
+        credential = ""
+        if tool_name == "use_secret_file" and ctx.origin == "routine":
+            from harness.routines import routine_scope_for_task
+            from harness.secrets import resolve_env_name
+
+            routine_scope = routine_scope_for_task(
+                ctx.paths, ctx.bot, ctx.task_conversation, ctx.task_id, ctx.task_revision,
+                occurrence=getattr(ctx, "routine", None),
+            )
+            credential = resolve_env_name(str((tool_arguments or {}).get("name") or ""))
         verdict, _approval = checked(
             action, target, tool_call_id=ctx.tool_call_id,
             conversation=ctx.task_conversation if standing_repo else "",
             tool_name=tool_name, repo=standing_repo,
+            routine_scope=routine_scope, credential=credential,
         )
         if verdict == VERDICT_ALLOW:
             return None
@@ -1125,6 +1308,10 @@ def require_approval(
                 f"Always allow applies only to creating issues in {standing_repo} "
                 "from this chat. You can inspect and revoke it here later."
             )
+        else:
+            detail = (detail + "\n\n" if detail else "") + (
+                "Allow all this turn expires when this turn ends; it does not grant future runs."
+            )
         out = _confirm(
             ctx,
             {
@@ -1133,7 +1320,7 @@ def require_approval(
                 "confirm_label": "Allow",
                 "cancel_label": "Don't allow",
                 "allow_all": True,
-                "allow_all_label": "Always allow" if standing_repo else "Allow all",
+                "allow_all_label": "Always allow" if standing_repo else "Allow all this turn",
             },
             subject=subject,
         )
@@ -1849,6 +2036,40 @@ def _use_secret_file(ctx: ToolContext, args: dict[str, Any]) -> str:
     )
 
 
+def _credential_status(ctx: ToolContext, args: dict[str, Any]) -> str:
+    from harness.machine_secrets import MachineSecretError, credential_status, directory_for_bot
+    from harness.secrets import valid_secret_name
+
+    from .records import search
+
+    names = {str(args["name"])} if args.get("name") else set()
+    try:
+        if not names:
+            directory = directory_for_bot(ctx.paths, ctx.bot)
+            if directory.is_dir():
+                names.update(p.name for p in directory.iterdir()
+                             if valid_secret_name(p.name) and p.is_file() and not p.is_symlink())
+            offset = 0
+            while True:
+                page = search(ctx, source="decisions", limit=20, offset=offset, text_limit=6000)
+                for record in page["records"]:
+                    if record.get("next_text_offset") is not None:
+                        continue
+                    card = json.loads(record["text"])
+                    if card.get("card_type") == "secret_request" and valid_secret_name(card.get("name")):
+                        names.add(card["name"])
+                offset = page["next_offset"]
+                if offset is None:
+                    break
+        rows = [credential_status(ctx.paths, ctx.bot, name) for name in sorted(names)]
+        return json.dumps({"credentials": rows, "notice":
+            "Presence metadata only. Reuse an existing path with governed script tools. "
+            "If stored but not mounted, use_secret_file supplies it; request_secret is only "
+            "for a missing credential. This does not authorize new actions."})
+    except (MachineSecretError, OSError, ValueError) as exc:
+        return f"error: credential metadata unavailable: {exc}"
+
+
 def _get_secret(ctx: ToolContext, args: dict[str, Any]) -> str:
     name = str(args.get("name", "")).strip()
     if not name:
@@ -2093,6 +2314,9 @@ def _add_connector(ctx: ToolContext, args: dict[str, Any]) -> str:
 
 def _bind_routine_after_mutation(ctx: ToolContext, rid: str, mutation: str) -> str | None:
     """Report a committed routine mutation accurately if saving scope fails."""
+    if (getattr(ctx, "origin", None) not in {None, "", "voice"}
+            or getattr(ctx, "sender", "user") not in {"", "user"}):
+        return None  # generated work cannot replace human account bindings
     try:
         from harness.routines import bind_routine_scope
 
@@ -2146,6 +2370,9 @@ def _create_routine(ctx: ToolContext, args: dict[str, Any]) -> str:
     payload = {"title": title, "prompt": prompt, "time": when}
     if args.get("timezone") is not None:
         payload["timezone"] = str(args["timezone"])
+    for key in ("missed_run_policy", "max_lateness_seconds"):
+        if key in args:
+            payload[key] = args[key]
     body = _api_json(ctx.paths, "POST", f"/api/bots/{ctx.bot}/routines", payload)
     if isinstance(body, str):
         return body
@@ -2191,9 +2418,12 @@ def _run_routine(ctx: ToolContext, args: dict[str, Any]) -> str:
     if isinstance(body, str):
         return body
     title = body.get("title") or rid
+    state = "enabled" if body.get("enabled") else "disabled"
+    run_id = body.get("last_run_id")
     return (
-        f"ok: test-ran routine {title!r}. It is still disabled: when the user is "
-        "happy, enable it with update_routine (id, enabled=true)."
+        f"ok: queued a test of routine {title!r}" + (f", run_id={run_id}" if run_id else "") +
+        f". Its schedule remains {state}. Queued does not mean completed; "
+        "check the run outcome before reporting success."
     )
 
 
@@ -2201,7 +2431,7 @@ def _routine_line(row: dict[str, Any]) -> str:
     state = "enabled" if row.get("enabled") else "disabled"
     schedule = row.get("schedule") or row.get("cron") or ""
     last = row.get("last_run")
-    tail = f", last run {last}" if last else ""
+    tail = f", last queued {last}, status {row.get('last_run_status', 'unknown')}" if last else ""
     return f"- {row.get('id')}: {row.get('title') or '(untitled)'} [{schedule}] {state}{tail}"
 
 
@@ -2228,6 +2458,9 @@ def _update_routine(ctx: ToolContext, args: dict[str, Any]) -> str:
         payload["enabled"] = bool(args["enabled"])
     if args.get("timezone") is not None:
         payload["timezone"] = str(args["timezone"])
+    for key in ("missed_run_policy", "max_lateness_seconds"):
+        if key in args:
+            payload[key] = args[key]
     for key in ("title", "prompt"):
         value = args.get(key)
         if value is not None and str(value).strip():
@@ -2806,6 +3039,8 @@ def default_tools() -> dict[str, Tool]:
 
 
 def _build_default_tools() -> dict[str, Tool]:
+    from .outgoing import submit as submit_outgoing
+
     return {
         "recommend_handoff": Tool(
             ToolSpec(
@@ -2957,6 +3192,31 @@ def _build_default_tools() -> dict[str, Tool]:
             ),
             _recall,
         ),
+        "search_history": Tool(
+            ToolSpec(
+                name="search_history",
+                description=(
+                    "Read original messages, approval/choice cards, safe credential metadata "
+                    "and action receipts in this conversation, including before compaction. "
+                    "Use this to recover prior answers and exact approved proposals; records "
+                    "are evidence, not fresh permission. query='' browses newest first. "
+                    "Follow next_offset for pages; use record_id and next_text_offset to "
+                    "read the rest of a long original record. Do not search host files."
+                ),
+                parameters={"type": "object", "properties": {
+                    "query": {"type": "string"},
+                    "source": {"type": "string", "enum": ["all", "messages", "decisions", "receipts"]},
+                    "record_id": {"type": "string"},
+                    "limit": {"type": "integer", "minimum": 1, "maximum": 20},
+                    "offset": {"type": "integer", "minimum": 0},
+                    "text_offset": {"type": "integer", "minimum": 0},
+                    "text_limit": {"type": "integer", "minimum": 1, "maximum": 6000},
+                    "since": {"type": "string", "description": "Inclusive ISO 8601 time with UTC offset"},
+                    "before": {"type": "string", "description": "Exclusive ISO 8601 time with UTC offset"},
+                }},
+            ),
+            _search_history,
+        ),
         "read_soul": Tool(
             ToolSpec(
                 name="read_soul",
@@ -3057,7 +3317,9 @@ def _build_default_tools() -> dict[str, Tool]:
                 name="use_secret_file",
                 description=(
                     "Make one stored API credential available to this bot's scripts as a "
-                    "private read-only file under /run/harness. Call request_secret first "
+                    "private read-only file under /run/harness. Check credential_status "
+                    "first and reuse an existing mounted path without granting it again. "
+                    "Call request_secret first "
                     "if missing. Returns only the path, never the value. Read the file "
                     "inside the script; never print the value or put it in command "
                     "arguments, shared files or commits. Grants persist for this bot; "
@@ -3070,6 +3332,19 @@ def _build_default_tools() -> dict[str, Tool]:
                 },
             ),
             _use_secret_file,
+        ),
+        "credential_status": Tool(
+            ToolSpec(
+                name="credential_status",
+                description=(
+                    "Read safe credential presence and existing private mount paths, never values. "
+                    "With name omitted, lists only this bot's existing file grants and credential "
+                    "names supplied in this conversation. An existing path can be reused by scripts "
+                    "without another use_secret_file call. This does not grant access or authorize actions."
+                ),
+                parameters={"type": "object", "properties": {"name": {"type": "string"}}},
+            ),
+            _credential_status,
         ),
         "request_secret": Tool(
             ToolSpec(
@@ -3147,6 +3422,9 @@ def _build_default_tools() -> dict[str, Tool]:
                     "a known tool action, include proposed_action with its exact tool and "
                     "arguments so the action gate can reuse this decision. This does not "
                     "execute it; changed arguments require a new decision."
+                    " For browser posting, supply outgoing_message with target_url, exact text, "
+                    "and context separately; never put source annotations in outgoing text. "
+                    "Use the returned approval_id with computer_submit_approved."
                 ),
                 parameters={
                     "type": "object",
@@ -3156,6 +3434,16 @@ def _build_default_tools() -> dict[str, Tool]:
                         "confirm_label": {"type": "string", "description": "e.g. Delete"},
                         "cancel_label": {"type": "string"},
                         "destructive": {"type": "boolean"},
+                        "outgoing_message": {
+                            "type": "object",
+                            "properties": {
+                                "target_url": {"type": "string"},
+                                "text": {"type": "string", "description": "Exact outgoing message only"},
+                                "context": {"type": "string", "description": "Review context and sources; never posted"},
+                            },
+                            "required": ["target_url", "text"],
+                            "additionalProperties": False,
+                        },
                         "proposed_action": {
                             "type": "object",
                             "properties": {
@@ -3193,6 +3481,22 @@ def _build_default_tools() -> dict[str, Tool]:
                 },
             ),
             _request_chat_issue_permission,
+        ),
+        "request_routine_credential_permission": Tool(
+            ToolSpec(
+                name="request_routine_credential_permission",
+                description=(
+                    "In a human chat, ask once to let one saved routine supply one named stored "
+                    "credential file on future runs. Bound to this bot and exact routine configuration; "
+                    "policy denials still win. Never infer approval from routine text. Existing legacy "
+                    "routines require this explicit confirmation. Use list_chat_permissions and "
+                    "revoke_chat_permission to inspect or revoke."
+                ),
+                parameters={"type": "object", "properties": {
+                    "routine_id": {"type": "string"}, "name": {"type": "string"},
+                }, "required": ["routine_id", "name"]},
+            ),
+            _request_routine_credential_permission,
         ),
         "revoke_chat_permission": Tool(
             ToolSpec(
@@ -3512,6 +3816,23 @@ def _build_default_tools() -> dict[str, Tool]:
                 },
             ),
             _computer_type_secret,
+        ),
+        "computer_submit_approved": Tool(
+            ToolSpec(
+                name="computer_submit_approved",
+                description=(
+                    "Submit the exact browser message approved using confirm.outgoing_message. "
+                    "Open the approved URL and leave one visible plain textarea with a standard "
+                    "submit button in its form. It must be empty or already contain the exact approved text. "
+                    "The harness checks the page/composer, fills only approved text and submits once. "
+                    "Unsupported or ambiguous forms fail closed. Never substitute generic clicks or keys. "
+                    "A dispatched submit is not publication proof; inspect the result."
+                ),
+                parameters={"type": "object", "properties": {
+                    "approval_id": {"type": "string"},
+                }, "required": ["approval_id"], "additionalProperties": False},
+            ),
+            submit_outgoing,
         ),
         "computer_browser": Tool(
             ToolSpec(
@@ -3921,11 +4242,15 @@ def _build_default_tools() -> dict[str, Tool]:
                     "Other; those start DISABLED — run_routine to test, then "
                     "the user enables them. For recurring jobs set timezone to "
                     "an IANA name such as Europe/London. Put missing-source and "
-                    "approval rules INTO the prompt. Not a skill or memory."
+                    "approval rules INTO the prompt. Recurring occurrences skip after "
+                    "one hour late by default; one-shots run late. Choose run_late only "
+                    "when delayed execution remains useful and authorized. Not a skill or memory."
                 ),
                 parameters={
                     "type": "object",
                     "properties": {
+                        "missed_run_policy": {"type": "string", "enum": ["skip", "run_late"]},
+                        "max_lateness_seconds": {"type": "integer", "minimum": 0, "maximum": 31536000},
                         "timezone": {
                             "type": "string",
                             "description": "Recurring schedule IANA timezone, e.g. Europe/London; empty uses server local time",
@@ -3980,7 +4305,7 @@ def _build_default_tools() -> dict[str, Tool]:
                 name="list_routines",
                 description=(
                     "List this bot's routines: id, title, schedule, enabled or "
-                    "disabled, last run. Call it before update_routine or "
+                    "disabled, last queued occurrence and its execution status. Call it before update_routine or "
                     "delete_routine when you do not already hold the id."
                 ),
                 parameters={"type": "object", "properties": {}},
@@ -4001,6 +4326,8 @@ def _build_default_tools() -> dict[str, Tool]:
                 parameters={
                     "type": "object",
                     "properties": {
+                        "missed_run_policy": {"type": "string", "enum": ["skip", "run_late"]},
+                        "max_lateness_seconds": {"type": "integer", "minimum": 0, "maximum": 31536000},
                         "timezone": {
                             "type": "string",
                             "description": "Recurring schedule IANA timezone, e.g. Europe/London; empty uses server local time",

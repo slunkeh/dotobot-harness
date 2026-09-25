@@ -167,6 +167,16 @@ def has_secret(name: str, paths: HarnessPaths | None = None) -> bool:
     return get_secret(name, paths) is not None
 
 
+def credential_fingerprint(name: str, paths: HarnessPaths) -> str:
+    """Private consent version; never return this digest through a tool or API."""
+    import hashlib
+
+    value = get_secret(name, paths)
+    if not value:
+        return ""
+    return hashlib.sha256((resolve_env_name(name) + "\0" + value).encode()).hexdigest()
+
+
 def secret_source(name: str, paths: HarnessPaths | None = None) -> str | None:
     """Return where a secret comes from ('env' | 'file') without revealing it."""
     if not valid_secret_name(name):
@@ -203,6 +213,8 @@ def set_secret(name: str, value: str, paths: HarnessPaths) -> None:
     path = _cred_file(paths, env_name)
     if path is None:
         raise SecretNameError(f"invalid secret name {name!r}")
+    if get_secret(name, paths) != value.strip():
+        _revoke_routine_consents(name, paths)
     # Store-write is the registration point: from here on the
     # scrubber replaces the value (raw / URL-encoded / JSON-escaped) with
     # its sentinel in logs, streams, and error payloads.
@@ -213,6 +225,18 @@ def set_secret(name: str, value: str, paths: HarnessPaths) -> None:
     refresh_grants(paths, env_name)
 
 
+def _revoke_routine_consents(name: str, paths: HarnessPaths) -> None:
+    env_name = resolve_env_name(name)
+    from .approvals import ApprovalStore
+
+    for approval_file in paths.control.glob("approvals-*.json"):
+        bot = approval_file.stem.removeprefix("approvals-")
+        store = ApprovalStore(paths, bot)
+        store.revoke_credential(env_name)
+        if name != env_name:
+            store.revoke_credential(name)
+
+
 def delete_secret(name: str, paths: HarnessPaths) -> bool:
     """Remove a stored API-key file. Returns True if a file was removed.
 
@@ -221,6 +245,8 @@ def delete_secret(name: str, paths: HarnessPaths) -> bool:
     if not valid_secret_name(name):
         return False
     env_name = resolve_env_name(name)
+    # Remove consent first; a storage failure must not revive it on re-add.
+    _revoke_routine_consents(name, paths)
     removed = False
     for candidate in (name, env_name):
         path = _cred_file(paths, candidate)

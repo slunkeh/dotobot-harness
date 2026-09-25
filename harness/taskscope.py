@@ -93,6 +93,12 @@ def _followup_text(text: str) -> str:
     return _FOLLOWUP_PREFIX.sub("", instruction_text(text).strip())
 
 
+def is_new_subject(text: str) -> bool:
+    return instruction_text(text).strip().casefold().startswith(
+        ("new task:", "new topic:", "new subject:", "start over:")
+    )
+
+
 def is_continuation(text: str) -> bool:
     clean = _followup_text(text)
     return bool(
@@ -236,6 +242,7 @@ def begin_task(
     active_followup: bool = False,
     trusted_user: bool = True,
     inherited_scope: dict | None = None,
+    continuation_of: tuple[str, int] | None = None,
 ) -> dict[str, Any]:
     """Atomically begin/update a task, replaying the same input exactly once.
 
@@ -262,7 +269,12 @@ def begin_task(
         clean_instruction = scrub(instruction_text(text)) if trusted_user else ""
         continuation = trusted_user and is_continuation(text)
         short_continuation = trusted_user and bool(_CONTINUE.fullmatch(_followup_text(text)))
-        same = bool(previous and trusted_user and (active_followup or continuation))
+        assessed = bool(previous and continuation_of == (
+            previous.get("task_id"), int(previous.get("revision", 1))
+        ))
+        same = bool(previous and trusted_user and not is_new_subject(text)
+                    and previous.get("status") != "stopped"
+                    and (active_followup or continuation or assessed))
         all_records = Connectors(paths).list()
         records = [
             r
@@ -381,6 +393,11 @@ def begin_task(
             "source_id": source_id if trusted_user else None,
             "excluded_connector_ids": delta["excluded_ids"],
         }
+        if not trusted_user and inherited_scope:
+            # These fields originate in scheduler admission, never in prompt text.
+            for key in ("routine_id", "routine_revision"):
+                if inherited_scope.get(key):
+                    task[key] = str(inherited_scope[key])
         for entry in task["provenance"]:
             entry["matched_name"] = scrub(entry["matched_name"])
         data = json.dumps(task, ensure_ascii=False)

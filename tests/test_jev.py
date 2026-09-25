@@ -54,7 +54,7 @@ class Writer:
     def status(self, value):
         pass
 
-    def tool(self, *event):
+    def tool(self, *event, **kwargs):
         self.events.append(event)
 
 

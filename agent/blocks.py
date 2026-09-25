@@ -84,6 +84,7 @@ def validate_view(node: Any) -> str | None:
     Errors are worded for the model so it can correct the tree and retry.
     """
     names: set[str] = set()
+    answer_labels: dict[str, str] = {}
     count = 0
 
     def walk(n: Any, depth: int) -> str | None:
@@ -118,10 +119,19 @@ def validate_view(node: Any) -> str | None:
             if not isinstance(action, dict) or action.get("kind") not in _ACTION_KINDS:
                 kinds = " | ".join(_ACTION_KINDS)
                 return f"error: button action must be an object with kind: {kinds}"
-            if action.get("kind") == "action" and not str(action.get("id", "")).strip():
+            if action.get("kind") == "action" and (not isinstance(action.get("id"), str) or not action["id"].strip()):
                 return "error: action buttons need an 'id'"
-            if action.get("kind") == "open_url" and not str(action.get("url", "")).strip():
+            if action.get("kind") == "open_url" and (not isinstance(action.get("url"), str) or not action["url"].strip()):
                 return "error: open_url buttons need a 'url'"
+            allowed = {"submit": {"kind"}, "action": {"kind", "id"}, "open_url": {"kind", "url"}}
+            if set(action) - allowed[action["kind"]]:
+                return "error: unsupported button action fields; submit sends form inputs only. Use confirm for approval, or action with a unique id."
+            if action["kind"] != "open_url":
+                answer = "submit" if action["kind"] == "submit" else action["id"]
+                label = str(n["label"]).strip().casefold()
+                if answer in answer_labels and answer_labels[answer] != label:
+                    return "error: differently labelled buttons send the same answer. Use confirm for approval, or action buttons with distinct ids."
+                answer_labels[answer] = label
         for child in n.get("children") or []:
             err = walk(child, depth + 1)
             if err:

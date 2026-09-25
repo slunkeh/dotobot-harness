@@ -113,6 +113,30 @@ def grant(paths: HarnessPaths, bot: str, name: str) -> str:
     return f"{MOUNT}/{name}"
 
 
+def credential_status(paths: HarnessPaths, bot: str, name: str) -> dict:
+    """Presence/freshness metadata only; no grant and no value leaves this module."""
+    import hmac
+
+    from harness.machine_view import machine_for_bot
+    from harness.secrets import get_secret, resolve_env_name, valid_secret_name
+
+    if not valid_secret_name(name):
+        raise MachineSecretError("Invalid secret name")
+    name = resolve_env_name(name)
+    target = directory_for_bot(paths, bot) / name
+    value = get_secret(name, paths)
+    stored = value is not None
+    granted = target.is_file() and not target.is_symlink()
+    current = bool(stored and granted and hmac.compare_digest(
+        target.read_bytes(), value.encode()
+    ))
+    machine = machine_for_bot(paths, bot)
+    mounted = bool(granted and machine and mounted_for_bot(paths, bot, machine))
+    return {"name": name, "stored": stored, "granted_to_bot": granted,
+            "mounted": mounted, "current": current,
+            "path": f"{MOUNT}/{name}" if current and mounted else None}
+
+
 def refresh_grants(paths: HarnessPaths, name: str, *, remove: bool = False) -> None:
     """Rotate or revoke copies already granted; never grant to another bot."""
     from harness.redaction import resolve_outbound
@@ -139,15 +163,25 @@ def refresh_grants(paths: HarnessPaths, name: str, *, remove: bool = False) -> N
 
 
 def _register_grants(paths: HarnessPaths, bot: str) -> None:
-    from harness.redaction import register_secret
-    from harness.secrets import valid_secret_name
+    from harness.redaction import register_secret, resolve_outbound
+    from harness.secrets import _revoke_routine_consents, get_secret, valid_secret_name
 
     directory = directory_for_bot(paths, bot)
     if not directory.is_dir():
         return
-    for target in directory.iterdir():
-        if valid_secret_name(target.name) and target.is_file() and not target.is_symlink():
-            register_secret(target.read_text(encoding="utf-8"), target.name)
+    with _lock(paths):
+        for target in directory.iterdir():
+            if valid_secret_name(target.name) and target.is_file() and not target.is_symlink():
+                mounted = target.read_text(encoding="utf-8")
+                register_secret(mounted, target.name)
+                current = get_secret(target.name, paths)
+                if current is not None and current != mounted:
+                    # A changed process environment cannot notify set_secret.
+                    # Refresh only this bot's already-granted file, preserving
+                    # the same capability boundary as a store-key rotation.
+                    current = resolve_outbound(current, where="a rotated bot script credential file")
+                    _revoke_routine_consents(target.name, paths)
+                    stage(paths, bot, target.name, current)
 
 
 @contextlib.contextmanager

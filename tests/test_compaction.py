@@ -160,14 +160,14 @@ def test_durable_blocks_are_reappended_after_compaction(tmp_path):
     ]
     record = [r for r in memory._session_records() if r.get("is_summary")][-1]
     durable = record["durable"]  # stored beside the summary, not summarized into it
-    assert str(memory.sessions_dir) in durable  # transcript pointer
+    assert "search_history" in durable  # accessible host-owned retrieval
     assert str(soul_path(paths, "atlas")) in durable  # soul reference
     assert "deploy-runbook" in durable  # attached skill names
     assert "Which env?" in durable  # open blocking prompt
     # and the rebuilt head turn carries them
     rebuilt, _ = build_history(memory, peer="user", provider=Provider(model="m"))
     assert "deploy-runbook" in rebuilt[0].content
-    assert str(memory.sessions_dir) in rebuilt[0].content
+    assert "search_history" in rebuilt[0].content
 
 
 def test_provider_failure_falls_back_to_truncated_transcript(tmp_path):
@@ -314,7 +314,7 @@ def test_recompaction_chains_instead_of_resummarizing(tmp_path):
     assert head.index("SUM1") < head.index("SUM2")
     assert "(covers" in head
     # durable blocks render once, not once per chain record
-    assert head.count(str(memory.sessions_dir)) == 1
+    assert head.count("Use search_history") == 1
 
 
 def test_epoch_fold_replaces_the_oldest_summaries(tmp_path, monkeypatch):

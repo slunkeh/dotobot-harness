@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import http.client
 import json
 import math
@@ -148,14 +149,19 @@ def select_context(paths, query, items, *, writer=None):
             },
         }
         for i in range(len(items))
+        if items[i].get("protected_context") is not True
     }
     state = {
         "request": query,
         "candidates": [
-            {"text": x.get("text", ""), "source": x.get("source", ""), "role": x.get("role", "")}
+            {"protected_context": True}
+            if x.get("protected_context") is True
+            else {"text": x.get("text", ""), "source": x.get("source", ""), "role": x.get("role", "")}
             for x in items
         ],
     }
+    if not questions:
+        return items
     # Do not announce a provider call when the payload would be rejected locally.
     if (
         len(json.dumps({"model": MODEL, "state": state, "questions": questions}).encode())
@@ -169,6 +175,9 @@ def select_context(paths, query, items, *, writer=None):
         answers = _request(key, state, questions)
         kept = []
         for i, item in enumerate(items):
+            if item.get("protected_context") is True:
+                kept.append(item)
+                continue
             answer = answers.get(str(i))
             if not isinstance(answer, dict):
                 raise JevError("Invalid selection")
@@ -186,6 +195,23 @@ def select_context(paths, query, items, *, writer=None):
         if writer:
             writer.tool("jev_context", "error", "Jev unavailable — using standard memory")
         return items
+    fallback = ""
+    if not kept:
+        # Selection optimizes recall; it must not erase the whole baseline.
+        kept = items
+        fallback = "all_omitted"
     if writer:
-        writer.tool("jev_context", "done", "Selected context with Jev")
+        identifiers = [
+            hashlib.sha256(json.dumps(item, sort_keys=True).encode()).hexdigest()[:16]
+            for item in items
+        ]
+        selected = {id(item) for item in kept}
+        writer.tool(
+            "jev_context", "done", "Selected context with Jev",
+            detail=json.dumps({
+                "kept": [key for key, item in zip(identifiers, items, strict=True) if id(item) in selected],
+                "omitted": [key for key, item in zip(identifiers, items, strict=True) if id(item) not in selected],
+                "fallback": fallback,
+            }),
+        )
     return kept

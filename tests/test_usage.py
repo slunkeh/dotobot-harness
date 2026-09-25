@@ -248,7 +248,29 @@ def test_turn_appends_one_ledger_record_by_default(tmp_path):
     assert records[0]["provider"] == "echo"
     assert records[0]["model"] == "echo-1"
     assert records[0]["requests"] == 1
-    assert rollup(paths)["providers"]["echo"]["requests"] == 2
+    assert records[1]["requests"] == 2  # relation check plus the follow-up response
+    assert rollup(paths)["providers"]["echo"]["requests"] == 3
+
+
+@pytest.mark.parametrize("relation", ['{"relation":"same_task"}', '{"relation":"new_task"}', "invalid"])
+def test_continuity_usage_accumulates_in_the_followup_turn(tmp_path, relation):
+    class FollowupProvider(Provider):
+        id = "fake"
+
+        def complete(self, messages, *, system=None, **kwargs):
+            if (system or "").startswith("Classify whether"):
+                return Completion(text=relation, usage={"input_tokens": 11, "output_tokens": 1})
+            return Completion(text="The brief is ready.", usage={"input_tokens": 20, "output_tokens": 2})
+
+    seen = []
+    agent, _ = _agent(tmp_path, FollowupProvider(model="fake-1"),
+                      on_usage=lambda *args: seen.append(args))
+    agent._produce("user", "Find the brief")
+    agent._produce("user", "What did you find?")
+    assert len(seen) == 2
+    assert seen[1] == ("fake", "fake-1", 2, {
+        "input_tokens": 31, "output_tokens": 3, "cache_read_tokens": 0, "cache_write_tokens": 0,
+    })
 
 
 def test_usage_callback_failure_never_fails_the_turn(tmp_path):
