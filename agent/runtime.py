@@ -2379,11 +2379,13 @@ class Agent:
             return completion.text
 
         ctx.browser_text = browser_text
+        completion_repair_started = False
 
         def repair_completion(instruction):
-            nonlocal turn_requests
+            nonlocal turn_requests, completion_repair_started
             if self._preempted(turn_id) or not repair_budget.spend():
                 return ""
+            completion_repair_started = True
             turn_requests += 1
             try:
                 revised = self.active_provider.complete(
@@ -2908,12 +2910,13 @@ class Agent:
                     final_text = cap
             from harness.jev_features import check_completion
 
-            if final_text and not self._turn_interrupted() and stuck_reason is None:
+            if (final_text and not self._turn_interrupted() and stuck_reason is None
+                    and not self._preempted(turn_id)):
                 final_text = check_completion(
                     self.paths, final_text, jev_evidence, writer=writer,
                     evidence_complete=completion_evidence_complete, repair=repair_completion,
                 )
-                if self._preempted(turn_id):
+                if completion_repair_started and self._preempted(turn_id):
                     self._mark_interrupted()
                     final_text = self._interrupt_text()
             crashed = False
