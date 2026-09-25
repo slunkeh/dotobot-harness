@@ -83,6 +83,62 @@ def test_occurrence_reports_enqueue_separately_from_completion(tmp_path):
     assert row["id"] == job["id"]
 
 
+def test_resumed_old_occurrence_restores_legacy_history_fields(tmp_path):
+    paths = setup(tmp_path)
+    job = routines.add_routine(paths, "atlas", title="Digest", prompt="Read notes",
+                               when="8am", enabled=True, timezone="Etc/UTC")
+    now = datetime.now(UTC).replace(hour=8, minute=0, second=0, microsecond=0)
+    routines.fire_due(paths, ["atlas"], now=now)
+    occurrence = messaging.pending(paths, "atlas")[0].routine
+    rows = routines.list_routines(paths, "atlas")
+    rows[0]["history"] = [{"ts": "2030-01-01 08:00", "kind": "schedule",
+                            "run_id": f"later-{i}"} for i in range(20)]
+    routines._save(paths, "atlas", rows)
+    routines.record_run_state(paths, "atlas", occurrence, "completed")
+    row = routines.public(routines.list_routines(paths, "atlas")[0])
+    restored = next(item for item in row["history"] if item.get("run_id") == occurrence["run_id"])
+    assert row["id"] == job["id"]
+    assert restored["ts"] == now.strftime("%Y-%m-%d %H:%M")
+    assert restored["kind"] == "schedule"
+
+
+def test_admitted_one_shot_keeps_exact_credential_consent_after_auto_disable(tmp_path, monkeypatch):
+    from agent import govern, policy
+    from harness.approvals import ApprovalStore
+    from harness.secrets import credential_fingerprint, set_secret
+
+    paths = setup(tmp_path)
+    monkeypatch.delenv("SERVICE_KEY", raising=False)
+    set_secret("SERVICE_KEY", "fictional-service-value", paths)
+    now = datetime.now(UTC)
+    row = routines.add_routine(paths, "atlas", title="One report", prompt="Read inventory",
+                               once_at=now.timestamp() - 1, enabled=True)
+    original = routines.list_routines(paths, "atlas")[0]
+    approvals = ApprovalStore(paths, "atlas")
+    approvals.grant_routine_credential(
+        "peer:user", row["id"], routines.routine_revision(original), "SERVICE_KEY",
+        source_task="confirmed-human-task", fingerprint=credential_fingerprint("SERVICE_KEY", paths),
+    )
+    routines.fire_due(paths, ["atlas"], now=now)
+    assert routines.list_routines(paths, "atlas")[0]["enabled"] is False
+    msg = messaging.pending(paths, "atlas")[0]
+    scope = taskscope.scope_for_input(paths, "atlas", msg.id)
+    ctx = tools.ToolContext(paths, "atlas", Memory(paths, "atlas"), approvals=approvals,
+                            origin="routine", routine=msg.routine,
+                            task_conversation=scope["conversation"], task_id=scope["task_id"],
+                            task_revision=scope["revision"])
+    monkeypatch.setattr(tools, "_confirm", lambda *args, **kwargs: pytest.fail("repeated one-shot ask"))
+    assert govern.govern(ctx, "use_secret_file", {"name": "SERVICE_KEY"}, paths=paths,
+                         bot="atlas", policy=policy.parse({"ask": [{"intent": "type_secret"}]}),
+                         approver=tools.require_approval) is None
+
+    ctx.routine = {**msg.routine, "run_id": "unrelated-occurrence"}
+    monkeypatch.setattr(tools, "_confirm", lambda *args, **kwargs: "user cancelled")
+    assert govern.govern(ctx, "use_secret_file", {"name": "SERVICE_KEY"}, paths=paths,
+                         bot="atlas", policy=policy.parse({"ask": [{"intent": "type_secret"}]}),
+                         approver=tools.require_approval).startswith("error:")
+
+
 def test_expired_recurring_occurrence_never_calls_model(tmp_path):
     paths = setup(tmp_path)
     routines.add_routine(

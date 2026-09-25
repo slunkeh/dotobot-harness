@@ -642,7 +642,8 @@ def bind_routine_scope(
 
 
 def routine_scope_for_task(paths: HarnessPaths, bot: str, conversation: str,
-                           task_id: str, revision: int) -> tuple[str, str] | None:
+                           task_id: str, revision: int, *, occurrence: dict | None = None
+                           ) -> tuple[str, str] | None:
     """Verify scheduler-owned identity against the current task and routine."""
     from .taskscope import read_task
 
@@ -655,8 +656,16 @@ def routine_scope_for_task(paths: HarnessPaths, bot: str, conversation: str,
     if not rid or not version:
         return None  # legacy prompt prose never migrates authority
     row = next((r for r in list_routines(paths, bot) if r.get("id") == rid), None)
-    if row and row.get("enabled") and routine_revision(row) == version:
-        return str(rid), str(version)
+    if row and routine_revision(row) == version:
+        admitted_once = bool(
+            occurrence and occurrence.get("kind") == "once" and row.get("once_fired")
+            and occurrence.get("id") == rid and occurrence.get("revision") == version
+            and occurrence.get("scheduled_at") == _once_at(row)
+            and conversation == f"routine:{rid}:{occurrence.get('run_id')}"
+            and not occurrence_stop_reason(paths, bot, occurrence)
+        )
+        if row.get("enabled") or admitted_once:
+            return str(rid), str(version)
     return None
 
 

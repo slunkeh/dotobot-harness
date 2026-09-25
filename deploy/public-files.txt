@@ -372,3 +372,4 @@ tests/test_jev_evidence.py
 agent/outgoing.py
 tests/test_card_contracts.py
 tests/test_routine_continuations.py
+tests/test_routine_prompt_waits.py

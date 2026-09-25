@@ -1285,7 +1285,8 @@ def require_approval(
             from harness.secrets import resolve_env_name
 
             routine_scope = routine_scope_for_task(
-                ctx.paths, ctx.bot, ctx.task_conversation, ctx.task_id, ctx.task_revision
+                ctx.paths, ctx.bot, ctx.task_conversation, ctx.task_id, ctx.task_revision,
+                occurrence=getattr(ctx, "routine", None),
             )
             credential = resolve_env_name(str((tool_arguments or {}).get("name") or ""))
         verdict, _approval = checked(
