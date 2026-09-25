@@ -376,6 +376,100 @@ def test_expiry_rechecked_after_model_before_mutation(tmp_path, monkeypatch):
     assert routines.list_routines(paths, "atlas")[0]["last_run_status"] == "expired"
 
 
+@pytest.mark.parametrize("change", [None, "expire", "configure"])
+def test_outgoing_revalidates_after_browser_preparation_without_claiming_twice(
+    tmp_path, monkeypatch, change
+):
+    from agent.computer import GatedComputer
+    from harness.delivery import Ledger
+
+    paths = setup(tmp_path)
+    job = routines.add_routine(
+        paths,
+        "atlas",
+        title="Review message",
+        prompt="Review the message before posting",
+        when="8am",
+    )
+    routines.run_now(paths, "atlas", job["id"])
+    agent = build_agent(paths, Bot(name="atlas", provider="echo"), stream_delay=0)
+    agent.provider = Replies(
+        Completion(
+            tool_calls=[
+                ToolCall(
+                    id="review",
+                    name="confirm",
+                    arguments={
+                        "question": "Review?",
+                        "outgoing_message": {
+                            "target_url": "https://forum.example.test/topic/42",
+                            "text": "Please share the dimensions.",
+                        },
+                    },
+                )
+            ]
+        )
+    )
+    assert agent.process_inbox_once()
+    prompt = list_prompts(paths, "atlas")[0]
+    write_answer(paths, prompt["id"], "confirm")
+    sends, claims = [], []
+    start = Ledger.start_action
+
+    def claim(self, *args, **kwargs):
+        claims.append(args)
+        return start(self, *args, **kwargs)
+
+    monkeypatch.setattr(Ledger, "start_action", claim)
+
+    class Browser:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            pass
+
+        def prepare_outgoing(self, url, text):
+            if change == "expire":
+                monkeypatch.setattr(routines, "occurrence_expired", lambda *a, **kw: True)
+            elif change == "configure":
+                routines.update_routine(
+                    paths, "atlas", job["id"], prompt="Use the revised instruction"
+                )
+            return "ready"
+
+        def submit_outgoing(self, url, text):
+            sends.append((url, text))
+            return "ok"
+
+    monkeypatch.setattr(GatedComputer, "browser_session", lambda self: Browser())
+    restarted = build_agent(paths, Bot(name="atlas", provider="echo"), stream_delay=0)
+    restarted.provider = Replies(
+        Completion(
+            tool_calls=[
+                ToolCall(
+                    id="submit",
+                    name="computer_submit_approved",
+                    arguments={"approval_id": prompt["id"]},
+                )
+            ]
+        ),
+        Completion(text="I inspected the submitted result."),
+    )
+    assert restarted.process_inbox_once()
+    assert len(claims) == 1
+    row = get_prompt(paths, prompt["id"])
+    if change:
+        assert sends == []
+        assert not row.get("execution_started")
+        assert routines.list_routines(paths, "atlas")[0]["last_run_status"] == (
+            "expired" if change == "expire" else "cancelled"
+        )
+    else:
+        assert sends == [("https://forum.example.test/topic/42", "Please share the dimensions.")]
+        assert row["execution_started"]
+
+
 def test_routine_secret_prompt_resumes_with_availability_only(tmp_path):
     from agent.streaming import resolve_secret_prompts
     from harness.secrets import set_secret

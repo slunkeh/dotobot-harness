@@ -213,6 +213,8 @@ class ToolContext:
     browser_authorize: Callable[[str, dict], str | None] | None = None
     browser_check: Callable[[], str | None] | None = None
     browser_text: Callable[[str], str] | None = None
+    #: Re-enter authorization after observing a composer, without claiming delivery twice.
+    outgoing_revalidate: Callable[[], str | None] | None = None
 
 
 def _from_colleague(ctx: ToolContext) -> bool:

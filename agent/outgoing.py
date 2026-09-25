@@ -43,6 +43,9 @@ def submit(ctx, args):
     admitted = getattr(ctx, "outgoing_approval", None)
     if not admitted or admitted.get("id") != args.get("approval_id"):
         return "error: this submit has no current governed approval"
+    revalidate = getattr(ctx, "outgoing_revalidate", None)
+    if not callable(revalidate):
+        return "error: outgoing dispatch revalidation is unavailable; nothing was posted"
     session = getattr(ctx.computer, "browser_session", None)
     if not callable(session):
         return "error: verified browser submission is unavailable; nothing was posted"
@@ -52,6 +55,8 @@ def submit(ctx, args):
         with session() as browser:
             if browser.prepare_outgoing(message["target_url"], message["text"]) != "ready":
                 return "error: target or composer is different, unsupported, or ambiguous; nothing was posted"
+            if refusal := revalidate():
+                return refusal
             if not store_for(ctx.paths).claim_prompt_execution(
                 admitted["id"], bot=ctx.bot, task_id=ctx.task_id, revision=ctx.task_revision
             ):

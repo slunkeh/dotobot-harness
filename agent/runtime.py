@@ -2650,17 +2650,10 @@ class Agent:
                         claimed = False
                         action_digest = delivery.args_digest(call.name, args)
 
-                        def claim_action(
-                            row=row,
-                            ledger=ledger,
-                            send_key=send_key,
-                            s_digest=s_digest,
-                            legacy_refusal=legacy_refusal,
-                            tool_name=call.name,
-                            intent=s_intent,
-                            action_digest=action_digest,
-                        ):
-                            nonlocal claimed, routine_state
+                        def validate_current_action(tool_name=call.name, intent=s_intent):
+                            nonlocal routine_state
+                            if self._interrupt_requested():
+                                return "error: action interrupted before dispatch"
                             if routine:
                                 from harness.routines import occurrence_stop_reason
 
@@ -2695,12 +2688,26 @@ class Agent:
                                 bindings=connector_bindings,
                             ):
                                 return "error: this connector account was disabled or changed; select its current account before using it"
+                            if origin == messaging.ORIGIN_RECOVERY and not recovery_can_act and intent in govern.TASK_HELD_INTENTS:
+                                return "error: this is a missed-reply notification, not permission to restart work. Report only the saved task state."
+                            return None
+
+                        def claim_action(
+                            row=row,
+                            ledger=ledger,
+                            send_key=send_key,
+                            s_digest=s_digest,
+                            legacy_refusal=legacy_refusal,
+                            intent=s_intent,
+                            action_digest=action_digest,
+                        ):
+                            nonlocal claimed
+                            if refusal := validate_current_action():
+                                return refusal
                             if ctx.task_id and intent in govern.RECOVERY_HELD_INTENTS:
                                 if ledger.unresolved_actions(self.bot.name, ctx.task_id):
                                     ctx.delivery_uncertain = True
                                     return "error: this task has an action with an unknown outcome; verify it before further actions"
-                            if origin == messaging.ORIGIN_RECOVERY and not recovery_can_act and intent in govern.TASK_HELD_INTENTS:
-                                return "error: this is a missed-reply notification, not permission to restart work. Report only the saved task state."
                             if routine and intent in govern.RECOVERY_HELD_INTENTS:
                                 if action_digest in routine_prior_receipts:
                                     return "error: this action already ran before the scheduled pause; it was not repeated. Observe current state to verify its outcome. "
@@ -2755,6 +2762,17 @@ class Agent:
                                     policy=self._policy, approver=require_approval,
                                     delivery_guard=browser_check,
                                 )
+                                # Observation may outlive routine expiry or a task edit.
+                                # Recheck the same authorization without touching this
+                                # action's already-claimed delivery row a second time.
+                                ctx.outgoing_revalidate = (
+                                    lambda name=call.name, params=args, validate=validate_current_action: govern.govern(
+                                        ctx, name, params, paths=self.paths, bot=self.bot.name,
+                                        policy=self._policy, approver=require_approval,
+                                        connector_tools=service_tools,
+                                        delivery_guard=validate,
+                                    )
+                                ) if call.name == "computer_submit_approved" else None
 
                                 try:
                                     with script_secret_scope(self.paths, self.bot.name):

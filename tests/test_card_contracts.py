@@ -69,6 +69,13 @@ def context(tmp_path):
                 1,
             ),
         )
+    ctx.outgoing_revalidate = lambda: govern.govern(
+        ctx,
+        "computer_submit_approved",
+        {"approval_id": ctx.outgoing_approval["id"]},
+        paths=paths,
+        bot=ctx.bot,
+    )
     return ctx
 
 
@@ -217,6 +224,20 @@ def test_approval_execution_has_one_winner_across_workers(context, monkeypatch):
 
     with ThreadPoolExecutor(2) as pool:
         assert sum(pool.map(claim, range(2))) == 1
+
+
+def test_outgoing_without_host_revalidation_fails_closed(context, monkeypatch):
+    row, _ = approval(context, monkeypatch)
+    args = {"approval_id": row["id"]}
+    assert (
+        govern.govern(
+            context, "computer_submit_approved", args, paths=context.paths, bot=context.bot
+        )
+        is None
+    )
+    context.outgoing_revalidate = None
+    assert "revalidation is unavailable" in submit(context, args)
+    assert not get_prompt(context.paths, row["id"]).get("execution_started")
 
 
 def test_execution_claim_rechecks_answer_state_atomically(context, monkeypatch):
