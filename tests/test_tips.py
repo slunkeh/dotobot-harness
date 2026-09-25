@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import json
+import stat
 from pathlib import Path
+
+import pytest
 
 from agent.skills import Skill, ensure_default_skills
 from agent.tips import TABLE_COLUMNS, TIPS, tips_skill_md, tips_table_args
@@ -137,6 +140,129 @@ def test_seeding_never_clobbers_edits(tmp_path):
     md.write_text("my version", encoding="utf-8")
     ensure_default_skills(paths)
     assert md.read_text(encoding="utf-8") == "my version"
+
+
+_OLD_CITATION_SEED = b"""\
+---
+name: cite-sources
+description: Always cite sources when stating a fact
+when_to_use: user asks for a fact or /cite-sources
+---
+1. Find a source for each claim.
+2. Quote or link the source in the reply.
+3. If you cannot cite, say so.
+"""
+
+
+def test_untouched_citation_seed_upgrades_without_resetting_user_state(tmp_path):
+    from agent.skills import load_skills
+    from harness.workflows import set_enabled
+
+    paths = HarnessPaths.resolve(tmp_path / "home")
+    shared = paths.skills / "cite-sources" / "SKILL.md"
+    shared.parent.mkdir(parents=True)
+    shared.write_bytes(_OLD_CITATION_SEED)
+    helper = shared.with_name("notes.txt")
+    helper.write_text("Keep this helper.")
+    private = paths.bot_memory("atlas") / "skills" / "cite-sources" / "SKILL.md"
+    private.parent.mkdir(parents=True)
+    private.write_bytes(_OLD_CITATION_SEED)
+    set_enabled(paths, "atlas", "cite-sources", False)
+    enablement = paths.bot_memory("atlas") / "disabled-workflows.json"
+    saved_enablement = enablement.read_bytes()
+
+    ensure_default_skills(paths)
+
+    assert shared.read_bytes() != _OLD_CITATION_SEED
+    assert "review context" in Skill.from_file(shared, "shared").body
+    assert private.read_bytes() == _OLD_CITATION_SEED
+    assert helper.read_text() == "Keep this helper."
+    assert enablement.read_bytes() == saved_enablement
+    assert not any(s.skill_id == "cite-sources" for s in load_skills(paths, "atlas", enabled_only=True))
+    updated = shared.stat().st_mtime_ns
+    ensure_default_skills(paths)
+    assert shared.stat().st_mtime_ns == updated
+
+
+def test_fresh_citation_seed_distinguishes_review_and_approved_outgoing_text(tmp_path):
+    paths = HarnessPaths.resolve(tmp_path / "home")
+    ensure_default_skills(paths)
+    skill = Skill.from_file(paths.skills / "cite-sources" / "SKILL.md", "shared")
+    assert "Always cite" not in skill.description
+    assert "review context" in skill.body
+    assert "exact approved outgoing text unchanged" in skill.body
+    assert "explicitly requests citations in the outgoing message" in skill.body
+    assert "revised proposal and new approval" in skill.body
+
+
+@pytest.mark.parametrize("mode", [0o640, 0o644])
+def test_citation_upgrade_preserves_shared_file_mode(tmp_path, mode):
+    paths = HarnessPaths.resolve(tmp_path / "home")
+    shared = paths.skills / "cite-sources" / "SKILL.md"
+    shared.parent.mkdir(parents=True)
+    shared.write_bytes(_OLD_CITATION_SEED)
+    shared.chmod(mode)
+
+    ensure_default_skills(paths)
+
+    assert shared.read_bytes() != _OLD_CITATION_SEED
+    assert stat.S_IMODE(shared.stat().st_mode) == mode
+
+
+def test_fresh_default_skills_keep_normal_creation_mode(tmp_path):
+    paths = HarnessPaths.resolve(tmp_path / "home")
+    normal = tmp_path / "normal.md"
+    normal.write_text("Normal creation permissions.")
+    mode = stat.S_IMODE(normal.stat().st_mode)
+
+    ensure_default_skills(paths)
+
+    for skill in paths.skills.glob("*/SKILL.md"):
+        assert stat.S_IMODE(skill.stat().st_mode) == mode
+
+
+@pytest.mark.parametrize("content", [
+    _OLD_CITATION_SEED + b"\nCustom note.\n",
+    _OLD_CITATION_SEED.replace(b"each claim", b"important claims"),
+    _OLD_CITATION_SEED.replace(b"\n", b"\r\n"),
+])
+def test_citation_seed_migration_preserves_edited_bytes(tmp_path, content):
+    paths = HarnessPaths.resolve(tmp_path / "home")
+    shared = paths.skills / "cite-sources" / "SKILL.md"
+    shared.parent.mkdir(parents=True)
+    shared.write_bytes(content)
+    ensure_default_skills(paths)
+    assert shared.read_bytes() == content
+
+
+@pytest.mark.parametrize("kind", ["root", "directory", "file", "dangling-file"])
+def test_citation_seeding_never_writes_through_symlinks(tmp_path, kind):
+    paths = HarnessPaths.resolve(tmp_path / "home")
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    target = outside / "SKILL.md"
+    if kind != "dangling-file":
+        target.write_bytes(_OLD_CITATION_SEED)
+    if kind == "root":
+        paths.home.mkdir()
+        target.parent.joinpath("cite-sources").mkdir()
+        target.rename(outside / "cite-sources" / "SKILL.md")
+        target = outside / "cite-sources" / "SKILL.md"
+        paths.skills.symlink_to(outside, target_is_directory=True)
+    elif kind == "directory":
+        paths.skills.mkdir(parents=True)
+        (paths.skills / "cite-sources").symlink_to(outside, target_is_directory=True)
+    else:
+        skill_dir = paths.skills / "cite-sources"
+        skill_dir.mkdir(parents=True)
+        (skill_dir / "SKILL.md").symlink_to(target)
+    before = {str(p.relative_to(outside)): p.read_bytes() for p in outside.rglob("*") if p.is_file()}
+
+    ensure_default_skills(paths)
+
+    assert {str(p.relative_to(outside)): p.read_bytes() for p in outside.rglob("*") if p.is_file()} == before
+    if kind == "dangling-file":
+        assert not target.exists()
 
 
 # -- roster.json backfill --------------------------------------------------

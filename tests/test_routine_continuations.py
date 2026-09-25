@@ -258,6 +258,41 @@ def test_later_occurrence_does_not_invalidate_waiting_earlier_decision(tmp_path)
     assert messaging.continuation_scope(paths, "atlas", answers[0].resume)
 
 
+def test_approved_routine_reply_does_not_acquire_a_citation_instruction(tmp_path):
+    paths = setup(tmp_path)
+    job = routines.add_routine(
+        paths, "atlas", title="Forum reply review",
+        prompt="Review one reply for the user. Keep research sources in the review context.",
+        when="8am",
+    )
+    routines.run_now(paths, "atlas", job["id"])
+    agent = build_agent(paths, Bot(name="atlas", provider="echo"), stream_delay=0)
+    agent.provider = Replies(Completion(tool_calls=[ToolCall(
+        id="review", name="confirm", arguments={
+            "question": "Post?",
+            "outgoing_message": {
+                "target_url": "https://forum.example.test/topic/42",
+                "text": "Which size worked for you?",
+                "context": "Thread: https://forum.example.test/topic/42",
+            },
+        },
+    )], finish_reason="tool_use"))
+    assert agent.process_inbox_once()
+    prompt = list_prompts(paths, "atlas")[0]
+    write_answer(paths, prompt["id"], "confirm")
+
+    restarted = build_agent(paths, Bot(name="atlas", provider="echo"), stream_delay=0)
+    restarted.provider = Replies(Completion(text="The exact reply remains approved."))
+    assert restarted.process_inbox_once()
+    messages, _ = restarted.provider.seen[0]
+    resumed_input = next(m.content for m in reversed(messages) if m.role == "user")
+    assert "Which size worked for you?" in resumed_input
+    assert '"responded_value": "confirm"' in resumed_input
+    assert "Use your skill 'cite-sources'" not in resumed_input
+    assert get_prompt(paths, prompt["id"])["answer_consumed"]
+    assert len(list_prompts(paths, "atlas")) == 0
+
+
 def test_late_approval_for_expired_occurrence_does_not_run(tmp_path, monkeypatch):
     paths = setup(tmp_path)
     job = routines.add_routine(

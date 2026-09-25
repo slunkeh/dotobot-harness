@@ -59,6 +59,40 @@ _STOPWORDS = frozenset(
 
 _WORD = re.compile(r"[a-z0-9_]+")
 
+# Citation instructions change the answer, so require an actual request rather
+# than the seeded skill's broad metadata words ("user", "fact", "sources").
+_CITE_REQUEST = re.compile(
+    r"^(?:(?:please|also|always)\s+)*"
+    r"(?:(?:(?:can|could|would|will)\s+you|"
+    r"i\s+(?:want|need|would\s+like)(?:\s+you)?\s+to)\s+)?(?:please\s+)?"
+    r"(?:"
+    r"(?:(?:use|run|load|apply|follow)\s+(?:the\s+)?)?/cite[-_]sources\b"
+    r"|(?:use|run|load|apply|follow)\s+(?:the\s+)?cite[-_]sources\b"
+    r"|cite[-_]sources(?=$|\s+(?:please|for|on|to|with)\b)"
+    r"|(?:cite|reference)\s+(?:(?:your|the|these|those|relevant|reliable|primary)\s+)*"
+    r"(?:sources?|references?|evidence)\b"
+    r"|(?:include|add|provide|give\s+me|show\s+me|i\s+(?:want|need))\s+"
+    r"(?:(?:some|your|the)\s+)?(?:citations?|references?|source\s+links?|sources?)\b"
+    r")"
+)
+
+
+def _citation_requested(text: str) -> bool:
+    from harness.connectors import instruction_text
+
+    clean = instruction_text(text).lower().replace("’", "'")
+    for sentence in re.split(r"[.!?;\n]|\bbut\b", clean):
+        indirect = False
+        for clause in re.split(r"\band\b", sentence):
+            if not indirect and _CITE_REQUEST.match(clause.strip(" \t-*`")):
+                return True
+            # Carry a negative or reported instruction across "and" ("do not
+            # browse and cite sources"), but let a new sentence stand alone.
+            indirect |= bool(re.search(
+                r"\b(?:not|never|without|avoid|stop|no|don't|whether|said|says)\b", clause
+            ))
+    return False
+
 
 @dataclass(frozen=True)
 class Selection:
@@ -144,6 +178,9 @@ def _matches(skill: Any, text: str, turn_words: set[str]) -> bool:
         from agent.tips import ASK_RE
 
         return bool(ASK_RE.search(text or ""))
+    if any(str(getattr(skill, attr, "") or "").lower().replace("_", "-") == "cite-sources"
+           for attr in ("name", "skill_id")):
+        return _citation_requested(text)
     if _name_mentioned(skill, text):
         return True
     if _name_only_skill(skill):

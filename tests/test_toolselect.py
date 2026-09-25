@@ -9,6 +9,8 @@ this fails OPEN, and most of what is below pins that down.
 
 from __future__ import annotations
 
+import pytest
+
 import agent.toolselect as ts
 
 
@@ -167,6 +169,63 @@ def test_an_empty_message_offers_everything():
 
 
 # -- the matcher -----------------------------------------------------------
+
+
+@pytest.mark.parametrize("text", [
+    "Send the exact reply approved by the user.",
+    "Check the sources before preparing the review card.",
+    "Find a suitable discussion and ask the user to approve a reply.",
+    "Do not cite sources in the approved reply.",
+    "Please don't include citations.",
+    "Do not browse and cite sources.",
+    "No citations are needed.",
+    "Do not use cite-sources.",
+    "Review whether we should cite sources.",
+    "Review this instruction: cite sources for every claim.",
+    "Explain why cite-sources activated in the previous reply.",
+    "The report says to cite sources. Review that wording only.",
+    "cite-sources blocked the approved reply; review that behavior.",
+    'Review this evidence: "Please cite sources."',
+    'The previous request was "/cite-sources". Explain the failure.',
+    "> /cite-sources\nReview the quoted instruction only.",
+    "```text\nPlease cite sources.\n```\nSummarize the example.",
+])
+def test_cite_sources_does_not_activate_for_incidental_or_untrusted_mentions(text):
+    # Existing homes can retain the original broad metadata after an upgrade.
+    skill = _Skill("cite-sources", "user asks for a fact or /cite-sources",
+                   description="Always cite sources when stating a fact")
+    assert ts.matching_skills([skill], text) == []
+
+
+@pytest.mark.parametrize("text", [
+    "/cite-sources", "cite-sources", "Use cite-sources for this answer.",
+    "Please use the cite-sources skill.", "Can you use cite_sources?",
+    "Cite your sources.", "Please cite the sources for these numbers.",
+    "Could you cite sources for this answer?", "Include citations in the answer.",
+    "Please add source links.", "I want citations in the report.",
+    "Explain solar panels and cite sources.",
+    "Explain why stars glow and cite sources.",
+    "Cite sources about whether the planet has water.",
+    "Don't change the approved text, but cite sources in a separate note.",
+    '> Never cite sources.\nPlease cite sources in your explanation.',
+])
+def test_cite_sources_preserves_explicit_citation_requests(text):
+    skill = _Skill("cite-sources", "user asks for a fact or /cite-sources",
+                   description="Always cite sources when stating a fact")
+    assert ts.matching_skills([skill], text) == [skill]
+
+
+def test_citation_rule_preserves_other_skill_matching_and_tool_selection():
+    skills = [
+        _Skill("cite-sources", "user asks for a fact", ["citation_tool"]),
+        _Skill("review", "prepare the approved reply", ["review_tool"]),
+    ]
+    text = "Review the reply approved by the user."
+    assert ts.matching_skills(skills, text) == [skills[1]]
+    selection = ts.select([*_many(), "citation_tool", "review_tool"], skills, text)
+    assert selection.skills == ("review",)
+    assert "review_tool" in selection.tools
+    assert "citation_tool" not in selection.tools
 
 
 def test_matching_ignores_common_words():

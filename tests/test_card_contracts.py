@@ -79,7 +79,7 @@ def context(tmp_path):
     return ctx
 
 
-def approval(ctx, monkeypatch, answer="confirm"):
+def approval(ctx, monkeypatch, answer="confirm", *, text="Could you share the measurements?"):
     def wait(ctx, done, **kwargs):
         row = list_prompts(ctx.paths)[0]
         answer_prompt(ctx.paths, row["id"], answer)
@@ -93,7 +93,7 @@ def approval(ctx, monkeypatch, answer="confirm"):
             "allow_all": True,
             "outgoing_message": {
                 "target_url": "https://forum.example.test/topic/42",
-                "text": "Could you share the measurements?",
+                "text": text,
                 "context": "Source: https://reference.example.test/report",
             },
         },
@@ -179,8 +179,16 @@ def test_outgoing_respects_policy_denial_and_never_prompts_twice(context, monkey
     )
 
 
-def test_browser_submit_uses_only_saved_exact_message_and_replays_never_send(context, monkeypatch):
-    row, _ = approval(context, monkeypatch)
+@pytest.mark.parametrize("text", [
+    "Could you share the measurements?",
+    "The report gives a width of 12 cm: https://reference.example.test/report",
+])
+def test_browser_submit_uses_only_saved_exact_message_and_replays_never_send(
+    context, monkeypatch, text
+):
+    # A requested citation can be approved as part of the text; review-only
+    # sources remain excluded in both cases.
+    row, _ = approval(context, monkeypatch, text=text)
     sent = []
 
     class Browser:
@@ -206,7 +214,7 @@ def test_browser_submit_uses_only_saved_exact_message_and_replays_never_send(con
         is None
     )
     assert "dispatched once" in submit(context, args)
-    assert sent == [("https://forum.example.test/topic/42", "Could you share the measurements?")]
+    assert sent == [("https://forum.example.test/topic/42", text)]
     assert govern.govern(
         context, "computer_submit_approved", args, paths=context.paths, bot=context.bot
     )
