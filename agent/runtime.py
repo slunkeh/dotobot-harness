@@ -1841,6 +1841,10 @@ class Agent:
         recovery_input_id: str | None = None,
     ) -> str:
         self.refresh_profile()
+        # One logical turn = one usage record, including task classification
+        # before the ordinary provider/tool loop starts.
+        turn_requests = 0
+        turn_usage: dict[str, int] = {}
         prompt_answer = origin == "prompt_answer" and resume is not None
         continuation = (origin == "colleague_reply" or prompt_answer) and resume is not None
         if prompt_answer:
@@ -1902,7 +1906,8 @@ class Agent:
                 if candidate(previous, plugin_text):
                     try:
                         related, relation_usage = assess(self.active_provider, previous, plugin_text)
-                        self._record_turn_usage(1, relation_usage or {}, "task_continuity")
+                        turn_requests += 1
+                        add_usage(turn_usage, relation_usage)
                         if related:
                             continuation_of = (previous["task_id"], int(previous["revision"]))
                     except Exception:
@@ -1924,6 +1929,7 @@ class Agent:
             if current and current["task_id"] == task["task_id"]:
                 task = current
         except Exception as exc:
+            task = task or {}
             task_error = "Task state could not be saved; actions are paused until storage recovers."
             self._log(f"task state unavailable: {type(exc).__name__}")
         if task and not getattr(self, "_task_receipts_pruned", False):
@@ -1997,6 +2003,7 @@ class Agent:
                         )
                     except Exception:
                         pass
+                self._record_turn_usage(turn_requests, turn_usage, origin)
                 return builtin
         if cmd and not is_builtin(cmd.name):
             found = find_skill(self.paths, self.bot.name, cmd.name)
@@ -2429,11 +2436,6 @@ class Agent:
                     "When connector schemas are deferred, load_connector_tools searches only this task's selected services."
                 )
             )
-
-        # One logical turn = one usage record: provider calls in the tool loop
-        # below sum into these, recorded once in the finally.
-        turn_requests = 0
-        turn_usage: dict[str, int] = {}
 
         def browser_text(context):
             nonlocal turn_requests
