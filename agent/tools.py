@@ -226,6 +226,13 @@ def _from_colleague(ctx: ToolContext) -> bool:
     )
 
 
+def _resumable_prompt(payload: dict) -> bool:
+    return not payload.get("resolution") and (
+        payload.get("type") in {"choice", "secret_request"}
+        or (payload.get("type") == "card" and payload.get("card_type") == "confirm")
+    )
+
+
 def _open_prompt(ctx: ToolContext, payload: dict[str, Any]) -> str | None:
     """Persist a prompt row; room rides so resolution fan-out stays off 1:1."""
     if ctx.room:
@@ -243,8 +250,9 @@ def _open_prompt(ctx: ToolContext, payload: dict[str, Any]) -> str | None:
     if ctx.routine:
         payload = {**payload, "routine_receipts": list(ctx.routine_receipts), "protected_context": True}
     result = write_prompt(ctx.paths, payload)
-    if payload.get("type") in {"choice", "secret_request"} or payload.get("card_type") == "confirm":
-        ctx.pending_prompt_id = str(payload.get("id") or "")
+    # A control-return card (or an already answered decision) cannot resume
+    # through the durable answer queue. Never inherit an earlier prompt's id.
+    ctx.pending_prompt_id = str(payload.get("id") or "") if _resumable_prompt(payload) else None
     return result
 
 
@@ -719,9 +727,18 @@ def _wait_for_human(ctx: ToolContext, done, *, status: str = "waiting") -> bool:
     if done():
         return True
     if ctx.origin == "routine" and ctx.task_id and ctx.pending_prompt_id:
-        # The durable prompt mailbox owns the continuation. Holding a worker
-        # here would starve every other scheduled occurrence on this bot.
-        raise RoutineSuspended()
+        from harness.statestore import store_for
+
+        store = store_for(ctx.paths)
+        prompt = store.prompt(ctx.pending_prompt_id) or {}
+        if (_resumable_prompt(prompt) and prompt.get("bot") == ctx.bot
+                and prompt.get("task_id") == ctx.task_id
+                and prompt.get("task_revision") == ctx.task_revision
+                and prompt.get("task_conversation") == ctx.task_conversation
+                and store.prompt_current(prompt)):
+            # The durable prompt mailbox owns this unresolved continuation.
+            raise RoutineSuspended()
+        ctx.pending_prompt_id = None
     deadline = time.time() + ctx.user_input_timeout
     beat = 0.0
     if ctx.writer is not None:
