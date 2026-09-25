@@ -121,6 +121,43 @@ For development without Docker, Python 3.11+ can run the API/CLI from a checkout
 `python3 -m harness --backend process serve`. This uses shared host processes,
 not the separate bot computers of the standard container installation.
 
+## Scheduled work and recovery
+
+A scheduled occurrence records its original due time, timezone and run ID. Its
+status distinguishes `queued`, `running`, `waiting`, `completed`, `expired`,
+`cancelled`, `failed` and `unknown`. `completed` means the agent finished processing
+the run; it does not certify an external publication or other side effect. Test
+run requests enqueue work and report the routine's actual enabled state.
+
+Recurring routines default to `missed_run_policy="skip"` with
+`max_lateness_seconds=3600`, including existing saved configurations without these
+fields. One-shot reminders default to `run_late`. An explicit `run_late` policy
+keeps delayed execution enabled; `skip` accepts a configurable grace period.
+The window is checked before starting and before further actions, including after
+a late approval. Editing or deleting the routine invalidates queued occurrences.
+No historical cron ticks are reconstructed when the scheduler was offline.
+
+An unanswered scheduled decision is saved and releases the worker for other work.
+Its answer resumes the exact occurrence once, including after a restart. Earlier
+generic action fingerprints prevent replay of matching actions; uncertain outcomes
+remain held for verification. These receipts contain no command arguments or
+result contents and do not grant permissions. Each run retains at most 64 such
+fingerprints; further mutations are held when that bound is reached.
+
+On upgrade, already queued scheduled messages that lack occurrence metadata and
+have waited over one hour are skipped with an explanatory notice. Their original
+due time and reminder type cannot safely be reconstructed. Fresh legacy messages
+keep their existing behavior. A skipped item needs a fresh run if still relevant;
+this does not edit the routine configuration or credentials. Existing client and
+state fields remain supported; new metadata is additive. Custom Python scheduler
+send callbacks must accept `task_scope` and `routine` keyword arguments and pass
+both to `Orchestrator.chat_stream`, as the built-in server relay does.
+
+Recovery notifications retain their internal origin and refer to the saved source
+request. Known unfinished work keeps its current task bindings and normal approval
+rules. Completed, stale, missing or uncertain source state cannot authorize a new
+action simply because a recovery message arrived.
+
 ## Develop
 
 The runtime uses only Python's standard library. Install development tools in a

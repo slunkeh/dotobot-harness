@@ -81,6 +81,10 @@ class Msg:
     voice_call_id: str | None = None
     #: Runtime-owned return scope for a nonblocking private colleague request.
     resume: dict | None = None
+    #: Scheduler-owned occurrence, preserved across approval continuation and restart.
+    routine: dict | None = None
+    #: Source input of an internal missed-reply notification; never a new grant.
+    recovery_input_id: str | None = None
 
     @property
     def is_continuation(self) -> bool:
@@ -156,6 +160,7 @@ LANE_ORDER = (LANE_USER, LANE_AGENT, LANE_BACKGROUND)
 
 #: message origins that are background work rather than somebody talking
 ORIGIN_ROUTINE = "routine"
+ORIGIN_RECOVERY = "recovery"
 ORIGIN_DREAM = "dream"
 #: legacy wire value from the first release of dreaming ("idle think");
 #: messages carrying it are still background work and still gated as dreams
@@ -194,7 +199,7 @@ def is_routine_prompt(text: str, origin: str | None = None) -> bool:
 
 def lane_of(msg: Msg) -> str:
     """Scheduling lane for a pending message: human chat > bot-to-bot > routine."""
-    if (msg.origin or "") in (ORIGIN_ROUTINE, ORIGIN_DREAM, ORIGIN_IDLE):
+    if (msg.origin or "") in (ORIGIN_ROUTINE, ORIGIN_DREAM, ORIGIN_IDLE, ORIGIN_RECOVERY):
         return LANE_BACKGROUND
     if (msg.frm or "user") in ("", "user"):
         return LANE_USER
@@ -383,9 +388,8 @@ def queue_prompt_answers(paths: HarnessPaths, bot: str) -> None:
             if (
                 not row.get("task_conversation")
                 or row.get("request_id") in queued
-                or row.get("type") == "secret_request"
                 or row.get("card_type") == "control_return"
-                or "responded_value" not in resolution
+                or ("responded_value" not in resolution and not resolution.get("secret_provided"))
             ):
                 continue
             current = conn.execute(
@@ -423,6 +427,7 @@ def queue_prompt_answers(paths: HarnessPaths, bot: str) -> None:
                     ensure_ascii=False,
                 ),
                 origin="prompt_answer",
+                routine=row.get("routine"),
                 reply_to=row.get("request_id") or rid,
                 room=row.get("room"),
                 thread_id=thread,
@@ -433,6 +438,8 @@ def queue_prompt_answers(paths: HarnessPaths, bot: str) -> None:
                     "conversation": conversation,
                     "thread_id": thread,
                     "origin": source_origin,
+                    "routine": row.get("routine"),
+                    "routine_receipts": row.get("routine_receipts", []),
                     "reply_target": {
                         "to": "user",
                         "reply_to": rid,

@@ -122,6 +122,14 @@ from .terminals import (
 )
 
 
+class RoutineSuspended(Exception):
+    """A durable scheduled decision is waiting; release the bot's worker."""
+
+
+class RoutineExpired(Exception):
+    """The permitted execution window closed before another action began."""
+
+
 @dataclass
 class ToolContext:
     paths: HarnessPaths
@@ -166,6 +174,10 @@ class ToolContext:
     #: chat). The gate (`agent/govern.py`) holds side-effect intents back on
     #: dream turns.
     origin: str | None = None
+    routine: dict | None = None
+    pending_prompt_id: str | None = None
+    #: Runtime-only fingerprints of earlier routine actions; never raw arguments/results.
+    routine_receipts: list[dict] = field(default_factory=list)
     #: web content (a screenshot, an unfurled link) has entered this turn's
     #: transcript. Set by the dispatch loop, never by a handler; the gate
     #: (`agent/govern.py`) escalates sensitive default decisions while it is
@@ -222,7 +234,16 @@ def _open_prompt(ctx: ToolContext, payload: dict[str, Any]) -> str | None:
         payload = {**payload, "thread_id": ctx.thread_id}
     if ctx.origin:
         payload = {**payload, "origin": ctx.origin}
-    return write_prompt(ctx.paths, payload)
+    if ctx.task_id:
+        payload = {**payload, "task_id": ctx.task_id, "task_revision": ctx.task_revision,
+                   "task_conversation": ctx.task_conversation, "origin": ctx.origin,
+                   "thread_id": ctx.thread_id, "routine": ctx.routine}
+    if ctx.routine:
+        payload = {**payload, "routine_receipts": list(ctx.routine_receipts), "protected_context": True}
+    result = write_prompt(ctx.paths, payload)
+    if payload.get("type") in {"choice", "secret_request"} or payload.get("card_type") == "confirm":
+        ctx.pending_prompt_id = str(payload.get("id") or "")
+    return result
 
 
 def _decision_prompt(
@@ -252,6 +273,10 @@ def _decision_prompt(
             task_id=task, task_revision=ctx.task_revision, task_conversation=ctx.task_conversation
         )
     row.update(origin=ctx.origin, thread_id=ctx.thread_id)
+    if ctx.routine is not None:
+        row["routine"] = ctx.routine
+        row["routine_receipts"] = list(ctx.routine_receipts)
+        row["protected_context"] = True
     if ctx.room:
         row["room"] = ctx.room
     if subject is not None:
@@ -668,6 +693,12 @@ def _turn_preempted(ctx: ToolContext) -> bool:
 
 def _wait_for_human(ctx: ToolContext, done, *, status: str = "waiting") -> bool:
     """Poll until `done()` or timeout. Heartbeats keep the stream alive."""
+    if done():
+        return True
+    if ctx.origin == "routine" and ctx.task_id and ctx.pending_prompt_id:
+        # The durable prompt mailbox owns the continuation. Holding a worker
+        # here would starve every other scheduled occurrence on this bot.
+        raise RoutineSuspended()
     deadline = time.time() + ctx.user_input_timeout
     beat = 0.0
     if ctx.writer is not None:
@@ -775,7 +806,7 @@ def _request_secret(ctx: ToolContext, args: dict[str, Any]) -> str:
             )
             return f"ok: secret {name!r} is now available (value is never shown)"
     finally:
-        if not lookup_secret(name, ctx.paths):
+        if not lookup_secret(name, ctx.paths) and not isinstance(sys.exc_info()[1], RoutineSuspended):
             # Unanswered: the box lives for the whole wait, then settles as
             # skipped (session log + stream) so history-only catch-up cannot
             # reopen it. Not a sweep — secrets stay out of turn-end expiry.
@@ -2180,6 +2211,9 @@ def _create_routine(ctx: ToolContext, args: dict[str, Any]) -> str:
     payload = {"title": title, "prompt": prompt, "time": when}
     if args.get("timezone") is not None:
         payload["timezone"] = str(args["timezone"])
+    for key in ("missed_run_policy", "max_lateness_seconds"):
+        if key in args:
+            payload[key] = args[key]
     body = _api_json(ctx.paths, "POST", f"/api/bots/{ctx.bot}/routines", payload)
     if isinstance(body, str):
         return body
@@ -2225,9 +2259,12 @@ def _run_routine(ctx: ToolContext, args: dict[str, Any]) -> str:
     if isinstance(body, str):
         return body
     title = body.get("title") or rid
+    state = "enabled" if body.get("enabled") else "disabled"
+    run_id = body.get("last_run_id")
     return (
-        f"ok: test-ran routine {title!r}. It is still disabled: when the user is "
-        "happy, enable it with update_routine (id, enabled=true)."
+        f"ok: queued a test of routine {title!r}" + (f", run_id={run_id}" if run_id else "") +
+        f". Its schedule remains {state}. Queued does not mean completed; "
+        "check the run outcome before reporting success."
     )
 
 
@@ -2235,7 +2272,7 @@ def _routine_line(row: dict[str, Any]) -> str:
     state = "enabled" if row.get("enabled") else "disabled"
     schedule = row.get("schedule") or row.get("cron") or ""
     last = row.get("last_run")
-    tail = f", last run {last}" if last else ""
+    tail = f", last queued {last}, status {row.get('last_run_status', 'unknown')}" if last else ""
     return f"- {row.get('id')}: {row.get('title') or '(untitled)'} [{schedule}] {state}{tail}"
 
 
@@ -2262,6 +2299,9 @@ def _update_routine(ctx: ToolContext, args: dict[str, Any]) -> str:
         payload["enabled"] = bool(args["enabled"])
     if args.get("timezone") is not None:
         payload["timezone"] = str(args["timezone"])
+    for key in ("missed_run_policy", "max_lateness_seconds"):
+        if key in args:
+            payload[key] = args[key]
     for key in ("title", "prompt"):
         value = args.get(key)
         if value is not None and str(value).strip():
@@ -3987,11 +4027,15 @@ def _build_default_tools() -> dict[str, Tool]:
                     "Other; those start DISABLED — run_routine to test, then "
                     "the user enables them. For recurring jobs set timezone to "
                     "an IANA name such as Europe/London. Put missing-source and "
-                    "approval rules INTO the prompt. Not a skill or memory."
+                    "approval rules INTO the prompt. Recurring occurrences skip after "
+                    "one hour late by default; one-shots run late. Choose run_late only "
+                    "when delayed execution remains useful and authorized. Not a skill or memory."
                 ),
                 parameters={
                     "type": "object",
                     "properties": {
+                        "missed_run_policy": {"type": "string", "enum": ["skip", "run_late"]},
+                        "max_lateness_seconds": {"type": "integer", "minimum": 0, "maximum": 31536000},
                         "timezone": {
                             "type": "string",
                             "description": "Recurring schedule IANA timezone, e.g. Europe/London; empty uses server local time",
@@ -4046,7 +4090,7 @@ def _build_default_tools() -> dict[str, Tool]:
                 name="list_routines",
                 description=(
                     "List this bot's routines: id, title, schedule, enabled or "
-                    "disabled, last run. Call it before update_routine or "
+                    "disabled, last queued occurrence and its execution status. Call it before update_routine or "
                     "delete_routine when you do not already hold the id."
                 ),
                 parameters={"type": "object", "properties": {}},
@@ -4067,6 +4111,8 @@ def _build_default_tools() -> dict[str, Tool]:
                 parameters={
                     "type": "object",
                     "properties": {
+                        "missed_run_policy": {"type": "string", "enum": ["skip", "run_late"]},
+                        "max_lateness_seconds": {"type": "integer", "minimum": 0, "maximum": 31536000},
                         "timezone": {
                             "type": "string",
                             "description": "Recurring schedule IANA timezone, e.g. Europe/London; empty uses server local time",

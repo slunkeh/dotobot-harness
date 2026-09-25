@@ -9,6 +9,7 @@ them up — app open or not.
 from __future__ import annotations
 
 import fcntl
+import hashlib
 import json
 import logging
 import os
@@ -53,6 +54,103 @@ _ONCE_CLOCK = re.compile(
 
 class RoutineError(ValueError):
     """Bad routine payload or unknown id."""
+
+
+DEFAULT_MAX_LATENESS_SECONDS = 3600
+
+
+def _missed_run_settings(row: dict[str, Any]) -> tuple[str, int]:
+    """Old recurring rows acquire a bounded grace; one-shots still run late."""
+    policy = row.get("missed_run_policy") or ("run_late" if _once_at(row) is not None else "skip")
+    grace = row.get("max_lateness_seconds", DEFAULT_MAX_LATENESS_SECONDS)
+    if policy not in {"skip", "run_late"}:
+        raise RoutineError("missed_run_policy must be skip or run_late")
+    if isinstance(grace, bool) or not isinstance(grace, int) or not 0 <= grace <= 31_536_000:
+        raise RoutineError("max_lateness_seconds must be an integer from 0 to 31536000")
+    return policy, grace
+
+
+def routine_revision(row: dict[str, Any]) -> str:
+    """Configuration identity; queue history never changes an authorization scope."""
+    config = {
+        key: row.get(key)
+        for key in (
+            "id",
+            "prompt",
+            "cron",
+            "once_at",
+            "timezone",
+            "task_scope",
+            "missed_run_policy",
+            "max_lateness_seconds",
+        )
+    }
+    return hashlib.sha256(
+        json.dumps(config, sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()
+
+
+def occurrence_expired(occurrence: dict | None, *, now: float | None = None) -> bool:
+    if not occurrence or occurrence.get("expires_at") is None:
+        return False
+    return (time.time() if now is None else now) > float(occurrence["expires_at"])
+
+
+def occurrence_stop_reason(paths: HarnessPaths, bot: str, occurrence: dict | None) -> str:
+    if not occurrence:
+        return ""
+    if occurrence_expired(occurrence):
+        return "expired"
+    row = next(
+        (row for row in list_routines(paths, bot) if row.get("id") == occurrence.get("id")), None
+    )
+    if row is None or routine_revision(row) != occurrence.get("revision"):
+        return "cancelled"
+    if not row.get("enabled", True) and occurrence.get("kind") not in {"once", "test"}:
+        return "cancelled"
+    return ""
+
+
+def occurrence_context(occurrence: dict | None) -> str:
+    if not occurrence:
+        return ""
+    scheduled = (
+        datetime.fromisoformat(occurrence["scheduled_local"])
+        if occurrence.get("scheduled_local")
+        else datetime.fromtimestamp(float(occurrence["scheduled_at"])).astimezone()
+    )
+    zone = str(occurrence.get("timezone") or "")
+    if zone:
+        scheduled = scheduled.astimezone(ZoneInfo(zone))
+    return (
+        "[Scheduled occurrence recorded by the harness: "
+        f"{scheduled.isoformat()}, timezone {zone or str(scheduled.tzinfo)}; "
+        f"run {occurrence['run_id']}. This is the original due time, not the time "
+        "the queue delivered it. Do not describe delayed work as an early future run.]"
+    )
+
+
+def record_run_state(paths: HarnessPaths, bot: str, occurrence: dict | None, state: str) -> None:
+    """Update this occurrence, without overwriting the status of a newer run."""
+    if not occurrence:
+        return
+    with _lock(paths, bot):
+        rows = list_routines(paths, bot)
+        row = next((row for row in rows if row.get("id") == occurrence.get("id")), None)
+        if row is None:
+            return  # deleted jobs stay deleted
+        history = row.setdefault("history", [])
+        entry = next(
+            (entry for entry in history if entry.get("run_id") == occurrence["run_id"]), None
+        )
+        if entry is None:
+            entry = {"run_id": occurrence["run_id"], "scheduled_at": occurrence["scheduled_at"]}
+            history.append(entry)
+        entry.update(status=state, updated_at=time.time())
+        row["history"] = history[-20:]
+        if row.get("last_run_id") == occurrence["run_id"]:
+            row["last_run_status"] = state
+        _save(paths, bot, rows)
 
 
 def _timezone(value: Any) -> str:
@@ -338,6 +436,7 @@ def public(row: dict[str, Any]) -> dict[str, Any]:
     cron = str(row.get("cron") or "")
     history = row.get("history") if isinstance(row.get("history"), list) else []
     once = _once_at(row)
+    policy, grace = _missed_run_settings(row)
     if once is not None:
         schedule = describe_once(once)
     elif cron:
@@ -357,6 +456,10 @@ def public(row: dict[str, Any]) -> dict[str, Any]:
         "schedule": schedule,
         "enabled": bool(row.get("enabled", True)),
         "last_run": row.get("last_run"),
+        "last_run_id": row.get("last_run_id"),
+        "last_run_status": row.get("last_run_status", "unknown"),
+        "missed_run_policy": policy,
+        "max_lateness_seconds": grace,
         "triggers": _triggers(row),
         "history": history[-20:],
     }
@@ -372,6 +475,8 @@ def add_routine(
     enabled: bool | None = None,
     once_at: float | None = None,
     timezone: str = "",
+    missed_run_policy: str | None = None,
+    max_lateness_seconds: int = DEFAULT_MAX_LATENESS_SECONDS,
 ) -> dict[str, Any]:
     with _lock(paths, bot):
         timezone = _timezone(timezone)
@@ -415,7 +520,10 @@ def add_routine(
             "history": [],
             "created": time.time(),
             "timezone": timezone,
+            "missed_run_policy": missed_run_policy,
+            "max_lateness_seconds": max_lateness_seconds,
         }
+        _missed_run_settings(row)
         rows = list_routines(paths, bot)
         rows.append(row)
         _save(paths, bot, rows)
@@ -442,6 +550,9 @@ def update_routine(paths: HarnessPaths, bot: str, routine_id: str, **fields: Any
                 row["title"] = str(fields["title"]).strip()
             if "prompt" in fields and fields["prompt"] is not None:
                 row["prompt"] = str(fields["prompt"]).strip()
+            for key in ("missed_run_policy", "max_lateness_seconds"):
+                if key in fields:
+                    row[key] = fields[key]
             when = fields.get("when") or fields.get("time") or fields.get("cron")
             if when:
                 _apply_when(row, str(when))
@@ -463,6 +574,7 @@ def update_routine(paths: HarnessPaths, bot: str, routine_id: str, **fields: Any
                 # A time-only edit may replace a zoned recurring schedule. Its
                 # inherited timezone no longer applies to the absolute deadline.
                 row["timezone"] = None
+            _missed_run_settings(row)
             _save(paths, bot, rows)
             return public(row)
         raise RoutineError(f"no routine {routine_id!r}")
@@ -625,29 +737,64 @@ def _enqueue(
     *,
     now: datetime,
     kind: str,
-    send: Callable[[str, str], None] | None,
+    send: Callable[..., None] | None,
 ) -> None:
     stamp = _stamp(_schedule_now(row, now))
     title = row.get("title") or "scheduled"
     prompt = (row.get("prompt") or "").strip()
     text = f"[Routine: {title}]\n{prompt}".strip()
-    stored_scope = row.get("task_scope")
-    scope = (
-        {**stored_scope, "conversation": f"routine:{row['id']}"}
-        if isinstance(stored_scope, dict)
-        else None
+    policy, grace = _missed_run_settings(row)
+    scheduled_at = (
+        float(_once_at(row))
+        if kind == "once"
+        else now.replace(second=0, microsecond=0).timestamp()
+        if kind == "schedule"
+        else now.timestamp()
     )
+    run_id = (
+        uuid.uuid4().hex
+        if kind == "test"
+        else uuid.uuid5(uuid.NAMESPACE_URL, f"routine:{bot}:{row['id']}:{scheduled_at}").hex
+    )
+    scheduled_local = datetime.fromtimestamp(scheduled_at).astimezone()
+    if row.get("timezone"):
+        scheduled_local = scheduled_local.astimezone(ZoneInfo(row["timezone"]))
+    occurrence = {
+        "id": row["id"],
+        "run_id": run_id,
+        "scheduled_at": scheduled_at,
+        "timezone": row.get("timezone") or "",
+        "prompt": text,
+        "scheduled_local": scheduled_local.isoformat(),
+        "kind": kind,
+        "revision": routine_revision(row),
+        "expires_at": scheduled_at + grace if policy == "skip" else None,
+    }
+    stored_scope = row.get("task_scope")
+    scope = {
+        **(stored_scope if isinstance(stored_scope, dict) else {}),
+        "conversation": f"routine:{row['id']}:{run_id}",
+        "routine_id": row["id"],
+        "routine_revision": occurrence["revision"],
+    }
+    processed = (paths.processed(bot) / f"{scheduled_at:.6f}-{run_id}.json").exists()
     if send is not None:
-        if scope is None:
-            send(bot, text)
-        else:
+        if not processed:
             # Server relay preserves scope before publishing its chosen input
             # id. A legacy callback cannot silently discard a bound scope.
-            send(bot, text, task_scope=scope)
+            send(bot, text, task_scope=scope, routine=occurrence)
     else:
         # origin="routine" puts scheduled work in the background lane
-        msg = messaging.Msg(to=bot, frm="user", text=text, origin="routine")
-        if scope is not None:
+        msg = messaging.Msg(
+            to=bot,
+            frm="user",
+            text=text,
+            origin="routine",
+            id=run_id,
+            ts=scheduled_at,
+            routine=occurrence,
+        )
+        if not processed:
             from .taskscope import begin_task
 
             begin_task(
@@ -659,12 +806,26 @@ def _enqueue(
                 trusted_user=False,
                 inherited_scope=scope,
             )
-        messaging.send(paths, msg)
+            messaging.send(paths, msg)
     row["last_run"] = stamp
+    row["last_run_id"] = run_id
     history = row.setdefault("history", [])
     if not isinstance(history, list):
         row["history"] = history = []
-    history.append({"ts": stamp, "kind": kind})
+    previous = next((entry for entry in history if entry.get("run_id") == run_id), None)
+    row["last_run_status"] = (
+        (previous.get("status", "unknown") if previous else "unknown") if processed else "queued"
+    )
+    if previous is None:
+        history.append(
+            {
+                "ts": stamp,
+                "kind": kind,
+                "run_id": run_id,
+                "scheduled_at": scheduled_at,
+                "status": row["last_run_status"],
+            }
+        )
     row["history"] = history[-20:]
 
 
@@ -693,7 +854,7 @@ def fire_due(
     bots: list[str],
     *,
     now: datetime | None = None,
-    send: Callable[[str, str], None] | None = None,
+    send: Callable[..., None] | None = None,
 ) -> list[dict[str, Any]]:
     """Enqueue a user message for each due routine. Returns the fired rows."""
     now = now or datetime.now()
@@ -738,7 +899,7 @@ def scheduled_bots(roster: Any) -> list[str]:
 def start_scheduler(
     orch: Any,
     interval: float = 20.0,
-    send: Callable[[str, str], None] | None = None,
+    send: Callable[..., None] | None = None,
 ) -> threading.Thread:
     """Background tick used by `harness serve`. Daemon so process exit is clean."""
 
@@ -761,7 +922,7 @@ def run_now(
     bot: str,
     routine_id: str,
     *,
-    send: Callable[[str, str], None] | None = None,
+    send: Callable[..., None] | None = None,
 ) -> dict[str, Any]:
     with _lock(paths, bot):
         rows = list_routines(paths, bot)

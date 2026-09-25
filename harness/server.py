@@ -1744,6 +1744,8 @@ class _Handler(BaseHTTPRequestHandler):
                 enabled=enabled,
                 once_at=once_at,
                 timezone=str(data.get("timezone") or ""),
+                missed_run_policy=data.get("missed_run_policy"),
+                max_lateness_seconds=data.get("max_lateness_seconds", 3600),
             )
         except RoutineError as exc:
             return self._send_json({"error": str(exc)}, 400)
@@ -3659,6 +3661,7 @@ def relay_bot_turn(
     origin: str | None = "routine",
     *,
     task_scope: dict | None = None,
+    routine: dict | None = None,
 ) -> str:
     """Inbox a bot AND fan the live stream out to every connected app.
 
@@ -3666,6 +3669,8 @@ def relay_bot_turn(
     only written to `messages/user/inbox` (which the Mac client never reads).
     """
     scope_args = {"task_scope": task_scope} if task_scope is not None else {}
+    if routine is not None:
+        scope_args["routine"] = routine
     rid, reader = orch.chat_stream(bot, text, origin=origin, **scope_args)
     note_user_announced(orch, [rid])
     hub = getattr(orch, "ws_hub", None)
@@ -3691,6 +3696,8 @@ def relay_bot_turn(
             messaging.ORIGIN_DREAM,
             messaging.ORIGIN_IDLE,
             messaging.ORIGIN_WELCOME,
+            messaging.ORIGIN_RECOVERY,
+            "prompt_answer",
         ):
             frame["text"] = text
             # Only scheduler dumps collapse to a card; human block actions
@@ -3969,6 +3976,8 @@ def start_consult_relays(orch) -> None:
                 messaging.ORIGIN_IDLE,
                 messaging.ORIGIN_ROUTINE,
                 messaging.ORIGIN_WELCOME,
+                messaging.ORIGIN_RECOVERY,
+                "prompt_answer",
             )
             if not background:
                 background = (

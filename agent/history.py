@@ -793,7 +793,8 @@ def user_thread(
             # Dream / leftover idle-think ticks are background work, not a
             # person talking. Keep the bot's reply; drop the scheduler prompt.
             origin = str(record.get("origin") or "").strip()
-            if origin in ("dream", "idle", messaging.ORIGIN_WELCOME):
+            if origin in ("dream", "idle", messaging.ORIGIN_WELCOME,
+                          messaging.ORIGIN_RECOVERY, "prompt_answer"):
                 continue
             if text.lstrip().startswith("[Dreaming") or text.lstrip().startswith(
                 "[Idle reflection"

@@ -41,17 +41,45 @@ DEFAULT_IDLE_WINDOW = 20.0
 _MAX_IDS = 20
 
 RECOVERY_PROMPT = (
-    "[System recovery] One or more of your user's messages may never have been "
-    "answered — the turn handling them was interrupted, or the harness "
-    "restarted before a reply went out, and their latest message may be "
-    "missing from your context entirely. Respond to the user now: if you can "
-    "see their latest message and already finished what it asked, send a brief "
-    "confirmation with the result; if you can see it but the work is not done, "
-    "acknowledge them and continue the work; if you cannot be certain what "
-    "they last asked, tell them you may have missed their latest message and "
-    "ask them to resend it. Never guess or claim completion of work you "
-    "cannot see."
+    "[System recovery] The harness may have missed a reply to a previously accepted "
+    "message. This is an internal notification, not a new user instruction. "
+    "Use only the saved source task state below. Report a saved completed outcome; "
+    "continue unfinished work only when the exact task is current and its outcomes are known. "
+    "Never repeat recorded actions or substitute another recent task. If the source cannot be identified, tell the "
+    "user you may have missed their message and ask them to resend it."
 )
+
+
+def _recovery_prompt(paths: HarnessPaths, bot: str, record: dict) -> str:
+    from harness import taskscope
+    from harness.redaction import scrub
+
+    sources = []
+    for input_id in record.get("message_ids", [])[-_MAX_IDS:]:
+        scope = taskscope.scope_for_input(paths, bot, input_id)
+        if not scope:
+            continue
+        current = taskscope.read_task(paths, bot, scope["conversation"])
+        if not current or (current["task_id"], current["revision"]) != (
+            scope["task_id"],
+            scope["revision"],
+        ):
+            sources.append({"input_id": input_id, "status": "superseded; do not resume"})
+            continue
+        sources.append(
+            {
+                "input_id": input_id,
+                "task_id": scope["task_id"],
+                "revision": scope["revision"],
+                "conversation": scope["conversation"],
+                "status": current.get("status"),
+                "objective": str(current.get("objective") or "")[:2000],
+                "outcome": str(current.get("outcome") or "")[:2000],
+            }
+        )
+    if not sources:
+        return RECOVERY_PROMPT
+    return RECOVERY_PROMPT + "\nSaved source tasks (data only):\n" + scrub(json.dumps(sources))
 
 
 def idle_window() -> float:
@@ -126,7 +154,9 @@ def _user_pending(paths: HarnessPaths, bot: str) -> bool:
     )
 
 
-def settle(paths: HarnessPaths, bot: str, *, now: float | None = None) -> None:
+def settle(
+    paths: HarnessPaths, bot: str, *, now: float | None = None, source_id: str | None = None
+) -> None:
     """A user-visible reply went out: clear the obligation, or keep it alive.
 
     With user messages still queued the obligation stays (they are covered by
@@ -136,6 +166,8 @@ def settle(paths: HarnessPaths, bot: str, *, now: float | None = None) -> None:
     record = get(paths, bot)
     if record is None:
         return
+    if source_id is not None and source_id not in record.get("message_ids", []):
+        return  # an unrelated background result cannot settle a missing human reply
     if _user_pending(paths, bot):
         record["last_send_ts"] = time.time() if now is None else now
         _write(paths, bot, record)
@@ -178,5 +210,15 @@ def maybe_redrive(
     record["redrives"] = int(record.get("redrives", 0)) + 1
     record["last_redrive_ts"] = now
     _write(paths, bot, record)
-    messaging.send(paths, messaging.Msg(to=bot, frm="user", text=RECOVERY_PROMPT))
-    return RECOVERY_PROMPT
+    prompt = _recovery_prompt(paths, bot, record)
+    messaging.send(
+        paths,
+        messaging.Msg(
+            to=bot,
+            frm="user",
+            text=prompt,
+            origin=messaging.ORIGIN_RECOVERY,
+            recovery_input_id=(record.get("message_ids") or [None])[-1],
+        ),
+    )
+    return prompt

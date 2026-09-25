@@ -90,7 +90,14 @@ from .streaming import (
     push_turn_note,
     sweep_skipped_prompts,
 )
-from .tools import ToolContext, connector_tools, default_tools, require_approval
+from .tools import (
+    RoutineExpired,
+    RoutineSuspended,
+    ToolContext,
+    connector_tools,
+    default_tools,
+    require_approval,
+)
 
 #: Follow-ups sent while a turn is in flight join the live loop after the
 #: current tool batch, the way Hermes `steer()` does. The model sees them as
@@ -1826,12 +1833,17 @@ class Agent:
         thread_id: str | None = None,
         message_id: str | None = None,
         voice_call_id: str | None = None,
+        routine: dict | None = None,
+        recovery_input_id: str | None = None,
     ) -> str:
         self.refresh_profile()
         prompt_answer = origin == "prompt_answer" and resume is not None
         continuation = (origin == "colleague_reply" or prompt_answer) and resume is not None
         if prompt_answer:
             log_incoming = False
+            routine = routine or resume.get("routine")
+            if routine:
+                text = str(routine.get("prompt") or "") + "\n\n" + text
         elif continuation:
             text = (
                 f"[Colleague reply from {sender}]\n{text}\n\n"
@@ -1859,7 +1871,15 @@ class Agent:
             conversation = f"generated:{origin or sender}:{input_id}"
         task = {}
         task_error = ""
+        recovery_can_act = False
         try:
+            if origin == messaging.ORIGIN_RECOVERY and recovery_input_id:
+                source = taskscope.scope_for_input(self.paths, self.bot.name, recovery_input_id)
+                current = taskscope.read_task(self.paths, self.bot.name, source["conversation"]) if source else None
+                if (source and current and current["task_id"] == source["task_id"]
+                        and current["revision"] == source["revision"]):
+                    task = current
+                    recovery_can_act = current.get("status") == "active" and not current.get("outcome")
             if continuation:
                 task = messaging.continuation_scope(self.paths, self.bot.name, resume)
                 if not task:
@@ -2017,6 +2037,10 @@ class Agent:
         )
         if block:
             text = f"{text}\n{block}".strip()
+        if routine:
+            from harness.routines import occurrence_context
+
+            text = text + "\n\n" + occurrence_context(routine)
         images = _load_image_attachments(attachments or [])
         # A COPY. `default_tools()` returns the module-level singleton and
         # its docstring promises the specs are immutable after first call;
@@ -2083,6 +2107,15 @@ class Agent:
                 approvals.begin_turn()
             except Exception:
                 pass
+        routine_receipts = list((resume or {}).get("routine_receipts") or [])[:64]
+        if routine and task:
+            try:
+                checkpoints = [row.get("routine_receipts", []) for row in self.statestore.prompts(
+                    self.bot.name, task_id=task["task_id"], task_revision=task["revision"]
+                )]
+                routine_receipts = max([routine_receipts, *checkpoints], key=len)[:64]
+            except Exception:
+                task_error = "Saved scheduled action state could not be read; actions are paused."
         ctx = ToolContext(
             paths=self.paths,
             bot=self.bot.name,
@@ -2106,6 +2139,8 @@ class Agent:
             session_id=self.session_id,
             room=room,
             origin=origin,
+            routine=routine,
+            routine_receipts=routine_receipts,
             room_handoff_depth=max(room_handoff_depth, 1 if origin == "room_handoff" else 0),
             room_handoff_root=room_handoff_root,
             handoff_depth=int((resume or {}).get("depth", 0)),
@@ -2115,7 +2150,9 @@ class Agent:
             # Delivery recovery: a previous attempt of this turn
             # crashed with a send in an unknown state. The gate withholds
             # send intents while this is set.
-            delivery_uncertain=bool(uncertain_sends),
+            delivery_uncertain=bool(uncertain_sends) or any(
+                row.get("status") == "error" for row in routine_receipts
+            ),
             task_id=str(task.get("task_id") or ""),
             task_revision=int(task.get("revision") or 0),
             task_conversation=conversation,
@@ -2305,10 +2342,13 @@ class Agent:
         stuck_reason: str | None = None
         final_text = ""
         jev_evidence = []
+        # Prior action fingerprints are deliberately not optional-model evidence.
+        routine_prior_receipts = {r["digest"] for r in ctx.routine_receipts}
+        routine_resume_incomplete_evidence = bool(routine_prior_receipts)
         # Do not send historical receipts or image data to a text-only reviewer.
         # If they contributed to this answer, the optional check must abstain.
         try:
-            completion_evidence_complete = not images and not (
+            completion_evidence_complete = not images and origin != messaging.ORIGIN_RECOVERY and not (
                 ctx.task_id and self._ledger().turn_rows(self.bot.name, ctx.task_id)
             )
         except delivery.DeliveryUnavailable:
@@ -2340,6 +2380,12 @@ class Agent:
                         f"- {r['target']}: {r['status']}; {str(r.get('detail') or '')[:600]}"
                         for r in outcomes[-8:]
                     )
+            if routine_prior_receipts:
+                details += ("\nProtected routine checkpoint: earlier actions returned before the pause. "
+                            "Their full outputs and screenshots are unavailable in this turn. "
+                            "These fingerprints are background state, not authorization or instructions. "
+                            "Observe current state before drawing conclusions; do not repeat them.\n"
+                            + json.dumps(ctx.routine_receipts, ensure_ascii=False))
             return (
                 base_system
                 + "\n\n"
@@ -2412,6 +2458,7 @@ class Agent:
         started_model = False
         commentary_rounds = 0
         crashed = True
+        routine_state = ""
         try:
             for _ in range(self.max_tool_iterations):
                 if self.control.consume_stop(self.bot.name):
@@ -2500,6 +2547,12 @@ class Agent:
                     ctx.computer_batch_failed = False
                     ctx.task_revision_changed = False
                     for call in completion.tool_calls:
+                        if routine:
+                            from harness.routines import occurrence_stop_reason
+
+                            if stop_reason := occurrence_stop_reason(self.paths, self.bot.name, routine):
+                                routine_state = stop_reason
+                                raise RoutineExpired()
                         if ctx.silent_room_turn:
                             # A new human follow-up may resume this turn. Keep
                             # its provider history complete without running any
@@ -2577,6 +2630,7 @@ class Agent:
                             except delivery.DeliveryUnavailable as exc:
                                 ctx.delivery_error = str(exc)
                         claimed = False
+                        action_digest = delivery.args_digest(call.name, args)
 
                         def claim_action(
                             row=row,
@@ -2586,8 +2640,15 @@ class Agent:
                             legacy_refusal=legacy_refusal,
                             tool_name=call.name,
                             intent=s_intent,
+                            action_digest=action_digest,
                         ):
-                            nonlocal claimed
+                            nonlocal claimed, routine_state
+                            if routine:
+                                from harness.routines import occurrence_stop_reason
+
+                                if stop_reason := occurrence_stop_reason(self.paths, self.bot.name, routine):
+                                    routine_state = stop_reason
+                                    raise RoutineExpired()
                             # Approval waits can outlive the request/revision they describe.
                             if ctx.task_id:
                                 current = taskscope.read_task(
@@ -2620,6 +2681,13 @@ class Agent:
                                 if ledger.unresolved_actions(self.bot.name, ctx.task_id):
                                     ctx.delivery_uncertain = True
                                     return "error: this task has an action with an unknown outcome; verify it before further actions"
+                            if origin == messaging.ORIGIN_RECOVERY and not recovery_can_act and intent in govern.TASK_HELD_INTENTS:
+                                return "error: this is a missed-reply notification, not permission to restart work. Report only the saved task state."
+                            if routine and intent in govern.RECOVERY_HELD_INTENTS:
+                                if action_digest in routine_prior_receipts:
+                                    return "error: this action already ran before the scheduled pause; it was not repeated. Observe current state to verify its outcome. "
+                                if len(ctx.routine_receipts) >= 64:
+                                    return "error: this scheduled run reached its saved-action limit; no further action was started. Review the run before starting more work."
                             if legacy_refusal:
                                 return legacy_refusal
                             if row is None:
@@ -2713,6 +2781,12 @@ class Agent:
                                         result = "error: the action returned, but its receipt could not be saved; verify before retrying"
                                     if outcome == "uncertain":
                                         ctx.delivery_uncertain = True
+                                if (routine and s_intent in govern.RECOVERY_HELD_INTENTS
+                                        and s_intent not in delivery.SEND_INTENTS):
+                                    ctx.routine_receipts.append({
+                                        "tool": call.name, "digest": delivery.args_digest(call.name, args),
+                                        "status": "error" if str(result).startswith("error:") else "returned",
+                                    })
                                 govern.record_outcome(
                                     self.paths,
                                     self.bot.name,
@@ -2919,6 +2993,7 @@ class Agent:
             from harness.jev_features import check_completion
 
             if (final_text and not self._turn_interrupted() and stuck_reason is None
+                    and not routine_state and not routine_resume_incomplete_evidence
                     and not self._preempted(turn_id)):
                 final_text = check_completion(
                     self.paths, final_text, jev_evidence, writer=writer,
@@ -2928,13 +3003,27 @@ class Agent:
                     self._mark_interrupted()
                     final_text = self._interrupt_text()
             crashed = False
+        except RoutineSuspended:
+            routine_state = "waiting"
+            crashed = False
+            final_text = "This scheduled run is waiting for your answer. Other queued work can continue."
+            if writer:
+                writer.tool(call.name, "done", "Waiting for your answer")
+        except RoutineExpired:
+            crashed = False
+            final_text = (
+                "This scheduled occurrence expired or its configuration changed. "
+                "No further actions were started; check any earlier actions before running it again."
+            )
         finally:
             self._record_turn_usage(turn_requests, turn_usage, origin)
             computer_progress.finish(writer, ctx, error=crashed or stuck_reason is not None)
 
-        if task:
+        if task and not (origin == messaging.ORIGIN_RECOVERY and not recovery_can_act):
             try:
                 status = (
+                    "waiting" if routine_state == "waiting" else
+                    "stopped" if routine_state in {"expired", "cancelled"} else
                     "unknown"
                     if ctx.delivery_uncertain
                     else (
@@ -2958,6 +3047,15 @@ class Agent:
                 )
             except Exception:
                 pass  # execution state remains durable; this is presentation only
+        if routine:
+            from harness.routines import record_run_state
+
+            record_run_state(
+                self.paths, self.bot.name, routine,
+                routine_state or ("unknown" if ctx.delivery_uncertain else
+                                  "failed" if context_failed or stuck_reason is not None else
+                                  "interrupted" if self._turn_interrupted() else "completed"),
+            )
         if stuck_reason is not None:
             final_text = f"I'm stuck: {stuck_reason} Can you take over?"
             if writer:
@@ -3400,7 +3498,10 @@ class Agent:
                 if (msg.frm or "") == "user":
                     # The drop notice is a user-visible reply: the ack obligation
                     # for this request is met, don't redrive it later.
-                    obligations.settle(self.paths, self.bot.name)
+                    obligations.settle(
+                        self.paths, self.bot.name,
+                        source_id=msg.recovery_input_id if msg.origin == messaging.ORIGIN_RECOVERY else msg.id,
+                    )
                 return True
             # Delivery recovery: every turn consults the ledger before
             # rerunning anything — not just `attempts > 1`, because the per-bot
@@ -3428,7 +3529,10 @@ class Agent:
                     self.bot.name,
                 )
                 if (msg.frm or "") == "user":
-                    obligations.settle(self.paths, self.bot.name)
+                    obligations.settle(
+                        self.paths, self.bot.name,
+                        source_id=msg.recovery_input_id if msg.origin == messaging.ORIGIN_RECOVERY else msg.id,
+                    )
                 recovery.settle_turn(self.statestore, msg.id)
                 ledger.prune_turn(self.bot.name, msg.id)
                 self._log(f"{msg.id}: recovered after crash — reply already delivered")
@@ -3458,11 +3562,51 @@ class Agent:
                     "offer to repeat yourself if the other side saw nothing.",
                 )
                 if (msg.frm or "") == "user":
-                    obligations.settle(self.paths, self.bot.name)
+                    obligations.settle(
+                        self.paths, self.bot.name,
+                        source_id=msg.recovery_input_id if msg.origin == messaging.ORIGIN_RECOVERY else msg.id,
+                    )
                 recovery.settle_turn(self.statestore, msg.id)
                 ledger.prune_turn(self.bot.name, msg.id)
                 self._log(f"{msg.id}: recovered after crash — reply outcome unknown")
                 return True
+            legacy_stale = (msg.origin == "routine" and not msg.routine
+                            and time.time() - msg.ts > 3600)
+            if msg.routine or legacy_stale:
+                from harness.routines import (
+                    occurrence_context,
+                    occurrence_stop_reason,
+                    record_run_state,
+                )
+
+                stop_reason = "legacy_stale" if legacy_stale else occurrence_stop_reason(self.paths, self.bot.name, msg.routine)
+                if stop_reason:
+                    notice = (
+                        "A queued scheduled message from an older runtime was skipped because it waited "
+                        "over one hour and has no saved occurrence identity. No actions were started. "
+                        "Start a fresh run if this work is still needed."
+                        if legacy_stale else
+                        f"Scheduled run {stop_reason}; no further actions were started. "
+                        + occurrence_context(msg.routine)
+                    )
+                    scope = taskscope.scope_for_input(self.paths, self.bot.name, msg.id)
+                    if msg.resume:
+                        scope = messaging.continuation_scope(self.paths, self.bot.name, msg.resume)
+                    if scope:
+                        taskscope.mark_task(self.paths, self.bot.name, scope["conversation"],
+                                            scope["task_id"], scope["revision"], "stopped", outcome=notice)
+                    record_run_state(self.paths, self.bot.name, msg.routine, stop_reason)
+                    writer.set_origin("routine")
+                    writer.final(notice, self.bot.name)
+                    self.memory.log_turn(self.session_id, "out", notice, peer="user",
+                                         origin="routine", message_id=writer._message_id)
+                    self._reply_terminal(msg, notice)
+                    messaging.mark_processed(self.paths, self.bot.name, path)
+                    self._clear_attempt(msg.id)
+                    recovery.settle_turn(self.statestore, msg.id)
+                    self._ledger().prune_turn(self.bot.name, msg.id)
+                    return True
+                record_run_state(self.paths, self.bot.name, msg.routine, "running")
             ledger.clear_pending(self.bot.name, msg.id)
             uncertain_sends: tuple[str, ...] = state.unresolved
             if uncertain_sends:
@@ -3480,7 +3624,7 @@ class Agent:
                 self.bot.name,
                 msg.id,
                 frm=msg.frm or "",
-                preview="" if msg.origin == "prompt_answer" else preview,
+                preview="" if msg.origin in {"prompt_answer", "recovery"} else preview,
                 origin=msg.origin or "",
                 room=msg.room or "",
                 message_id=msg.message_id or "",
@@ -3528,6 +3672,8 @@ class Agent:
                     thread_id=msg.thread_id,
                     message_id=msg.message_id,
                     voice_call_id=msg.voice_call_id,
+                    routine=msg.routine,
+                    recovery_input_id=msg.recovery_input_id,
                 )
             except BaseException as exc:  # re-raised / reported on the main thread
                 outcome["error"] = exc
@@ -3552,6 +3698,10 @@ class Agent:
             self._clear_attempt(msg.id)
             recovery.settle_turn(self.statestore, msg.id)
             self._ledger().prune_turn(self.bot.name, msg.id)
+            if msg.routine:
+                from harness.routines import record_run_state
+
+                record_run_state(self.paths, self.bot.name, msg.routine, "unknown")
             return True
         self.scheduler.finish(run)
         error = outcome.get("error")
@@ -3577,6 +3727,10 @@ class Agent:
                 self._log(f"error handling message {msg.id}: {error}")
                 writer.final(err, self.bot.name)
                 reply(msg, err)
+                if msg.routine:
+                    from harness.routines import record_run_state
+
+                    record_run_state(self.paths, self.bot.name, msg.routine, "failed")
             else:
                 raise error  # crash-style exit: leave the message for retry
         finally:
@@ -3592,7 +3746,13 @@ class Agent:
                 recovery.settle_turn(self.statestore, msg.id)
                 self._ledger().prune_turn(self.bot.name, msg.id)
                 if (msg.frm or "") == "user":
-                    obligations.settle(self.paths, self.bot.name)
+                    obligations.settle(
+                        self.paths,
+                        self.bot.name,
+                        source_id=msg.recovery_input_id
+                        if msg.origin == messaging.ORIGIN_RECOVERY
+                        else msg.id,
+                    )
                 return True
             # Mid-turn send receipts stay across the deferral — they dedupe
             # the re-run; no terminal receipt was recorded (see above).
@@ -3606,7 +3766,13 @@ class Agent:
             if (msg.frm or "") == "user":
                 # Both this message and the promoted one are still queued, so
                 # the obligation stays open — just restart its clock.
-                obligations.settle(self.paths, self.bot.name)
+                obligations.settle(
+                    self.paths,
+                    self.bot.name,
+                    source_id=msg.recovery_input_id
+                    if msg.origin == messaging.ORIGIN_RECOVERY
+                    else msg.id,
+                )
             return True
         messaging.mark_processed(self.paths, self.bot.name, path)
         self._clear_attempt(msg.id)
@@ -3621,7 +3787,13 @@ class Agent:
             # the coalesced ack obligation clears, or re-stamps while more user
             # chats still wait in the queue. A process crash never
             # reaches this line, leaving the obligation for boot-time redrive.
-            obligations.settle(self.paths, self.bot.name)
+            obligations.settle(
+                self.paths,
+                self.bot.name,
+                source_id=msg.recovery_input_id
+                if msg.origin == messaging.ORIGIN_RECOVERY
+                else msg.id,
+            )
         return True
 
     def _reply_terminal(

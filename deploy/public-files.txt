@@ -366,3 +366,4 @@ docs/google-workspace-oauth.md
 tests/test_jev_evidence.py
 agent/outgoing.py
 tests/test_card_contracts.py
+tests/test_routine_continuations.py
