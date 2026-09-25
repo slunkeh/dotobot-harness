@@ -19,7 +19,7 @@ _ROWS: list[tuple[str, str, str, str]] = [
         "4dem",
         "official",
         "https://api.4dem.it/open-api",
-        "Store the 4Dem API key. The connector exchanges it at /authenticate for a bearer token before every request. Paths are relative to https://api.4dem.it, for example /addressbook/. Dedicated and partner API-channel hosts are not covered.",
+        "Requires an existing legacy 4Dem account: its signup link currently redirects to Positive User pricing, which does not provision a 4Dem API key. Store the 4Dem API key. The connector exchanges it at /authenticate for a bearer token before every request. Paths are relative to https://api.4dem.it, for example /addressbook/. Dedicated and partner API-channel hosts are not covered.",
     ),
     (
         "abyssale",
