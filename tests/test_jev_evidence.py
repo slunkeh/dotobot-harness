@@ -117,7 +117,8 @@ def test_authoritative_history_result_never_filtered(paths, monkeypatch):
     assert jev_features.filter_tool_result(paths, "request", result) == result
 
 
-def test_runtime_revises_only_answer_without_repeating_tool(tmp_path, monkeypatch):
+@pytest.mark.parametrize("repair_returns_tool", [False, True])
+def test_runtime_revises_only_answer_without_repeating_tool(tmp_path, monkeypatch, repair_returns_tool):
     from agent import runtime
     from agent.tools import Tool, default_tools
     from providers.base import Completion, Provider, ToolCall
@@ -132,6 +133,10 @@ def test_runtime_revises_only_answer_without_repeating_tool(tmp_path, monkeypatc
             calls.append(kwargs)
             if "Draft answer:" in messages[-1].content:
                 assert kwargs["tools"] == []
+                if repair_returns_tool:
+                    return Completion(text="", tool_calls=[
+                        ToolCall(id="repeat", name="recall", arguments={"query": "status"})
+                    ])
                 return Completion(text="Uploaded; installation remains unchecked.")
             if not any(m.role == "tool" for m in messages):
                 return Completion(text="", tool_calls=[ToolCall(id="read", name="recall", arguments={"query": "status"})])
@@ -151,7 +156,11 @@ def test_runtime_revises_only_answer_without_repeating_tool(tmp_path, monkeypatc
     monkeypatch.setattr(jev, "_request", lambda key, state, qs: {
         "supported": {"choice": "unsupported" if state["reply"] == "Installed." else "supported", "confidence": 1},
     })
-    assert agent._produce("user", "Check the upload status") == "Uploaded; installation remains unchecked."
+    result = agent._produce("user", "Check the upload status")
+    if repair_returns_tool:
+        assert result.startswith("Completion remains unverified")
+    else:
+        assert result == "Uploaded; installation remains unchecked."
     assert len(calls) == 3 and len(actions) == 1
 
 
