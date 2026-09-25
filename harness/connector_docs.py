@@ -1112,9 +1112,9 @@ _ROWS: list[tuple[str, str, str, str]] = [
     ),
     (
         "slack",
-        "community",
-        "https://github.com/korotovsky/slack-mcp-server",
-        "Table lists a community server; harness already uses official mcp.slack.com/mcp.",
+        "official",
+        "https://docs.slack.dev/ai/slack-mcp-server/",
+        "Uses Slack's official MCP server at mcp.slack.com/mcp. Register a Slack app with the displayed Client ID and Client Secret, enable Slack MCP Server, and allow the localhost callback. The default scopes cover public-channel search, details, history, and posting only.",
     ),
     (
         "stripe",
