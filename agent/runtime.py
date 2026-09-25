@@ -2299,6 +2299,14 @@ class Agent:
         stuck_reason: str | None = None
         final_text = ""
         jev_evidence = []
+        # Do not send historical receipts or image data to a text-only reviewer.
+        # If they contributed to this answer, the optional check must abstain.
+        try:
+            completion_evidence_complete = not images and not (
+                ctx.task_id and self._ledger().turn_rows(self.bot.name, ctx.task_id)
+            )
+        except delivery.DeliveryUnavailable:
+            completion_evidence_complete = False
         jev_filter_checks = 0
         sink: dict = {"typing": False, "chunks": []}
         repair_budget = repairs.RepairState()
@@ -2371,6 +2379,26 @@ class Agent:
             return completion.text
 
         ctx.browser_text = browser_text
+
+        def repair_completion(instruction):
+            nonlocal turn_requests
+            if self._preempted(turn_id) or not repair_budget.spend():
+                return ""
+            turn_requests += 1
+            try:
+                revised = self.active_provider.complete(
+                    [*messages, Message(role="user", content=instruction + "\n\nDraft answer:\n" + final_text)],
+                    system=system,
+                    tools=[],
+                    max_tokens=2048,
+                    temperature=0,
+                )
+            except ProviderError:
+                return ""
+            add_usage(turn_usage, revised.usage)
+            # This is an answer revision only. Never dispatch repair tool calls.
+            return "" if revised.tool_calls else revised.text
+
         started_model = False
         commentary_rounds = 0
         crashed = True
@@ -2724,6 +2752,8 @@ class Agent:
                             state = "error" if str(result).startswith("error:") else "done"
                             _emit_trail_tool(writer, call.name, state, args, result)
                             computer_progress.on_tool(writer, ctx, call.name, args, state)
+                        if ctx.images or call.name == "search_history":
+                            completion_evidence_complete = False
                         pending_images.extend(ctx.images)
                         ctx.images.clear()
                         if (
@@ -2741,6 +2771,7 @@ class Agent:
 
                         if (
                             jev_filter_checks < 3
+                            and call.name != "search_history"
                             and s_intent in {govern.INTENT_READ, govern.INTENT_READ_TOOL}
                             and not str(result).startswith("error:")
                             and len(str(result)) >= 4000
@@ -2875,15 +2906,20 @@ class Agent:
                     final_text = f"{final_text.strip()}\n\n{cap}"
                 else:
                     final_text = cap
+            from harness.jev_features import check_completion
+
+            if final_text and not self._turn_interrupted() and stuck_reason is None:
+                final_text = check_completion(
+                    self.paths, final_text, jev_evidence, writer=writer,
+                    evidence_complete=completion_evidence_complete, repair=repair_completion,
+                )
+                if self._preempted(turn_id):
+                    self._mark_interrupted()
+                    final_text = self._interrupt_text()
             crashed = False
         finally:
             self._record_turn_usage(turn_requests, turn_usage, origin)
             computer_progress.finish(writer, ctx, error=crashed or stuck_reason is not None)
-
-        from harness.jev_features import check_completion
-
-        if final_text and not self._turn_interrupted() and stuck_reason is None:
-            final_text = check_completion(self.paths, final_text, jev_evidence, writer=writer)
 
         if task:
             try:

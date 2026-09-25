@@ -170,8 +170,10 @@ API key; TypeSafe bills your account directly. Enabling it sends the current
 request and recalled memory excerpts to TypeSafe. It does not replace your chat
 model or grant permission to act. Additional features are separate opt-ins; merely
 enabling Jev never enables them.
-Uncertain selections stay included. Failed, rate-limited, timed-out or oversized
-requests fall back to standard memory.
+Uncertain selections stay included. Failed, rate-limited, timed-out, oversized
+or all-omitted selections fall back to standard memory. Authoritative decisions
+are retained locally without sending their content to the selector. Selection
+diagnostics contain hashed candidate identifiers, not memory text.
 
 Compatible apps offer **Settings → Bot → Jev** on Mac and **Settings → Jev** on
 iPhone. Connect/test the key, then enable Jev separately. Older apps can use the
@@ -197,7 +199,7 @@ Compatible Mac/iPhone settings expose each supported feature separately.
 | `compaction` | Compare the same bounded conversation excerpt used by the summarizer with its candidate summary. Confidently missing/contradicted constraints, decisions, identifiers or unfinished work trigger existing corrective retries. No passing candidate means no summary commit. Epoch folds with a detected omission are skipped. Original session records remain intact. |
 | `memory` | Compare a new memory with the last 30 saved facts. Persist advisory durable/temporary and new/duplicate/conflict labels alongside it; the remember tool reports them. Never silently delete, replace or discard a requested memory. |
 | `tool_results` | Filter clearly unrelated entries from large, successful read-only JSON search results (`results`, `items`, `messages`, `events` or `files`). Preserve original retained objects, pagination/count metadata and external-content boundaries; mark omissions. Unsupported shapes, errors, uncertainty, and an all-omitted result keep the original. At most three eligible results are considered per turn. |
-| `completion` | Compare a final reply with this turn's original tool receipts. Append an explicit unverified-outcomes note for confidently unsupported action-completion claims. A model judgment is not proof of success or failure. |
+| `completion` | Compare a final reply with this turn's original tool receipts. A confidently unsupported claim gets one tool-free answer revision and recheck, never an action retry or contradictory footer. If the main agent used images, earlier receipts or structured history, this text-only review abstains; those records are not additionally sent to TypeSafe. A model judgment is not proof of success or failure. |
 | `handoffs` | Offer `recommend_handoff(task)` to the bot. Compare the task with roster roles and the requesting bot's pending handoffs in this conversation; group chats restrict candidates to members. Recommend a bot and flag possible duplicates. Never send, suppress, reroute or authorize a handoff. |
 | `notifications` | Classify the final reply's attention needs to order pending push delivery. Approval/input prompts retain top priority. Every notification remains queued; nothing is suppressed. Existing notification preferences and relay payloads remain unchanged. |
 | `browser` | Offer `computer_browser(goal, max_steps)` for ordinary HTML navigation and forms. Send the bounded goal, visible page text, controls and recent actions to TypeSafe. Jev selects the operation and compatible target together; the bot's configured model generates literal field text only when needed. Every action passes existing permissions. |

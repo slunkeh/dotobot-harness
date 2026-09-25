@@ -173,13 +173,14 @@ def test_tool_filter_never_changes_errors_or_unsupported_shapes(paths, monkeypat
         assert features.filter_tool_result(paths, "question", result) == result
 
 
-def test_completion_claim_is_flagged_not_rewritten_as_failure(paths, monkeypatch):
+def test_completion_claim_is_not_preserved_beside_a_contradictory_warning(paths, monkeypatch):
     enable(paths, "completion")
     answer(monkeypatch, {"supported": "unsupported"})
     text = features.check_completion(
         paths, "Installed.", [{"tool": "upload", "result": "uploaded"}]
     )
-    assert text.startswith("Installed.") and "unverified" in text
+    assert not text.startswith("Installed.") and "unverified" in text
+    assert "failed" not in text and "may have happened" in text
     answer(monkeypatch, {"supported": "unsupported"}, confidence=0.5)
     assert features.check_completion(paths, "Installed.", []) == "Installed."
 

@@ -173,6 +173,8 @@ def filter_tool_result(paths, query, result, *, writer=None):
     items = data[field]
     if not 3 <= len(items) <= 20 or not all(isinstance(x, dict) for x in items):
         return result
+    if any(item.get("protected_context") is True for item in items):
+        return result
     answers = choices(
         paths,
         "tool_results",
@@ -208,28 +210,48 @@ def filter_tool_result(paths, query, result, *, writer=None):
     return selected if len(selected) < len(result) else result
 
 
-def check_completion(paths, text, evidence, *, writer=None):
-    answers = choices(
-        paths,
-        "completion",
-        {"reply": text, "tool_evidence": evidence},
-        {
-            "supported": question(
-                "Does the reply claim an action was completed beyond what tool evidence establishes? Distinguish planned, attempted, uploaded, published, available and installed. Advice and ordinary answers do not claim execution. Missing evidence is not proof of failure.",
+def check_completion(paths, text, evidence, *, writer=None, evidence_complete=True, repair=None):
+    """At most one tool-free revision, without enlarging the external payload.
+
+    When the main agent used images or prior receipts, abstain: a text-only
+    current-turn reviewer does not have enough context to overrule it. Those
+    images and historical records stay with the main agent.
+    """
+    if not evidence_complete:
+        return text
+
+    def unsupported(reply):
+        answers = choices(
+            paths, "completion", {"reply": reply, "tool_evidence": evidence},
+            {"supported": question(
+                "Does the reply claim an action completed beyond the supplied tool evidence? "
+                "Distinguish planned, attempted, uploaded, published, available and installed. "
+                "Advice does not claim execution. Handler success or browser input alone is not publication. "
+                "Missing evidence is not proof of failure or non-execution.",
                 {
                     "supported": "No unsupported action-completion claim",
                     "unsupported": "At least one action-completion claim exceeds the supplied evidence",
                 },
-            )
-        },
-        writer=writer,
-    )
-    if answers and answers["supported"] == "unsupported":
-        return (
-            text
-            + "\n\nVerification note: Jev could not confirm every completion claim from this turn’s tool results. Treat those outcomes as unverified until checked."
+            )}, writer=writer,
         )
-    return text
+        return bool(answers and answers["supported"] == "unsupported")
+
+    if not unsupported(text):
+        return text
+    if repair is not None:
+        revised = repair(
+            "Review this answer against the original tool results and recorded outcomes. "
+            "A reviewer found a possible unsupported completion claim. Correct only claims "
+            "that exceed the evidence. Missing receipts are not proof of failure or non-execution. "
+            "Do not retry actions, call tools, or claim an action failed merely because evidence "
+            "is unavailable. Return one consistent final answer with precise remaining uncertainty."
+        )
+        if isinstance(revised, str) and revised.strip() and not unsupported(revised):
+            return revised.strip()
+    return (
+        "Completion remains unverified from the available evidence. The action may have happened, "
+        "so its recorded result should be checked before any retry."
+    )
 
 
 def handoff_advice(paths, task, candidates, pending, *, writer=None):

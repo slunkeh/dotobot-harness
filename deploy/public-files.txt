@@ -363,3 +363,4 @@ harness/delegated_oauth.py
 tests/test_delegated_oauth.py
 
 docs/google-workspace-oauth.md
+tests/test_jev_evidence.py
