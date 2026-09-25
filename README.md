@@ -181,6 +181,15 @@ named actions need distinct IDs when they represent different decisions.
 
 ## Recovering context and credential setup
 
+Selecting a connector account saves that choice for this bot and conversation.
+Later turns, new tasks, restarts and context compaction retain it without another
+selection. Explicitly asking to stop using the account removes the saved choice.
+Disabled accounts cannot run, and a replacement account never inherits the old
+account's selection. Other chats and background jobs keep their own scope;
+individual actions still follow the normal approval rules. Existing chats recover
+their selections from recorded human choices, without treating assistant replies
+or retrieved documents as permission.
+
 The built-in `search_history` tool retrieves original messages, decision cards
 and delivery receipts in the current conversation, including records behind a
 compacted summary. Its page and text offsets make long records recoverable.

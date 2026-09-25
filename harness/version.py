@@ -5,4 +5,4 @@ can read it without triggering the package's heavier imports. pyproject.toml
 reads it via `[tool.setuptools.dynamic]`.
 """
 
-__version__ = "0.2.127"
+__version__ = "0.2.128"

@@ -316,6 +316,7 @@ tests/test_stream_contract.py
 tests/test_stream_resume.py
 tests/test_streaming.py
 tests/test_task_runtime.py
+tests/test_chat_connector_scope.py
 tests/test_taskscope.py
 tests/test_task_continuity.py
 tests/test_teachrec.py

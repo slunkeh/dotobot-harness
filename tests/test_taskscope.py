@@ -1,4 +1,4 @@
-"""Human-source connector scope survives continuation without mining old prose."""
+"""Human-source chat selection is independent of task continuation."""
 
 import pytest
 
@@ -49,7 +49,7 @@ def scope_home(tmp_path, monkeypatch):
 
 
 def start(paths, text, input_id, **kwargs):
-    return begin_task(paths, "atlas", "main", text=text, input_id=input_id, **kwargs)
+    return begin_task(paths, "atlas", "peer:user", text=text, input_id=input_id, **kwargs)
 
 
 def test_continuation_survives_restart_and_keeps_human_source(scope_home):
@@ -106,20 +106,21 @@ def test_referential_followup_keeps_scope_but_revalidates_actions(scope_home, te
         'Summarize: "use it to write"',
     ],
 )
-def test_new_subject_or_quoted_followup_does_not_inherit(scope_home, text):
+def test_new_subject_keeps_chat_selection_without_reusing_task(scope_home, text):
     paths, _ = scope_home
     first = start(paths, "Use Notion", "first")
     second = start(paths, text, "second")
     assert second["task_id"] != first["task_id"]
-    assert second["connector_ids"] == []
+    assert second["connector_ids"] == ["n"]
+    assert second["provenance"] == first["provenance"]
 
 
-def test_unrelated_input_does_not_inherit_previous_chat_tools(scope_home):
+def test_unrelated_input_keeps_previous_chat_tools(scope_home):
     paths, _ = scope_home
     first = start(paths, "Use Notion", "first")
     second = start(paths, "Explain photosynthesis", "second")
     assert second["task_id"] != first["task_id"]
-    assert second["connector_ids"] == []
+    assert second["connector_ids"] == ["n"]
 
 
 def test_replayed_input_keeps_identity_without_replacing_newer_task(scope_home):
@@ -128,7 +129,7 @@ def test_replayed_input_keeps_identity_without_replacing_newer_task(scope_home):
     current = start(paths, "Explain photosynthesis", "second")
     assert start(paths, "Use Gmail instead", "first") == first
     assert scope_for_input(paths, "atlas", "first") == first
-    assert read_task(paths, "atlas", "main") == current
+    assert read_task(paths, "atlas", "peer:user") == current
 
 
 def test_live_correction_removes_connector_and_invalidates_old_revision(scope_home):
@@ -235,18 +236,18 @@ def test_stop_and_stale_finalization_do_not_change_successor(scope_home):
     assert stopped["status"] == "stopped"
     assert stopped["connector_ids"] == []
     assert not mark_task(
-        paths, "atlas", "main", first["task_id"], first["revision"], "completed", "done"
+        paths, "atlas", "peer:user", first["task_id"], first["revision"], "completed", "done"
     )
-    assert read_task(paths, "atlas", "main") == stopped
+    assert read_task(paths, "atlas", "peer:user") == stopped
 
 
 def test_task_finalization_updates_only_matching_revision(scope_home):
     paths, _ = scope_home
     task = start(paths, "Use Notion", "first")
     assert mark_task(
-        paths, "atlas", "main", task["task_id"], task["revision"], "completed", "Verified"
+        paths, "atlas", "peer:user", task["task_id"], task["revision"], "completed", "Verified"
     )
-    assert read_task(paths, "atlas", "main")["outcome"] == "Verified"
+    assert read_task(paths, "atlas", "peer:user")["outcome"] == "Verified"
 
 
 def test_conversations_keep_independent_scope(scope_home):
@@ -254,7 +255,7 @@ def test_conversations_keep_independent_scope(scope_home):
     direct = start(paths, "Use Notion", "first")
     room = begin_task(paths, "atlas", "room:r1", text="Use Gmail Work", input_id="room")
     assert room["task_id"] != direct["task_id"]
-    assert read_task(paths, "atlas", "main")["connector_ids"] == ["n"]
+    assert read_task(paths, "atlas", "peer:user")["connector_ids"] == ["n"]
 
 
 def test_bound_routine_replays_human_scope_without_parsing_generated_prompt(scope_home):
@@ -265,7 +266,7 @@ def test_bound_routine_replays_human_scope_without_parsing_generated_prompt(scop
         paths,
         "atlas",
         routine["id"],
-        conversation="main",
+        conversation="peer:user",
         task_id=task["task_id"],
         revision=task["revision"],
     )
@@ -275,7 +276,7 @@ def test_bound_routine_replays_human_scope_without_parsing_generated_prompt(scop
     replay = scope_for_input(paths, "atlas", queued.id)
     assert replay["connector_ids"] == ["gw"]
     assert replay["provenance"][0]["source_id"] == "human"
-    assert read_task(paths, "atlas", "main")["task_id"] == task["task_id"]
+    assert read_task(paths, "atlas", "peer:user")["task_id"] == task["task_id"]
 
 
 def test_unbound_routine_has_no_implicit_scope(scope_home):
@@ -299,7 +300,7 @@ def test_stale_task_cannot_bind_routine(scope_home):
             paths,
             "atlas",
             row["id"],
-            conversation="main",
+            conversation="peer:user",
             task_id=first["task_id"],
             revision=first["revision"],
         )
@@ -317,8 +318,8 @@ def test_registered_secret_never_reaches_durable_task_or_outcome(scope_home, mon
     paths, _ = scope_home
     task = start(paths, f"Use Notion; token {secret}", "human")
     assert secret not in json.dumps(scope_for_input(paths, "atlas", "human"))
-    mark_task(paths, "atlas", "main", task["task_id"], task["revision"], "failed", secret)
-    assert secret not in json.dumps(read_task(paths, "atlas", "main"))
+    mark_task(paths, "atlas", "peer:user", task["task_id"], task["revision"], "failed", secret)
+    assert secret not in json.dumps(read_task(paths, "atlas", "peer:user"))
 
 
 def test_store_failure_propagates_without_fake_scope(scope_home, monkeypatch):
@@ -344,7 +345,7 @@ def test_bound_routine_passes_scope_to_live_relay(scope_home):
         paths,
         "atlas",
         row["id"],
-        conversation="main",
+        conversation="peer:user",
         task_id=task["task_id"],
         revision=task["revision"],
     )
@@ -546,7 +547,7 @@ def test_replayed_correction_does_not_duplicate_instruction_or_clear_newer_const
     second = start(paths, "Keep it short", "second", active_followup=True)
     third = start(paths, "Use British spelling", "third", active_followup=True)
     assert start(paths, "Keep it short", "second", active_followup=True) == second
-    assert read_task(paths, "atlas", "main")["instructions"] == third["instructions"]
+    assert read_task(paths, "atlas", "peer:user")["instructions"] == third["instructions"]
 
 
 def test_unrelated_task_drops_old_correction_list(scope_home):
@@ -571,7 +572,7 @@ def test_retention_keeps_current_active_waiting_and_unknown_tasks(scope_home):
     assert active_task_ids(paths, "atlas") == retained
     assert active_task_ids(paths) == retained
     assert active_task_ids(paths, "another-bot") == set()
-    other = begin_task(paths, "another-bot", "main", text="hello", input_id="another")
+    other = begin_task(paths, "another-bot", "peer:user", text="hello", input_id="another")
     assert active_tasks(paths) == {
         *(("atlas", task_id) for task_id in retained),
         ("another-bot", other["task_id"]),
@@ -583,10 +584,10 @@ def test_action_surface_scope_requires_exact_live_source_task(scope_home):
 
     paths, _ = scope_home
     task = start(paths, "Use Notion", "first")
-    assert matching_scope(paths, "atlas", "main", task["task_id"], task["revision"])
-    assert matching_scope(paths, "atlas", "main", task["task_id"], task["revision"] + 1) is None
-    mark_task(paths, "atlas", "main", task["task_id"], task["revision"], "unknown")
-    assert matching_scope(paths, "atlas", "main", task["task_id"], task["revision"]) is None
+    assert matching_scope(paths, "atlas", "peer:user", task["task_id"], task["revision"])
+    assert matching_scope(paths, "atlas", "peer:user", task["task_id"], task["revision"] + 1) is None
+    mark_task(paths, "atlas", "peer:user", task["task_id"], task["revision"], "unknown")
+    assert matching_scope(paths, "atlas", "peer:user", task["task_id"], task["revision"]) is None
 
 
 def test_idle_generated_task_can_back_a_block_without_indefinite_receipt_retention(scope_home):
@@ -623,7 +624,7 @@ def test_routine_scope_failure_reports_existing_mutation_and_attempts_pause(
 
     paths, _ = scope_home
     ctx = SimpleNamespace(
-        paths=paths, bot="atlas", task_id="task", task_revision=1, task_conversation="main"
+        paths=paths, bot="atlas", task_id="task", task_revision=1, task_conversation="peer:user"
     )
     calls = []
 
