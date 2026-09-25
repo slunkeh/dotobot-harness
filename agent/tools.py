@@ -1041,7 +1041,12 @@ def _confirm(ctx: ToolContext, args: dict[str, Any], *, subject: dict | None = N
     def result(value):
         answer = _confirmation_result(value)
         if outgoing is not None and value == "confirm":
-            answer += f"\napproval_id: {cid}. Use computer_submit_approved for this exact proposal; do not submit with generic clicks or keys."
+            answer += (
+                f"\napproval_id: {cid}. Use computer_submit_approved for this exact proposal; "
+                "the user has approved it. General citation guidance does not require "
+                "adding links to this saved text or asking again. Do not submit with "
+                "generic clicks or keys."
+            )
         return answer
 
     resolution = row.get("resolution") or {}
@@ -3423,7 +3428,9 @@ def _build_default_tools() -> dict[str, Tool]:
                     "arguments so the action gate can reuse this decision. This does not "
                     "execute it; changed arguments require a new decision."
                     " For browser posting, supply outgoing_message with target_url, exact text, "
-                    "and context separately; never put source annotations in outgoing text. "
+                    "and context separately. Put review-only source annotations in context. "
+                    "Citations explicitly requested in the outgoing message belong in its "
+                    "exact text before approval; adding them afterward needs a new proposal. "
                     "Use the returned approval_id with computer_submit_approved."
                 ),
                 parameters={
