@@ -1,5 +1,7 @@
 """Only an unresolved resumable prompt can release a scheduled worker."""
 
+from types import SimpleNamespace
+
 import pytest
 
 from agent import tools
@@ -62,7 +64,15 @@ def test_resolved_confirmation_then_control_return_keeps_existing_wait(context, 
         waiting.append(row["id"])
         context.control.return_control(context.bot)
 
-    monkeypatch.setattr(tools.time, "sleep", return_computer)
+    monkeypatch.setattr(
+        tools,
+        "time",
+        SimpleNamespace(
+            time=tools.time.time,
+            monotonic=tools.time.monotonic,
+            sleep=return_computer,
+        ),
+    )
     result = tools._request_control(context, {"reason": "Continue the reviewed task"})
     assert result.startswith("ok: the user returned control")
     assert len(waiting) == 1
