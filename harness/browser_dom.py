@@ -12,6 +12,7 @@ from . import cdp
 # shadow DOM, canvas, rich editors, uploads and custom keyboard widgets.
 _SCRIPT = r"""(() => {
     let previous = null;
+    let outgoing = null;
     const visible = e => {
         if (e.checkVisibility && !e.checkVisibility({checkOpacity: true, checkVisibilityCSS: true})) return false;
         const r = e.getBoundingClientRect(), s = getComputedStyle(e);
@@ -80,7 +81,55 @@ _SCRIPT = r"""(() => {
                 [e.type, e.name, e.value, e.checked, e.disabled, e.form?.action, e.form?.method])]);
         return {data, nodes, signature};
     }
+    function messageForm(url, text) {
+        if (location.href !== url || document.visibilityState !== 'visible' ||
+            typeof text !== 'string' || !text.trim() || text.length > 2000) return null;
+        const fields = Array.from(document.querySelectorAll('textarea')).filter(e =>
+            visible(e) && !e.disabled && !e.readOnly && !e.closest('[inert]'));
+        if (fields.length !== 1) return null;
+        const field = fields[0], form = field.form;
+        if (!form || new URL(form.action, location.href).origin !== location.origin ||
+            (field.value !== '' && field.value !== text)) return null;
+        const buttons = Array.from(form.elements).filter(e =>
+            ['BUTTON','INPUT'].includes(e.tagName) && e.type === 'submit' && visible(e) && !e.disabled);
+        if (buttons.length !== 1) return null;
+        const button = buttons[0], r = button.getBoundingClientRect();
+        const top = document.elementFromPoint((Math.max(0,r.left)+Math.min(innerWidth,r.right))/2,
+            (Math.max(0,r.top)+Math.min(innerHeight,r.bottom))/2);
+        if (!top || !(top === button || button.contains(top))) return null;
+        const controls = Array.from(form.elements);
+        // Input handlers may rewrite hidden recipients or the submit endpoint.
+        // Permit only the approved textarea value to change during preparation.
+        const binding = JSON.stringify([form.action, form.method, form.target,
+            button.formAction, button.formMethod, button.formTarget,
+            controls.map(e => [e.tagName, e.type, e.name, e === field ? null : e.value,
+                e.checked, e.disabled])]);
+        if (new URL(button.formAction || form.action, location.href).origin !== location.origin) return null;
+        return {field, form, button, controls, binding, signature: read().signature};
+    }
     return {
+        prepareOutgoing(url, text) {
+            outgoing = messageForm(url, text);
+            return outgoing ? 'ready' : 'unsupported';
+        },
+        submitOutgoing(url, text) {
+            const old = outgoing; outgoing = null;
+            const current = messageForm(url, text);
+            if (!old || !current || old.field !== current.field || old.button !== current.button ||
+                old.form !== current.form || old.signature !== current.signature) return 'stale';
+            if (current.field.value === '') {
+                Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set.call(current.field, text);
+                current.field.dispatchEvent(new Event('input', {bubbles:true}));
+                current.field.dispatchEvent(new Event('change', {bubbles:true}));
+            }
+            const checked = messageForm(url, text);
+            if (!checked || checked.field !== current.field || checked.button !== current.button ||
+                checked.form !== current.form || checked.field.value !== text ||
+                checked.binding !== current.binding || checked.controls.length !== current.controls.length ||
+                checked.controls.some((e, i) => e !== current.controls[i])) return 'stale';
+            checked.button.click();
+            return 'ok';
+        },
         observe() { previous = read(); return previous.data; },
         act(operation, target, text) {
             if (!previous) return 'stale';
@@ -204,6 +253,14 @@ class Browser:
             target,
             text,
         )
+
+    def prepare_outgoing(self, url, text):
+        self.guard()
+        return self._call("function(url, text) { return this.prepareOutgoing(url, text); }", url, text)
+
+    def submit_outgoing(self, url, text):
+        self.guard()
+        return self._call("function(url, text) { return this.submitOutgoing(url, text); }", url, text)
 
     def __exit__(self, *exc):
         if self.session:

@@ -1234,6 +1234,8 @@ class _Handler(BaseHTTPRequestHandler):
             "resolution": dict(resolution),
             "mutation": "updated",
         }
+        if live.get("thread_id"):
+            frame["thread_id"] = live["thread_id"]
         if bot:
             frame["bot"] = bot
         if room:
@@ -1270,6 +1272,8 @@ class _Handler(BaseHTTPRequestHandler):
             payload=payload,
             frm=bot,
             resolution=resolution,
+            thread_id=live.get("thread_id"),
+            origin=live.get("origin"),
         )
 
     def _push_lists(self, *, bots: bool = False, rooms: bool = False) -> None:

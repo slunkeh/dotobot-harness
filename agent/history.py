@@ -716,7 +716,23 @@ def user_thread(
     rows: list[dict] = []
     last_in_peer = ""
     card_index: dict[str, int] = {}
+    prompts = {p["id"]: p for p in memory.store.prompts(memory.bot)}
     for record in memory._session_records():
+        if record.get("role") == "card":
+            # Older transcript projections omitted the prompt's conversation.
+            # Repair before filtering, including resolved prompts absent from
+            # the live snapshot; never move a side-thread card into the main chat.
+            prompt = prompts.get(str(record.get("card_id") or ""))
+            if prompt:
+                record = {**record}
+                for key in ("room", "thread_id", "origin", "resolution"):
+                    if prompt.get(key):
+                        record[key] = prompt[key]
+                scope, _, target = str(prompt.get("task_conversation") or "").partition(":")
+                if target and scope in {"room", "thread", "peer"}:
+                    key = {"room": "room", "thread": "thread_id", "peer": "peer"}[scope]
+                    if not record.get(key):
+                        record[key] = target
         if record.get("room") is not None:
             continue
         if record.get("origin") == "colleague_reply" and str(record.get("role", "")).startswith(
@@ -754,6 +770,8 @@ def user_thread(
                 "message_id": rec_mid,
             }
             origin = str(record.get("origin") or "").strip()
+            if rec_tid:
+                row["thread_id"] = rec_tid
             if origin:
                 row["origin"] = origin
             resolution = record.get("resolution")

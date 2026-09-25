@@ -218,6 +218,10 @@ def _open_prompt(ctx: ToolContext, payload: dict[str, Any]) -> str | None:
         payload = {**payload, "room": ctx.room}
     if ctx.turn_id:
         payload = {**payload, "request_id": ctx.turn_id}
+    if ctx.thread_id:
+        payload = {**payload, "thread_id": ctx.thread_id}
+    if ctx.origin:
+        payload = {**payload, "origin": ctx.origin}
     return write_prompt(ctx.paths, payload)
 
 
@@ -895,6 +899,8 @@ def _persist_card(
         payload=payload,
         frm=ctx.bot,
         resolution=resolution,
+        thread_id=ctx.thread_id,
+        origin=ctx.origin,
     )
 
 
@@ -920,6 +926,28 @@ def _confirm(ctx: ToolContext, args: dict[str, Any], *, subject: dict | None = N
     if bool(args.get("allow_all")):
         payload["allow_all"] = True
     proposal = args.get("proposed_action")
+    outgoing = args.get("outgoing_message")
+    if outgoing is not None:
+        from .outgoing import proposal as outgoing_proposal
+
+        if proposal is not None or subject is not None:
+            return "error: use outgoing_message for browser posting, or proposed_action for a connector action"
+        try:
+            message = outgoing_proposal(outgoing)
+        except ValueError as exc:
+            return f"error: {exc}"
+        payload["outgoing_message"] = message
+        payload.pop("allow_all", None)
+        payload.pop("allow_all_label", None)
+        # Legacy clients render question/detail. Keep source/context separate
+        # from the immutable text used by computer_submit_approved.
+        payload["question"] = "Post this exact message?"
+        payload["detail"] = (
+            f"Target: {message['target_url']}\n\nContext (not posted):\n{message['context']}"
+            f"\n\nExact message:\n{message['text']}"
+        )
+        payload["confirm_label"], payload["cancel_label"] = "Accept", "Decline"
+        subject = {"outgoing_message": {k: message[k] for k in ("target_url", "text")}}
     if proposal is not None:
         if not isinstance(proposal, dict) or not isinstance(proposal.get("arguments"), dict):
             return "error: proposed_action needs a tool and an arguments object"
@@ -939,12 +967,18 @@ def _confirm(ctx: ToolContext, args: dict[str, Any], *, subject: dict | None = N
         )
     row, created = _decision_prompt(ctx, "confirm", payload, subject=subject)
     cid = row["id"]
+    def result(value):
+        answer = _confirmation_result(value)
+        if outgoing is not None and value == "confirm":
+            answer += f"\napproval_id: {cid}. Use computer_submit_approved for this exact proposal; do not submit with generic clicks or keys."
+        return answer
+
     resolution = row.get("resolution") or {}
     if resolution:
         if resolution.get("state") != "answered":
             return "error: this confirmation was skipped; do not assume approval"
         val = str(resolution.get("responded_value") or "")
-        return _confirmation_result(val)
+        return result(val)
     if created:
         _emit_card(ctx, "confirm", payload, card_id=cid)
     else:
@@ -962,7 +996,7 @@ def _confirm(ctx: ToolContext, args: dict[str, Any], *, subject: dict | None = N
 
         if _wait_for_human(ctx, done):
             val = answered = str(picked["value"])
-            return _confirmation_result(val)
+            return result(val)
     finally:
         _settle_prompt(
             ctx,
@@ -2806,6 +2840,8 @@ def default_tools() -> dict[str, Tool]:
 
 
 def _build_default_tools() -> dict[str, Tool]:
+    from .outgoing import submit as submit_outgoing
+
     return {
         "recommend_handoff": Tool(
             ToolSpec(
@@ -3147,6 +3183,9 @@ def _build_default_tools() -> dict[str, Tool]:
                     "a known tool action, include proposed_action with its exact tool and "
                     "arguments so the action gate can reuse this decision. This does not "
                     "execute it; changed arguments require a new decision."
+                    " For browser posting, supply outgoing_message with target_url, exact text, "
+                    "and context separately; never put source annotations in outgoing text. "
+                    "Use the returned approval_id with computer_submit_approved."
                 ),
                 parameters={
                     "type": "object",
@@ -3156,6 +3195,16 @@ def _build_default_tools() -> dict[str, Tool]:
                         "confirm_label": {"type": "string", "description": "e.g. Delete"},
                         "cancel_label": {"type": "string"},
                         "destructive": {"type": "boolean"},
+                        "outgoing_message": {
+                            "type": "object",
+                            "properties": {
+                                "target_url": {"type": "string"},
+                                "text": {"type": "string", "description": "Exact outgoing message only"},
+                                "context": {"type": "string", "description": "Review context and sources; never posted"},
+                            },
+                            "required": ["target_url", "text"],
+                            "additionalProperties": False,
+                        },
                         "proposed_action": {
                             "type": "object",
                             "properties": {
@@ -3512,6 +3561,23 @@ def _build_default_tools() -> dict[str, Tool]:
                 },
             ),
             _computer_type_secret,
+        ),
+        "computer_submit_approved": Tool(
+            ToolSpec(
+                name="computer_submit_approved",
+                description=(
+                    "Submit the exact browser message approved using confirm.outgoing_message. "
+                    "Open the approved URL and leave one visible plain textarea with a standard "
+                    "submit button in its form. It must be empty or already contain the exact approved text. "
+                    "The harness checks the page/composer, fills only approved text and submits once. "
+                    "Unsupported or ambiguous forms fail closed. Never substitute generic clicks or keys. "
+                    "A dispatched submit is not publication proof; inspect the result."
+                ),
+                parameters={"type": "object", "properties": {
+                    "approval_id": {"type": "string"},
+                }, "required": ["approval_id"], "additionalProperties": False},
+            ),
+            submit_outgoing,
         ),
         "computer_browser": Tool(
             ToolSpec(

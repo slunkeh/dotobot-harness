@@ -37,6 +37,7 @@ would ride in the model's context and on the token bill.
 
 from __future__ import annotations
 
+import sqlite3
 from collections.abc import Callable, Container
 from dataclasses import dataclass
 from typing import Any
@@ -141,6 +142,7 @@ EFFECTS: dict[str, Effect] = {
     # `intent` exists rather than matching on tool names.
     "computer_click": Effect(INTENT_ACTIVATE, _coords),
     "computer_browser": Effect(INTENT_ACTIVATE, lambda a: _arg(a, "goal")),
+    "computer_submit_approved": Effect(INTENT_MESSAGE, lambda a: _arg(a, "approval_id")),
     "computer_move": Effect(INTENT_ACTIVATE, _coords),
     "computer_drag": Effect(INTENT_ACTIVATE, _drag_target),
     "computer_key": Effect(INTENT_ACTIVATE, lambda a: _arg(a, "key", "keys")),
@@ -380,6 +382,37 @@ def govern(
     """
     args = args if isinstance(args, dict) else {}
     intent, target, _askable = classify(name, args, connector_tools)
+    outgoing_row = None
+    outgoing_error = None
+    if name == "computer_submit_approved":
+        ctx.outgoing_approval = None
+        from harness.statestore import store_for
+
+        from .outgoing import proposal
+
+        try:
+            store = store_for(paths)
+            outgoing_row = store.prompt(str(args.get("approval_id") or ""))
+            row = outgoing_row or {}
+            message = proposal((row.get("payload") or {}).get("outgoing_message"))
+            resolution = row.get("resolution") or {}
+            if (
+                set(args) != {"approval_id"}
+                or row.get("bot") != bot
+                or not row.get("task_id")
+                or row.get("task_id") != getattr(ctx, "task_id", None)
+                or row.get("task_revision") != getattr(ctx, "task_revision", None)
+                or row.get("task_conversation") != getattr(ctx, "task_conversation", None)
+                or not store.prompt_current(row)
+                or resolution.get("state") != "answered"
+                or resolution.get("responded_value") != "confirm"
+                or row.get("execution_started")
+                or row.get("subject") != {"outgoing_message": {k: message[k] for k in ("target_url", "text")}}
+            ):
+                raise ValueError("approval does not match this task")
+            target = message["target_url"]
+        except (ValueError, TypeError, KeyError, OSError, sqlite3.Error):
+            outgoing_error = "error: exact outgoing approval is missing, declined, stale, or already used; nothing was posted"
     active = policy or policy_mod.Policy()
     origin = str(getattr(ctx, "origin", None) or "")
     exposed = bool(getattr(ctx, "web_exposed", False))
@@ -536,6 +569,11 @@ def govern(
             "were trying to do and why it would help."
         )
 
+    if outgoing_error:
+        audit_log.record(paths, bot, event="tool.outgoing_held", tool=name, intent=intent,
+                         target=target, decision=audit_log.DECISION_REFUSE, source="outgoing-approval")
+        return outgoing_error
+
     if exposure_refused:
         return (
             f"error: {name} is held back — this turn has viewed web content, "
@@ -552,7 +590,7 @@ def govern(
     # asked for and the fastest way to teach people to click Allow blind.
     # The one built-in exception is the exposure default above, which
     # escalates an attended exposed turn to this same ask.
-    if (decision.ask or exposure_held) and approver is not None:
+    if (decision.ask or exposure_held) and approver is not None and outgoing_row is None:
         detail = target
         if exposure_held and not decision.ask:
             detail = f"after viewing web content: {target or name}"
@@ -619,6 +657,8 @@ def govern(
                 tool_call_id=getattr(ctx, "tool_call_id", "") or "",
             )
             return refusal
+    if outgoing_row is not None:
+        ctx.outgoing_approval = outgoing_row
     return None
 
 

@@ -364,3 +364,5 @@ tests/test_delegated_oauth.py
 
 docs/google-workspace-oauth.md
 tests/test_jev_evidence.py
+agent/outgoing.py
+tests/test_card_contracts.py

@@ -200,6 +200,12 @@ _CLARIFY_PROMPT = (
     "(what to do next, which site or file, yes/no, which bot to create). "
     "Ask one question at a time, then wait. If the answer must be freeform "
     "(a name, URL, or password), ask in plain text or use request_secret."
+    " For posting a browser message, use confirm.outgoing_message with the exact "
+    "target URL and outgoing text, keeping review context and sources in context. "
+    "Never construct approval buttons with show_block or approve an unseen reply. "
+    "After acceptance, computer_submit_approved sends only that saved proposal once; "
+    "if its supported form checks fail, report the limitation rather than bypassing "
+    "the approval binding with generic clicks, keys or a browser agent."
 )
 
 _GROUP_PROMPT = (

@@ -223,3 +223,41 @@ def test_real_dom_fills_selects_and_rejects_stale_covered_and_replaced_nodes(chr
 
     evaluate('const frame = document.createElement("iframe"); document.body.append(frame)')
     assert chrome.observe()["unsupported"]
+
+
+@pytest.mark.timeout(60)
+def test_real_outgoing_form_binds_url_text_and_single_dispatch(chrome):
+    def evaluate(script):
+        return chrome.session.call("Runtime.evaluate", expression=script, returnByValue=True)["result"].get("value")
+
+    evaluate("document.body.innerHTML = '<form onsubmit=\"window.sent=this.elements.body.value; return false\"><textarea name=body></textarea><button>Send</button></form>'")
+    url = chrome.observe()["url"]
+    text = 'A literal message with "quotes" and a question?'
+    assert chrome.prepare_outgoing(url + "different", text) == "unsupported"
+    evaluate("document.querySelector('textarea').value = 'User draft'")
+    assert chrome.prepare_outgoing(url, text) == "unsupported"
+    evaluate("document.querySelector('textarea').value = ''")
+    assert chrome.prepare_outgoing(url, text) == "ready"
+    evaluate("document.querySelector('textarea').value = 'Changed after approval check'")
+    assert chrome.submit_outgoing(url, text) == "stale"
+    assert evaluate("window.sent") is None
+    for mutation in (
+        "e.target.form.action = '/different-recipient'",
+        "e.target.form.method = 'post'",
+        "e.target.form.elements.recipient.value = 'different'",
+        "const old=e.target.form.elements.recipient; old.replaceWith(old.cloneNode())",
+    ):
+        evaluate("document.body.innerHTML = '<form onsubmit=\"window.sent=this.elements.body.value; return false\"><input type=hidden name=recipient value=original><textarea name=body></textarea><button>Send</button></form>'; window.sent = null")
+        evaluate("document.querySelector('textarea').oninput = e => { " + mutation + " }")
+        assert chrome.prepare_outgoing(url, text) == "ready"
+        assert chrome.submit_outgoing(url, text) == "stale"
+        assert evaluate("window.sent") is None
+    evaluate("document.querySelector('textarea').value = ''; document.querySelector('textarea').oninput = null")
+    assert chrome.prepare_outgoing(url, text) == "ready"
+    assert chrome.submit_outgoing(url, text) == "ok"
+    assert evaluate("window.sent") == text
+    assert chrome.submit_outgoing(url, text) == "stale"
+    evaluate("document.querySelector('textarea').value = ''; window.sent = null; document.querySelector('textarea').oninput = e => e.target.value += ' Unapproved source'")
+    assert chrome.prepare_outgoing(url, text) == "ready"
+    assert chrome.submit_outgoing(url, text) == "stale"
+    assert evaluate("window.sent") is None
