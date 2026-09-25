@@ -490,8 +490,8 @@ def test_build_history_trim_appends_transcript_pointer(tmp_path, monkeypatch):
     messages, _ = build_history(memory, peer="user", provider=Provider(model="m"))
     note = transcript_pointer(memory)
     assert messages[0].content.startswith(note)  # rides on the oldest user turn
-    assert str(memory.sessions_dir) in note  # memory/<bot>/sessions/... path
-    assert "grep" in note and "never read them linearly" in note
+    assert str(memory.sessions_dir) not in note
+    assert "search_history" in note and "next_text_offset" in note
 
 
 def test_build_history_untrimmed_has_no_transcript_pointer(tmp_path):

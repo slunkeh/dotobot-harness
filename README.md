@@ -179,6 +179,25 @@ Custom blocks reject unsupported button-action fields and differently labelled
 buttons that submit the same answer. Form submit actions contain only `kind`;
 named actions need distinct IDs when they represent different decisions.
 
+## Recovering context and credential setup
+
+The built-in `search_history` tool retrieves original messages, decision cards
+and delivery receipts in the current conversation, including records behind a
+compacted summary. Its page and text offsets make long records recoverable.
+`recall` remains available for saved facts and routine results. Recovered records
+do not themselves authorize new actions.
+
+For script credentials, `credential_status` reports stored names previously used
+in this conversation or already granted to this bot, without revealing values.
+Reuse its current mounted path; `use_secret_file` supplies a stored credential
+when the file is missing. If configured policy asks on every scheduled run,
+`request_routine_credential_permission` opens an explicit confirmation for the
+named routine and credential. Saved consent can be inspected and revoked with
+the chat permission tools. It covers only that routine configuration and
+credential version; policy denials still apply. Existing bot file grants are a
+separate capability. See [Security](SECURITY.md#conversation-evidence-and-routine-credentials)
+for rotation and revocation boundaries.
+
 ## Develop
 
 The runtime uses only Python's standard library. Install development tools in a

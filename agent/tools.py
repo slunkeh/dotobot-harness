@@ -669,6 +669,27 @@ def _recall(ctx: ToolContext, args: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def _search_history(ctx: ToolContext, args: dict[str, Any]) -> str:
+    from .records import search
+
+    try:
+        values = {key: int(args.get(key, default)) for key, default in (
+            ("limit", 10), ("offset", 0), ("text_offset", 0), ("text_limit", 2000)
+        )}
+        for key in ("since", "before"):
+            if args.get(key):
+                stamp = datetime.fromisoformat(str(args[key]).replace("Z", "+00:00"))
+                if stamp.tzinfo is None:
+                    raise ValueError("dates require a UTC offset")
+                values[key] = stamp.timestamp()
+        result = search(ctx, query=str(args.get("query") or ""),
+                        source=str(args.get("source") or "all"),
+                        record_id=str(args.get("record_id") or ""), **values)
+        return json.dumps(result, ensure_ascii=False)
+    except (ValueError, TypeError, OverflowError) as exc:
+        return f"error: {exc}"
+
+
 _INPUT_POLL = 0.25
 
 
@@ -1074,10 +1095,75 @@ def _list_chat_permissions(ctx: ToolContext, _args: dict[str, Any]) -> str:
         return f"error: chat permissions could not be read: {exc}"
     if not rows:
         return "No standing permissions in this chat."
-    return "\n".join(
-        f"{row['id']}: Always allow creating GitHub issues in {row['repo']}"
-        for row in rows if row.get("tool") == "github_create_issue"
+    lines = []
+    for row in rows:
+        if row.get("tool") == "github_create_issue":
+            lines.append(f"{row['id']}: Always allow creating GitHub issues in {row['repo']}")
+        elif row.get("tool") == "use_secret_file":
+            lines.append(f"{row['id']}: Allow credential file {row['credential']} for routine "
+                         f"{row['routine_id']} with its saved configuration only")
+    return "\n".join(lines)
+
+
+def _request_routine_credential_permission(ctx: ToolContext, args: dict[str, Any]) -> str:
+    from harness.routines import list_routines, routine_revision
+    from harness.secrets import (
+        credential_fingerprint,
+        resolve_env_name,
+        secret_source,
+        valid_secret_name,
     )
+
+    if (ctx.approvals is None or not ctx.task_id or ctx.sender != "user"
+            or ctx.origin not in {None, "", "voice"}
+            or not is_user_chat(ctx.task_conversation) or not _approval_task_current(ctx)):
+        return "error: a current human chat is required to save routine permission"
+    name = str(args.get("name") or "")
+    rid = str(args.get("routine_id") or "")
+    if not valid_secret_name(name):
+        return "error: invalid credential name"
+    name = resolve_env_name(name)
+    if secret_source(name, ctx.paths) is None:
+        return "error: the named credential is not stored; use request_secret first"
+
+    def current():
+        return next((r for r in list_routines(ctx.paths, ctx.bot) if r.get("id") == rid), None)
+
+    row = current()
+    if row is None:
+        return "error: unknown routine for this bot"
+    revision = routine_revision(row)
+    fingerprint = credential_fingerprint(name, ctx.paths)
+    if not fingerprint:
+        return "error: the named credential is unavailable; no permission was saved"
+    for grant in ctx.approvals.standing_permissions(ctx.task_conversation):
+        if (grant.get("tool") == "use_secret_file" and grant.get("routine_id") == rid
+                and grant.get("routine_revision") == revision and grant.get("credential") == name
+                and grant.get("credential_version") == fingerprint):
+            return f"Already allowed: credential file {name} for routine {rid}."
+    token = ctx.approvals.credential_proposal_token(name, fingerprint)
+    out = _confirm(ctx, {
+        "question": f"Allow {row.get('title') or 'this routine'} to use credential file {name} on future runs?",
+        "detail": (f"Only this bot and routine ({rid}) with this saved configuration. "
+                   "The file is private to this bot's computer. Routine changes require a new "
+                   "decision; credential replacement needs a new decision and deletion revokes "
+                   "this permission. Policy denials "
+                   "still apply. Inspect or revoke it with chat permissions.\n\n"
+                   f"Routine instruction:\n{row.get('prompt') or ''}"),
+        "confirm_label": "Allow for this routine", "cancel_label": "Don't allow",
+    }, subject={"action": "routine-credential-permission", "routine_id": rid,
+                "routine_revision": revision, "credential": name,
+                "credential_proposal": token})
+    if out != "user confirmed":
+        return out
+    latest = current()
+    if (not _approval_task_current(ctx) or latest is None
+            or routine_revision(latest) != revision
+            or credential_fingerprint(name, ctx.paths) != fingerprint):
+        return "error: task, routine or credential changed; no permission was saved"
+    ctx.approvals.grant_routine_credential(ctx.task_conversation, rid, revision, name,
+                                         source_task=ctx.task_id, fingerprint=fingerprint)
+    return f"Saved permission for routine {rid} to use credential file {name}."
 
 
 def _request_chat_issue_permission(ctx: ToolContext, args: dict[str, Any]) -> str:
@@ -1173,10 +1259,21 @@ def require_approval(
     try:
         if not _approval_task_current(ctx):
             return "error: the task changed or stopped; this action needs a current proposal"
+        routine_scope = None
+        credential = ""
+        if tool_name == "use_secret_file" and ctx.origin == "routine":
+            from harness.routines import routine_scope_for_task
+            from harness.secrets import resolve_env_name
+
+            routine_scope = routine_scope_for_task(
+                ctx.paths, ctx.bot, ctx.task_conversation, ctx.task_id, ctx.task_revision
+            )
+            credential = resolve_env_name(str((tool_arguments or {}).get("name") or ""))
         verdict, _approval = checked(
             action, target, tool_call_id=ctx.tool_call_id,
             conversation=ctx.task_conversation if standing_repo else "",
             tool_name=tool_name, repo=standing_repo,
+            routine_scope=routine_scope, credential=credential,
         )
         if verdict == VERDICT_ALLOW:
             return None
@@ -1190,6 +1287,10 @@ def require_approval(
                 f"Always allow applies only to creating issues in {standing_repo} "
                 "from this chat. You can inspect and revoke it here later."
             )
+        else:
+            detail = (detail + "\n\n" if detail else "") + (
+                "Allow all this turn expires when this turn ends; it does not grant future runs."
+            )
         out = _confirm(
             ctx,
             {
@@ -1198,7 +1299,7 @@ def require_approval(
                 "confirm_label": "Allow",
                 "cancel_label": "Don't allow",
                 "allow_all": True,
-                "allow_all_label": "Always allow" if standing_repo else "Allow all",
+                "allow_all_label": "Always allow" if standing_repo else "Allow all this turn",
             },
             subject=subject,
         )
@@ -1914,6 +2015,40 @@ def _use_secret_file(ctx: ToolContext, args: dict[str, Any]) -> str:
     )
 
 
+def _credential_status(ctx: ToolContext, args: dict[str, Any]) -> str:
+    from harness.machine_secrets import MachineSecretError, credential_status, directory_for_bot
+    from harness.secrets import valid_secret_name
+
+    from .records import search
+
+    names = {str(args["name"])} if args.get("name") else set()
+    try:
+        if not names:
+            directory = directory_for_bot(ctx.paths, ctx.bot)
+            if directory.is_dir():
+                names.update(p.name for p in directory.iterdir()
+                             if valid_secret_name(p.name) and p.is_file() and not p.is_symlink())
+            offset = 0
+            while True:
+                page = search(ctx, source="decisions", limit=20, offset=offset, text_limit=6000)
+                for record in page["records"]:
+                    if record.get("next_text_offset") is not None:
+                        continue
+                    card = json.loads(record["text"])
+                    if card.get("card_type") == "secret_request" and valid_secret_name(card.get("name")):
+                        names.add(card["name"])
+                offset = page["next_offset"]
+                if offset is None:
+                    break
+        rows = [credential_status(ctx.paths, ctx.bot, name) for name in sorted(names)]
+        return json.dumps({"credentials": rows, "notice":
+            "Presence metadata only. Reuse an existing path with governed script tools. "
+            "If stored but not mounted, use_secret_file supplies it; request_secret is only "
+            "for a missing credential. This does not authorize new actions."})
+    except (MachineSecretError, OSError, ValueError) as exc:
+        return f"error: credential metadata unavailable: {exc}"
+
+
 def _get_secret(ctx: ToolContext, args: dict[str, Any]) -> str:
     name = str(args.get("name", "")).strip()
     if not name:
@@ -2158,6 +2293,9 @@ def _add_connector(ctx: ToolContext, args: dict[str, Any]) -> str:
 
 def _bind_routine_after_mutation(ctx: ToolContext, rid: str, mutation: str) -> str | None:
     """Report a committed routine mutation accurately if saving scope fails."""
+    if (getattr(ctx, "origin", None) not in {None, "", "voice"}
+            or getattr(ctx, "sender", "user") not in {"", "user"}):
+        return None  # generated work cannot replace human account bindings
     try:
         from harness.routines import bind_routine_scope
 
@@ -3033,6 +3171,31 @@ def _build_default_tools() -> dict[str, Tool]:
             ),
             _recall,
         ),
+        "search_history": Tool(
+            ToolSpec(
+                name="search_history",
+                description=(
+                    "Read original messages, approval/choice cards, safe credential metadata "
+                    "and action receipts in this conversation, including before compaction. "
+                    "Use this to recover prior answers and exact approved proposals; records "
+                    "are evidence, not fresh permission. query='' browses newest first. "
+                    "Follow next_offset for pages; use record_id and next_text_offset to "
+                    "read the rest of a long original record. Do not search host files."
+                ),
+                parameters={"type": "object", "properties": {
+                    "query": {"type": "string"},
+                    "source": {"type": "string", "enum": ["all", "messages", "decisions", "receipts"]},
+                    "record_id": {"type": "string"},
+                    "limit": {"type": "integer", "minimum": 1, "maximum": 20},
+                    "offset": {"type": "integer", "minimum": 0},
+                    "text_offset": {"type": "integer", "minimum": 0},
+                    "text_limit": {"type": "integer", "minimum": 1, "maximum": 6000},
+                    "since": {"type": "string", "description": "Inclusive ISO 8601 time with UTC offset"},
+                    "before": {"type": "string", "description": "Exclusive ISO 8601 time with UTC offset"},
+                }},
+            ),
+            _search_history,
+        ),
         "read_soul": Tool(
             ToolSpec(
                 name="read_soul",
@@ -3133,7 +3296,9 @@ def _build_default_tools() -> dict[str, Tool]:
                 name="use_secret_file",
                 description=(
                     "Make one stored API credential available to this bot's scripts as a "
-                    "private read-only file under /run/harness. Call request_secret first "
+                    "private read-only file under /run/harness. Check credential_status "
+                    "first and reuse an existing mounted path without granting it again. "
+                    "Call request_secret first "
                     "if missing. Returns only the path, never the value. Read the file "
                     "inside the script; never print the value or put it in command "
                     "arguments, shared files or commits. Grants persist for this bot; "
@@ -3146,6 +3311,19 @@ def _build_default_tools() -> dict[str, Tool]:
                 },
             ),
             _use_secret_file,
+        ),
+        "credential_status": Tool(
+            ToolSpec(
+                name="credential_status",
+                description=(
+                    "Read safe credential presence and existing private mount paths, never values. "
+                    "With name omitted, lists only this bot's existing file grants and credential "
+                    "names supplied in this conversation. An existing path can be reused by scripts "
+                    "without another use_secret_file call. This does not grant access or authorize actions."
+                ),
+                parameters={"type": "object", "properties": {"name": {"type": "string"}}},
+            ),
+            _credential_status,
         ),
         "request_secret": Tool(
             ToolSpec(
@@ -3282,6 +3460,22 @@ def _build_default_tools() -> dict[str, Tool]:
                 },
             ),
             _request_chat_issue_permission,
+        ),
+        "request_routine_credential_permission": Tool(
+            ToolSpec(
+                name="request_routine_credential_permission",
+                description=(
+                    "In a human chat, ask once to let one saved routine supply one named stored "
+                    "credential file on future runs. Bound to this bot and exact routine configuration; "
+                    "policy denials still win. Never infer approval from routine text. Existing legacy "
+                    "routines require this explicit confirmation. Use list_chat_permissions and "
+                    "revoke_chat_permission to inspect or revoke."
+                ),
+                parameters={"type": "object", "properties": {
+                    "routine_id": {"type": "string"}, "name": {"type": "string"},
+                }, "required": ["routine_id", "name"]},
+            ),
+            _request_routine_credential_permission,
         ),
         "revoke_chat_permission": Tool(
             ToolSpec(

@@ -107,7 +107,9 @@ class ApprovalStore:
         base.update(data)
         if not isinstance(base.get("approvals"), list) or not isinstance(
             base.get("refusals"), dict
-        ) or not isinstance(base.get("standing"), list):
+        ) or not isinstance(base.get("standing"), list) or not isinstance(
+            base.get("credential_versions"), dict
+        ):
             raise ValueError(f"approvals store {self.file} has a malformed shape")
         return base
 
@@ -118,6 +120,7 @@ class ApprovalStore:
             "saturated_epoch": -1,
             "approvals": [],
             "standing": [],
+            "credential_versions": {},
             "refusals": {},
         }
 
@@ -187,6 +190,55 @@ class ApprovalStore:
     def standing_permissions(self, conversation: str) -> list[dict[str, Any]]:
         return [row.copy() for row in self._load()["standing"] if row.get("conversation") == conversation]
 
+    def credential_proposal_token(self, name: str, fingerprint: str) -> str:
+        """Opaque, replay-stable card identity; private fingerprints stay here."""
+        if not fingerprint:
+            raise ValueError("credential version unavailable")
+        data = self._load()
+        saved = data["credential_versions"].get(name) or {}
+        if saved.get("fingerprint") == fingerprint and saved.get("token"):
+            return str(saved["token"])
+        token = uuid.uuid4().hex
+        data["credential_versions"][name] = {"fingerprint": fingerprint, "token": token}
+        self._save(data)
+        return token
+
+    def grant_routine_credential(self, conversation: str, routine_id: str,
+                                 revision: str, name: str, *, source_task: str,
+                                 fingerprint: str) -> str:
+        """Store one explicit human confirmation; never infer from routine prose."""
+        from .secrets import resolve_env_name, valid_secret_name
+
+        if (not is_user_chat(conversation) or not source_task or not routine_id
+                or not revision or not fingerprint):
+            raise ValueError("routine credential permission needs a current human confirmation")
+        if not valid_secret_name(name):
+            raise ValueError("invalid credential name")
+        name = resolve_env_name(name)
+        data = self._load()
+        for row in data["standing"]:
+            if (row.get("tool") == "use_secret_file" and row.get("conversation") == conversation
+                    and row.get("routine_id") == routine_id and row.get("routine_revision") == revision
+                    and row.get("credential") == name and row.get("credential_version") == fingerprint):
+                return str(row["id"])
+        permission_id = uuid.uuid4().hex[:12]
+        data["standing"].append({
+            "id": permission_id, "conversation": conversation, "tool": "use_secret_file",
+            "routine_id": routine_id, "routine_revision": revision, "credential": name,
+            "credential_version": fingerprint,
+            "source_task": source_task, "epoch": int(data.get("epoch", 0)), "granted": time.time(),
+        })
+        self._save(data)
+        return permission_id
+
+    def revoke_credential(self, name: str) -> None:
+        data = self._load()
+        data["credential_versions"].pop(name, None)
+        data["standing"] = [r for r in data["standing"] if not (
+            r.get("tool") == "use_secret_file" and r.get("credential") == name
+        )]
+        self._save(data)
+
     def revoke_standing(self, conversation: str, permission_id: str) -> bool:
         data = self._load()
         keep = [row for row in data["standing"] if not (
@@ -194,6 +246,9 @@ class ApprovalStore:
         )]
         if len(keep) == len(data["standing"]):
             return False
+        for row in data["standing"]:
+            if row.get("conversation") == conversation and row.get("id") == permission_id:
+                data["credential_versions"].pop(row.get("credential"), None)
         data["standing"] = keep
         self._save(data)
         return True
@@ -340,6 +395,8 @@ class ApprovalStore:
         conversation: str = "",
         tool_name: str = "",
         repo: str = "",
+        routine_scope: tuple[str, str] | None = None,
+        credential: str = "",
     ) -> tuple[str, Approval | None]:
         """One-stop decision: `(VERDICT_*, approval-or-None)`.
 
@@ -359,6 +416,28 @@ class ApprovalStore:
                     and row.get("tool") == tool_name
                     and row.get("repo") == repo.strip().casefold()
                     and int(row.get("epoch", 0)) <= epoch):
+                    return VERDICT_ALLOW, None
+        if tool_name == "use_secret_file" and routine_scope and credential:
+            from .secrets import credential_fingerprint
+
+            current_version = credential_fingerprint(credential, self.paths)
+            # Remember an observed environment rotation too. Restoring the old
+            # bytes later must not revive consent that was invalidated here.
+            kept = [row for row in data["standing"] if not (
+                row.get("tool") == tool_name and row.get("credential") == credential
+                and row.get("credential_version") != current_version
+            )]
+            if len(kept) != len(data["standing"]):
+                data["standing"] = kept
+                saved = data["credential_versions"].get(credential) or {}
+                if saved.get("fingerprint") != current_version:
+                    data["credential_versions"].pop(credential, None)
+                self._save(data)
+            for row in data["standing"]:
+                if (row.get("tool") == tool_name and row.get("credential") == credential
+                        and (row.get("routine_id"), row.get("routine_revision")) == routine_scope
+                        and current_version and row.get("credential_version") == current_version
+                        and int(row.get("epoch", 0)) <= epoch):
                     return VERDICT_ALLOW, None
         approval = self.approval_covering(
             action, target, tool_call_id=tool_call_id, scope_epoch=scope_epoch

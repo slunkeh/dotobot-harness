@@ -152,6 +152,7 @@ EFFECTS: dict[str, Effect] = {
     "computer_screenshot": Effect(INTENT_READ, lambda a: ""),
     # -- secrets ---------------------------------------------------------
     "get_secret": Effect(INTENT_READ_SECRET, lambda a: _arg(a, "name"), ask=True),
+    "credential_status": Effect(INTENT_READ, lambda a: _arg(a, "name")),
     "computer_type_secret": Effect(INTENT_TYPE_SECRET, lambda a: _arg(a, "name"), ask=True),
     "use_secret_file": Effect(INTENT_TYPE_SECRET, lambda a: _arg(a, "name"), ask=True),
     "request_secret": Effect(INTENT_READ_SECRET, lambda a: _arg(a, "name")),
@@ -164,6 +165,7 @@ EFFECTS: dict[str, Effect] = {
     "read_soul": Effect(INTENT_READ, lambda a: ""),
     "recommend_handoff": Effect(INTENT_READ, lambda a: _arg(a, "task")),
     "recall": Effect(INTENT_READ, lambda a: _arg(a, "query")),
+    "search_history": Effect(INTENT_READ, lambda a: _arg(a, "query", "record_id")),
     "read_shared_facts": Effect(INTENT_READ, lambda a: _arg(a, "query")),
     # -- the deployment --------------------------------------------------
     "create_bot": Effect(INTENT_MANAGE, lambda a: _arg(a, "name"), ask=True),
@@ -209,6 +211,7 @@ EFFECTS: dict[str, Effect] = {
     "confirm": Effect(INTENT_UI, lambda a: _arg(a, "question")),
     "list_chat_permissions": Effect(INTENT_READ, lambda a: "current chat permissions"),
     "request_chat_issue_permission": Effect(INTENT_UI, lambda a: _arg(a, "repo")),
+    "request_routine_credential_permission": Effect(INTENT_UI, lambda a: _arg(a, "routine_id")),
     "revoke_chat_permission": Effect(INTENT_WRITE_STATE, lambda a: _arg(a, "id")),
     "ask_user_choice": Effect(INTENT_UI, lambda a: _arg(a, "question")),
     "ask_human": Effect(INTENT_UI, lambda a: _arg(a, "reason")),

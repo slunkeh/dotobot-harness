@@ -173,9 +173,13 @@ _WORKSPACE_PROMPT = (
     "with message_agent — nobody is notified otherwise. There are no locks "
     "(last writer wins; use flock if it matters), deleting a bot leaves its "
     "files there, and nothing under /workspace is ever a secret: credentials "
-    "go through request_secret, never onto the shared disk. For API scripts, call "
-    "use_secret_file to supply a selected stored credential as a private read-only "
-    "file in this bot's machine. Read it inside the script; never print its value."
+    "go through request_secret, never onto the shared disk. For API scripts, check "
+    "credential_status and reuse an existing mounted path. Call use_secret_file only "
+    "when a stored credential needs to be supplied as a private read-only file. "
+    "Read it inside the script; never print its value. Credential presence does not "
+    "authorize a new action. Recurring credential setup needs an explicit scoped "
+    "request_routine_credential_permission confirmation in human chat; generic "
+    "Allow all this turn is temporary."
 )
 
 #: Preamble on the user-role message that carries screenshot frames. Public so
@@ -319,11 +323,11 @@ _ROUTINE_PROMPT = (
 
 _CONNECTOR_PROMPT = (
     "Prefer a connector tool (linear_*, github_*, and other namespaced "
-    "service tools) when one is available for the job. The user does not "
-    "have to @mention or name the service: 'check my emails' means the "
-    "connected mail plugin, 'any open PRs' means the connected GitHub, a "
-    "ticket key means the connected tracker — use the tool on your own "
-    "initiative. The browser inherits "
+    "service tools) when one is available for the job. The user "
+    "only needs to select an account when it is not already bound to this task. "
+    "Use the selected account for relevant follow-ups; authentication and task "
+    "selection are separate. A new task without a selected account needs the "
+    "user to name the existing connector. The browser inherits "
     "every fragility of the site — layout changes, consent prompts, session "
     "timeouts. Do not open Chrome to a service you have a connector for "
     "unless the user asked to visit the site, drive the screen, or the "
@@ -1889,15 +1893,29 @@ class Agent:
             task = (
                 task
                 or taskscope.scope_for_input(self.paths, self.bot.name, input_id)
-                or taskscope.begin_task(
-                    self.paths,
-                    self.bot.name,
-                    conversation,
-                    text=plugin_text,
-                    input_id=input_id,
-                    source_id=message_id or input_id,
-                    trusted_user=trusted_user,
-                )
+            )
+            continuation_of = None
+            if not task and trusted_user:
+                from .continuity import assess, candidate
+
+                previous = taskscope.read_task(self.paths, self.bot.name, conversation)
+                if candidate(previous, plugin_text):
+                    try:
+                        related, relation_usage = assess(self.active_provider, previous, plugin_text)
+                        self._record_turn_usage(1, relation_usage or {}, "task_continuity")
+                        if related:
+                            continuation_of = (previous["task_id"], int(previous["revision"]))
+                    except Exception:
+                        pass  # uncertainty cannot expand the new task's account scope
+            task = task or taskscope.begin_task(
+                self.paths,
+                self.bot.name,
+                conversation,
+                text=plugin_text,
+                input_id=input_id,
+                source_id=message_id or input_id,
+                trusted_user=trusted_user,
+                continuation_of=continuation_of,
             )
             conversation = task["conversation"]
             if prompt_answer:

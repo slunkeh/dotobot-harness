@@ -614,6 +614,7 @@ def bind_routine_scope(
             or scope.get("task_id") != task_id
             or scope.get("revision") != revision
             or scope.get("status") != "active"
+            or not scope.get("objective_source_id")
         ):
             raise RoutineError("routine connector scope no longer matches the current task")
         rows = list_routines(paths, bot)
@@ -622,10 +623,35 @@ def bind_routine_scope(
                 row["task_scope"] = {
                     "connector_ids": list(scope.get("connector_ids") or []),
                     "provenance": list(scope.get("provenance") or []),
+                    "source": {
+                        "conversation": conversation,
+                        "task_id": task_id,
+                        "revision": revision,
+                        "input_id": scope.get("input_id"),
+                    },
                 }
                 _save(paths, bot, rows)
                 return public(row)
         raise RoutineError(f"no routine {routine_id!r}")
+
+
+def routine_scope_for_task(paths: HarnessPaths, bot: str, conversation: str,
+                           task_id: str, revision: int) -> tuple[str, str] | None:
+    """Verify scheduler-owned identity against the current task and routine."""
+    from .taskscope import read_task
+
+    task = read_task(paths, bot, conversation)
+    if (not task or task.get("task_id") != task_id
+            or task.get("revision") != revision
+            or task.get("status") not in {"active", "waiting", "idle"}):
+        return None
+    rid, version = task.get("routine_id"), task.get("routine_revision")
+    if not rid or not version:
+        return None  # legacy prompt prose never migrates authority
+    row = next((r for r in list_routines(paths, bot) if r.get("id") == rid), None)
+    if row and row.get("enabled") and routine_revision(row) == version:
+        return str(rid), str(version)
+    return None
 
 
 def _apply_when(row: dict[str, Any], when: str) -> None:
