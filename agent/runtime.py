@@ -2389,7 +2389,9 @@ class Agent:
 
         def repair_completion(instruction):
             nonlocal turn_requests, completion_repair_started
-            if self._preempted(turn_id) or not repair_budget.spend():
+            if self._preempted(turn_id):
+                return None  # advisory review was cancelled; preserve the produced reply
+            if not repair_budget.spend():
                 return ""
             completion_repair_started = True
             turn_requests += 1

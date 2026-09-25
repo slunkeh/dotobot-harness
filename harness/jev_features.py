@@ -246,6 +246,8 @@ def check_completion(paths, text, evidence, *, writer=None, evidence_complete=Tr
             "Do not retry actions, call tools, or claim an action failed merely because evidence "
             "is unavailable. Return one consistent final answer with precise remaining uncertainty."
         )
+        if revised is None:
+            return text  # caller cancelled advisory review to handle newer input
         if isinstance(revised, str) and revised.strip() and not unsupported(revised):
             return revised.strip()
     return (

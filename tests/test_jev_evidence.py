@@ -194,6 +194,35 @@ def test_runtime_keeps_visual_result_with_main_agent(tmp_path, monkeypatch):
     assert agent._produce("user", "Check publication") == "The item appears in the published list."
 
 
+def test_new_input_during_advisory_review_preserves_first_reply(tmp_path, monkeypatch):
+    from providers.base import Completion, Provider
+    from tests.test_compaction import _agent
+
+    calls = []
+    pending = False
+
+    class Model(Provider):
+        id = "test"
+
+        def complete(self, messages, **kwargs):
+            calls.append(messages)
+            return Completion(text="The uploaded file is available.")
+
+    agent, paths = _agent(tmp_path, Model(model="test"))
+    set_secret(jev.KEY, "test-review-key", paths)
+    prefs.save(paths, {"jev_enabled": True, "jev_features": {"completion": True}})
+    monkeypatch.setattr(agent, "_preempted", lambda *args: pending)
+
+    def review(*args):
+        nonlocal pending
+        pending = True
+        return {"supported": {"choice": "unsupported", "confidence": 1}}
+
+    monkeypatch.setattr(jev, "_request", review)
+    assert agent._produce("user", "Check the file") == "The uploaded file is available."
+    assert len(calls) == 1
+
+
 def test_runtime_does_not_discredit_prior_receipt_or_send_it_to_reviewer(tmp_path, monkeypatch):
     from harness.delivery import Ledger
     from providers.base import Completion, Provider
