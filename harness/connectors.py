@@ -53,6 +53,7 @@ CATALOG: list[dict] = [
         "auth": "oauth",
         "mcp_url": "https://mcp.slack.com/mcp",
         "fields": ["client_id"],
+        "oauth_scopes": ["search:read.public", "channels:read", "channels:history", "chat:write"],
         "category": "Inbox And Collaboration",
         "description": "Search Slack messages, channels, and files, and send messages. Slack needs a Slack app (Client ID and Client Secret); it does not register automatically.",
         "icon": "number",

@@ -177,6 +177,7 @@ def test_static_client_skips_dcr(paths):
         ).items()
     }
     assert q["client_id"] == "slack-app-id"
+    assert q["scope"] == "search:read.public channels:read channels:history chat:write"
     assert t.registered == []
     stored = mcp_oauth.load_oauth_client(paths, "abc123")
     assert stored == {"client_id": "slack-app-id", "client_secret": "slack-app-secret"}
