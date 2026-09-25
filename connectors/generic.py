@@ -62,21 +62,42 @@ def tools(type_: str) -> list[ConnectorTool]:
     from harness.connectors import _CATALOG_TYPES
 
     array_body = bool((_CATALOG_TYPES.get(t) or {}).get("json_array_body"))
+    get_description = (
+        f"GET a path on the {t} REST API. Path is relative to the "
+        "connector's API base, which already includes its version prefix. "
+        "Do not repeat the base path. Use this to list or fetch records."
+    )
+    request_description = (
+        f"Call the {t} REST API (POST/PATCH/PUT/DELETE). Path is "
+        "relative to the connector's API host."
+    )
+    get_path_description = "path under the API host, e.g. /accounts"
+    if t == "google_docs":
+        # Docs has no account/list route. Operation words also let deferred
+        # tool discovery find writes from queries such as "google docs create".
+        get_description = (
+            "Read a Google Docs document with GET /documents/DOCUMENT_ID. "
+            "Requires an existing document ID; there is no account or document-list "
+            "endpoint in the Docs API. Paths omit /v1."
+        )
+        request_description = (
+            'Create a Google Docs document: POST /documents with body {"title":"..."}. '
+            "Edit or update document content: POST /documents/DOCUMENT_ID:batchUpdate "
+            'with body {"requests":[...]} (for example insertText or replaceAllText). '
+            "Paths omit /v1. Use the returned documentId for later reads and updates."
+        )
+        get_path_description = "/documents/DOCUMENT_ID; use a real document ID"
     return [
         ConnectorTool(
             ToolSpec(
                 name=f"{t}_get",
-                description=(
-                    f"GET a path on the {t} REST API. Path is relative to the "
-                    "connector's API base, which already includes its version prefix. "
-                    "Do not repeat the base path. Use this to list or fetch records."
-                ),
+                description=get_description,
                 parameters={
                     "type": "object",
                     "properties": {
                         "path": {
                             "type": "string",
-                            "description": "path under the API host, e.g. /accounts",
+                            "description": get_path_description,
                         },
                         "query": {
                             "type": "object",
@@ -91,10 +112,7 @@ def tools(type_: str) -> list[ConnectorTool]:
         ConnectorTool(
             ToolSpec(
                 name=f"{t}_request",
-                description=(
-                    f"Call the {t} REST API (POST/PATCH/PUT/DELETE). Path is "
-                    "relative to the connector's API host."
-                ),
+                description=request_description,
                 parameters={
                     "type": "object",
                     "properties": {
@@ -290,6 +308,12 @@ def _headers(ctx: ConnectorContext, secret: str) -> dict[str, str]:
         credentials = (
             secret + ":" + str(cat.get("basic_password", "")) if style == "basic_key" else secret
         )
+        if ctx.record["type"] == "360nrs":
+            username = str((ctx.record.get("config") or {}).get("username") or "").strip()
+            if username:
+                credentials = f"{username}:{secret}"
+            elif ":" not in secret:
+                raise ValueError("360NRS needs a username and API password; enter the username in its separate field")
         token = base64.b64encode(credentials.encode("utf-8")).decode("ascii")
         hdrs["Authorization"] = f"Basic {token}"
         return hdrs

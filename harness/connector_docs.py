@@ -13,13 +13,13 @@ _ROWS: list[tuple[str, str, str, str]] = [
         "360nrs",
         "official",
         "https://apidocs.360nrs.com/",
-        "Store username:apiPassword as the secret, using the API password, not the platform login password. Allow the server IP in 360NRS settings. Paths are relative to https://dashboard.360nrs.com/api/rest; HTTP Basic authentication is used.",
+        "Enter your 360NRS username separately and paste the generated API password as the secret (APIs > Change API password > Save). Do not use the platform login password or the profile API key. Existing username:apiPassword secrets remain supported. Allow the server IP in 360NRS settings. Paths are relative to https://dashboard.360nrs.com/api/rest; HTTP Basic authentication is used.",
     ),
     (
         "4dem",
         "official",
         "https://api.4dem.it/open-api",
-        "Store the 4Dem API key. The connector exchanges it at /authenticate for a bearer token before every request. Paths are relative to https://api.4dem.it, for example /addressbook/. Dedicated and partner API-channel hosts are not covered.",
+        "Requires an existing legacy 4Dem account: its signup link currently redirects to Positive User pricing, which does not provision a 4Dem API key. Store the 4Dem API key. The connector exchanges it at /authenticate for a bearer token before every request. Paths are relative to https://api.4dem.it, for example /addressbook/. Dedicated and partner API-channel hosts are not covered.",
     ),
     (
         "abyssale",
@@ -1112,9 +1112,9 @@ _ROWS: list[tuple[str, str, str, str]] = [
     ),
     (
         "slack",
-        "community",
-        "https://github.com/korotovsky/slack-mcp-server",
-        "Table lists a community server; harness already uses official mcp.slack.com/mcp.",
+        "official",
+        "https://docs.slack.dev/ai/slack-mcp-server/",
+        "Uses Slack's official MCP server at mcp.slack.com/mcp. Register a Slack app with the displayed Client ID and Client Secret, enable Slack MCP Server, and allow the localhost callback. The default scopes cover public-channel search, details, history, and posting only.",
     ),
     (
         "stripe",
