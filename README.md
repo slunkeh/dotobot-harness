@@ -158,6 +158,27 @@ request. Known unfinished work keeps its current task bindings and normal approv
 rules. Completed, stale, missing or uncertain source state cannot authorize a new
 action simply because a recovery message arrived.
 
+## Posting decisions
+
+Use `confirm` with `outgoing_message` to show the destination, exact message and
+separate review context in one approval card. Accept and Decline are saved as
+distinct decisions. `computer_submit_approved` takes only the saved approval ID,
+checks the current task and page, and dispatches that proposal at most once.
+Changed text or destination requires a new proposal. Existing clients can show
+the complete proposal through the ordinary confirmation question/detail fields.
+
+The verified browser path uses the existing Chrome debugging connection
+(`HARNESS_CHROME_CDP=1`); it does not require Jev. It supports one visible plain
+textarea with a standard same-origin submit form. Unsupported or ambiguous
+composers, changed form controls and unknown submission outcomes stop the action.
+A dispatched submit still needs independent publication verification. Generic
+computer controls remain available for other work; they do not provide this
+proposal-binding contract.
+
+Custom blocks reject unsupported button-action fields and differently labelled
+buttons that submit the same answer. Form submit actions contain only `kind`;
+named actions need distinct IDs when they represent different decisions.
+
 ## Develop
 
 The runtime uses only Python's standard library. Install development tools in a
