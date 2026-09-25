@@ -125,7 +125,7 @@ not the separate bot computers of the standard container installation.
 
 A scheduled occurrence records its original due time, timezone and run ID. Its
 status distinguishes `queued`, `running`, `waiting`, `completed`, `expired`,
-`cancelled`, `failed` and `unknown`. `completed` means the agent finished processing
+`cancelled`, `failed`, `interrupted` and `unknown`. `completed` means the agent finished processing
 the run; it does not certify an external publication or other side effect. Test
 run requests enqueue work and report the routine's actual enabled state.
 
@@ -134,7 +134,7 @@ Recurring routines default to `missed_run_policy="skip"` with
 fields. One-shot reminders default to `run_late`. An explicit `run_late` policy
 keeps delayed execution enabled; `skip` accepts a configurable grace period.
 The window is checked before starting and before further actions, including after
-a late approval. Editing or deleting the routine invalidates queued occurrences.
+a late approval. Changing execution settings or deleting the routine invalidates queued occurrences.
 No historical cron ticks are reconstructed when the scheduler was offline.
 
 An unanswered scheduled decision is saved and releases the worker for other work.

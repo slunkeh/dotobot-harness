@@ -144,7 +144,13 @@ def record_run_state(paths: HarnessPaths, bot: str, occurrence: dict | None, sta
             (entry for entry in history if entry.get("run_id") == occurrence["run_id"]), None
         )
         if entry is None:
-            entry = {"run_id": occurrence["run_id"], "scheduled_at": occurrence["scheduled_at"]}
+            scheduled = (
+                datetime.fromisoformat(occurrence["scheduled_local"])
+                if occurrence.get("scheduled_local")
+                else datetime.fromtimestamp(float(occurrence["scheduled_at"])).astimezone()
+            )
+            entry = {"run_id": occurrence["run_id"], "scheduled_at": occurrence["scheduled_at"],
+                     "ts": _stamp(scheduled), "kind": occurrence.get("kind", "schedule")}
             history.append(entry)
         entry.update(status=state, updated_at=time.time())
         row["history"] = history[-20:]
