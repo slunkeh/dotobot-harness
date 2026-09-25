@@ -66,10 +66,11 @@ def test_assessed_identity_cannot_adopt_newer_task_or_new_subject(scope):
     after = begin_task(paths, "atlas", "peer:user", text="What did you find?", input_id="late",
                        continuation_of=(first["task_id"], first["revision"]))
     assert after["task_id"] not in {first["task_id"], current["task_id"]}
-    assert after["connector_ids"] == []
+    assert after["connector_ids"] == ["original"]
     explicit = begin_task(paths, "atlas", "peer:user", text="New topic: check that", input_id="explicit",
                           active_followup=True, continuation_of=(after["task_id"], after["revision"]))
     assert explicit["task_id"] != after["task_id"]
+    assert explicit["connector_ids"] == ["original"]
 
 
 def test_disabled_or_replaced_accounts_never_reappear_on_semantic_continuation(scope):

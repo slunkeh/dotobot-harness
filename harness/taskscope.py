@@ -1,8 +1,9 @@
-"""Durable task identity and connector bindings derived only from human chat.
+"""Durable task identity and chat connector bindings derived only from humans.
 
 This deliberately does not classify arbitrary natural-language intent. A new
 message starts a task unless it is an explicit continuation or the runtime says
 it is a live follow-up. Quoted/generated context is never searched for grants.
+Selected accounts persist independently of task identity within the same chat.
 The tool gate remains responsible for every execution and approval decision.
 """
 
@@ -15,7 +16,8 @@ import uuid
 from collections import Counter
 from typing import Any
 
-from .connectors import CATALOG, Connectors, connector_scope_delta, instruction_text
+from .approvals import is_user_chat
+from .connectors import CATALOG, Connectors, connector_scope_delta, instruction_text, mention_titles
 from .paths import HarnessPaths
 from .redaction import scrub
 from .statestore import store_for
@@ -231,6 +233,142 @@ def pending_catalog_types(task: dict, records: list[dict], *, bot: str | None = 
     return [entry for entry in CATALOG if entry["type"] in pending and entry["type"] not in added]
 
 
+def _chat_state(bindings: dict, pending: dict) -> dict:
+    return {
+        "connector_ids": sorted(bindings),
+        "provenance": [bindings[cid] for cid in sorted(bindings)],
+        "pending_catalog": [pending[k] for k in sorted(pending)],
+    }
+
+
+def _saved_chat_state(value: Any) -> dict:
+    # An explicitly empty state is authoritative, including after revocation.
+    # Corrupt state must not turn into permission to mine older grants again.
+    if not isinstance(value, dict) or any(
+        not isinstance(value.get(key, []), list)
+        for key in ("connector_ids", "provenance", "pending_catalog")
+    ):
+        raise ValueError("invalid saved chat connector state")
+    return _chat_state(_human_bindings(value), _pending_catalog(value))
+
+
+def _legacy_transcript_bindings(conn, bot: str, conversation: str, records: list[dict]) -> tuple:
+    """Recover exact account IDs from original human messages, never aliases.
+
+    This is a one-time bridge for chats older than task admission records. A
+    current account's display name cannot establish which old account a person
+    meant. Negative names may remove a grant, but can never introduce one.
+    """
+    if conversation == "peer:user":
+        routing, args = "room IS NULL AND thread_id IS NULL", ()
+    elif conversation.startswith("thread:"):
+        routing, args = "room IS NULL AND thread_id=?", (conversation[7:],)
+    elif conversation.startswith("room:"):
+        routing, args = "room=?", (conversation[5:],)
+    else:
+        return {}, {}, {}
+    bindings, latest, sources = {}, {}, {}
+    rows = conn.execute(
+        "SELECT id,payload FROM transcripts WHERE bot=? AND role='in:user' "
+        "AND (peer IS NULL OR peer='user') AND is_summary=0 AND " + routing
+        + " ORDER BY ts,id", (bot, *args),
+    )
+    for order, raw in enumerate(rows):
+        row = json.loads(raw["payload"])
+        if row.get("origin") not in (None, "", "voice") or row.get("frm") not in (None, "", "user"):
+            continue
+        delta = connector_scope_delta(str(row.get("text") or ""), records)
+        source = str(row.get("message_id") or f"transcript:{raw['id']}")
+        if source in sources:
+            continue  # replayed logging cannot make an old grant newer than a revocation
+        sources[source] = order
+        for match in delta["matches"]:
+            if match["matched_name"].casefold() == f"connector:{match['connector_id']}".casefold():
+                bindings[match["connector_id"]] = {
+                    **match, "source_kind": "user", "source_id": source, "input_id": source,
+                }
+                latest[match["connector_id"]] = (order, True)
+        for cid in delta["excluded_ids"]:
+            bindings.pop(cid, None)
+            latest[cid] = (order, False)
+    return bindings, latest, sources
+
+
+def _load_chat_state(conn, bot: str, conversation: str, previous: dict | None, records: list[dict]) -> dict:
+    if previous is not None and "chat_connector_state" in previous:
+        return _saved_chat_state(previous["chat_connector_state"])
+    if not is_user_chat(conversation):
+        return _chat_state({}, {})
+    history = [json.loads(row[0]) for row in conn.execute(
+        "SELECT data FROM agent_task_inputs WHERE bot=? AND conversation=? ORDER BY rowid",
+        (bot, conversation),
+    )]
+    # An older worker may have replaced the current task JSON. Recover the
+    # latest initialized snapshot before applying only subsequent human events.
+    initialized = next((i for i in range(len(history) - 1, -1, -1)
+                        if "chat_connector_state" in history[i]), None)
+    if initialized is not None:
+        saved = _saved_chat_state(history[initialized]["chat_connector_state"])
+        bindings, pending = _human_bindings(saved), _pending_catalog(saved)
+        events = history[initialized + 1:]
+        transcript_events, transcript_sources = {}, {}
+    else:
+        bindings, transcript_events, transcript_sources = _legacy_transcript_bindings(
+            conn, bot, conversation, records
+        )
+        pending, events = {}, history
+
+    def after_transcript(cid, source, *, grant):
+        latest = transcript_events.get(cid)
+        if latest is None:
+            return True
+        position = transcript_sources.get(source)
+        if position is not None:
+            return position >= latest[0]
+        # Admission snapshots lack timestamps. Unordered older grant evidence
+        # cannot override an explicit transcript revocation. A new human turn
+        # can deliberately select it again after this one-time migration.
+        return not grant or latest[1]
+
+    if previous and not any(row.get("input_id") == previous.get("input_id") for row in history):
+        events = [*events, previous]
+    for row in events:
+        if not row.get("source_id"):
+            continue  # generated scopes may carry provenance, but are not human events
+        for cid, grant in _human_bindings(row).items():
+            explicit = (grant.get("input_id") == row.get("input_id")
+                        or grant.get("source_id") == row["source_id"])
+            pending_type = grant.get("type")
+            choice = pending.get(pending_type)
+            consumed_choice = bool(choice and all(
+                choice.get(key) == grant.get(key)
+                for key in ("source_id", "input_id", "matched_name")
+            ))
+            if consumed_choice:
+                # Historical setup selected this exact account. Never revive
+                # its provisional service grant when the account is replaced.
+                pending.pop(pending_type)
+            if (explicit or consumed_choice) and after_transcript(cid, grant["source_id"], grant=True):
+                bindings[cid] = grant
+        negative_ids = connector_scope_delta(
+            str(row.get("latest_instruction") or ""), records
+        )["excluded_ids"]
+        for cid in set(row.get("excluded_connector_ids", [])) | set(negative_ids):
+            if after_transcript(cid, row["source_id"], grant=False):
+                bindings.pop(cid, None)
+        for type_, grant in _pending_catalog(row).items():
+            if grant.get("input_id") == row.get("input_id") or grant.get("source_id") == row["source_id"]:
+                pending[type_] = grant
+        # Pending service choices also need their explicit negative instructions.
+        excluded = connector_scope_delta(
+            str(row.get("latest_instruction") or ""),
+            [{**entry, "id": entry["type"]} for entry in CATALOG],
+        )["excluded_ids"]
+        for type_ in excluded:
+            pending.pop(type_, None)
+    return _chat_state(bindings, pending)
+
+
 def begin_task(
     paths: HarnessPaths,
     bot: str,
@@ -276,18 +414,25 @@ def begin_task(
                     and previous.get("status") != "stopped"
                     and (active_followup or continuation or assessed))
         all_records = Connectors(paths).list()
+        chat_state = _load_chat_state(conn, bot, conversation, previous, all_records)
+        use_chat = trusted_user and is_user_chat(conversation)
         records = [
             r
             for r in all_records
             if not isinstance(r.get("enabled_for"), list) or bot in r["enabled_for"]
         ]
         visible = {str(r.get("id") or "") for r in records}
-        bindings = _human_bindings(
-            previous if same else inherited_scope if not trusted_user else None
-        )
+        if use_chat:
+            source_scope = chat_state
+        elif same:
+            source_scope = previous
+        else:
+            source_scope = inherited_scope if not trusted_user else None
+        bindings = _human_bindings(source_scope)
+        chat_bindings = dict(bindings) if use_chat else {}
         before = set(bindings)
         bindings = {cid: p for cid, p in bindings.items() if cid in visible}
-        pending_catalog = _pending_catalog(previous) if same else {}
+        pending_catalog = _pending_catalog(source_scope) if use_chat or same else {}
         # An explicit request for an unadded service can select its first
         # account once it exists. Consume the provisional selection so later
         # account replacement never silently inherits this authority.
@@ -302,6 +447,11 @@ def begin_task(
             if trusted_user
             else {"matches": [], "excluded_ids": []}
         )
+        all_delta = connector_scope_delta(text, all_records) if trusted_user else delta
+        if use_chat:
+            # Disabling an account prevents execution, not revocation of a
+            # saved choice. Names of disabled accounts can only remove scope.
+            delta["excluded_ids"] = all_delta["excluded_ids"]
         for match in delta["matches"]:
             cid = match["connector_id"]
             # Keep the original source when a later message merely repeats it.
@@ -316,11 +466,27 @@ def begin_task(
             )
         for cid in delta["excluded_ids"]:
             bindings.pop(cid, None)
+        if use_chat:
+            chat_bindings.update(bindings)
+            for cid in delta["excluded_ids"]:
+                chat_bindings.pop(cid, None)
         if trusted_user:
             catalog_delta = connector_scope_delta(
                 text, [{**entry, "id": entry["type"]} for entry in CATALOG]
             )
             added = {record.get("type") for record in records}
+            for record in all_records:
+                cid, type_ = record.get("id"), record.get("type")
+                generic = {name.casefold() for name in mention_titles(type_, "")}
+                specific = any(
+                    match["connector_id"] == cid and match["matched_name"].casefold() not in generic
+                    for match in all_delta["matches"]
+                )
+                if cid not in visible and (cid in chat_bindings or specific):
+                    # A known or explicitly named disabled account is not a
+                    # request to provision a different account. Generic service
+                    # requests still work when only other bots have accounts.
+                    added.add(type_)
             for match in catalog_delta["matches"]:
                 type_ = match["connector_id"]
                 if type_ not in added:
@@ -336,6 +502,8 @@ def begin_task(
                     )
             for type_ in catalog_delta["excluded_ids"]:
                 pending_catalog.pop(type_, None)
+        if use_chat:
+            chat_state = _chat_state(chat_bindings, pending_catalog)
         stopped = trusted_user and bool(_STOP.fullmatch(instruction_text(text).strip()))
         if stopped:
             bindings = {}
@@ -392,6 +560,7 @@ def begin_task(
             "input_id": input_id,
             "source_id": source_id if trusted_user else None,
             "excluded_connector_ids": delta["excluded_ids"],
+            "chat_connector_state": chat_state,
         }
         if not trusted_user and inherited_scope:
             # These fields originate in scheduler admission, never in prompt text.

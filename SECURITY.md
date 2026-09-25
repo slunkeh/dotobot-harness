@@ -38,8 +38,13 @@ make an unsupported host operating system secure.
 `search_history` reads original messages, decision cards and delivery receipts
 for the current bot conversation. It does not grant access to another bot or
 conversation, and recovered approvals are evidence, not current authorization.
-Task follow-ups may retain an already selected account; changed instructions
-still require action permissions to be evaluated again.
+Explicit human account selections persist across tasks in the same bot chat,
+independently of model context and task classification. Explicit account
+removal revokes the selection; disabled accounts cannot execute, and replacement
+accounts do not inherit it. Migration uses recorded human selections or exact
+account IDs in original human messages, never assistant or external text.
+Background jobs use their separately bound scope. Changed instructions still
+require action permissions to be evaluated again.
 
 `credential_status` reports credential presence and current bot mount availability
 without returning values. A path is shown only when its existing bot grant is
