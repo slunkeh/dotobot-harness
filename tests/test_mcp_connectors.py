@@ -185,6 +185,38 @@ def test_static_client_skips_dcr(paths):
     assert t.token_forms[0]["client_secret"] == "slack-app-secret"
 
 
+def test_asana_v2_uses_registered_client_without_dynamic_registration(paths):
+    entry = next(item for item in catalog() if item["type"] == "asana")
+    assert entry["mcp_url"] == "https://mcp.asana.com/v2/mcp"
+    assert "client_id" in entry["fields"]
+
+    class AsanaAuth(FakeAuth):
+        def get_json(self, url):
+            if url == "https://mcp.asana.com/.well-known/oauth-protected-resource/v2/mcp":
+                return {
+                    "resource": entry["mcp_url"],
+                    "authorization_servers": [AUTH],
+                    "scopes_supported": ["default"],
+                }
+            metadata = super().get_json(url)
+            metadata.pop("registration_endpoint", None)
+            return metadata
+
+    transport = AsanaAuth()
+    record = Connectors(paths).add("asana", "Test", config={"client_id": "fixture-client"})
+    start = mcp_oauth.start_authorize(
+        paths, record, entry["mcp_url"], "http://127.0.0.1:18765/callback",
+        transport, client_secret="fixture-secret",
+    )
+    query = urllib.parse.parse_qs(urllib.parse.urlparse(start["authorize_url"]).query)
+    assert query["client_id"] == ["fixture-client"]
+    assert query["resource"] == [entry["mcp_url"]]
+    assert query["scope"] == ["default"]
+    assert transport.registered == []
+    assert mcp_oauth.exchange(paths, start["state"], "fixture-code", transport)["status"] == "connected"
+    assert transport.token_forms[0]["client_secret"] == "fixture-secret"
+
+
 # -- code exchange + tokens -------------------------------------------------
 
 

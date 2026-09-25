@@ -145,10 +145,10 @@ CATALOG: list[dict] = [
         "type": "asana",
         "name": "Asana",
         "auth": "oauth",
-        "mcp_url": "https://mcp.asana.com/sse",
-        "fields": [],
+        "mcp_url": "https://mcp.asana.com/v2/mcp",
+        "fields": ["client_id"],
         "category": "Project Management",
-        "description": "Coordinate Asana tasks, projects, and portfolios.",
+        "description": "Coordinate Asana tasks, projects, and portfolios. Asana needs a registered MCP app (Client ID and Client Secret) with access to your workspace; it does not register automatically.",
         "icon": "checklist",
     },
     {

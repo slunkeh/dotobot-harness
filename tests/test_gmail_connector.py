@@ -11,6 +11,7 @@ from __future__ import annotations
 import email
 import email.policy
 import imaplib
+import json
 import re
 import smtplib
 from email.message import EmailMessage
@@ -112,11 +113,15 @@ class FakeIMAP:
         self._next_msgid = 0x1000
         self.raw_matcher = None  # callable(query, message dict) -> bool
 
-    def add(self, folder: str, raw: bytes, msgid: int, thrid: int | None = None) -> int:
+    def add(
+        self, folder: str, raw: bytes, msgid: int, thrid: int | None = None,
+        *, labels: tuple[str, ...] = (),
+    ) -> int:
         uid = self._next_uid
         self._next_uid += 1
         self.folders[folder].append(
-            {"uid": uid, "msgid": msgid, "thrid": thrid or msgid, "raw": raw, "flags": set()}
+            {"uid": uid, "msgid": msgid, "thrid": thrid or msgid, "raw": raw,
+             "flags": set(), "labels": labels}
         )
         return uid
 
@@ -171,6 +176,12 @@ class FakeIMAP:
                 if m["uid"] not in wanted:
                     continue
                 meta = f"{m['uid']} (X-GM-MSGID {m['msgid']} X-GM-THRID {m['thrid']} UID {m['uid']}"
+                if "X-GM-LABELS" in items:
+                    labels = " ".join(
+                        '"' + label.replace("\\", "\\\\").replace('"', '\\"') + '"'
+                        for label in m["labels"]
+                    )
+                    meta += f" X-GM-LABELS ({labels})"
                 if "BODY.PEEK[]" in items:
                     payload = m["raw"]
                     out.append(((meta + f" BODY[] {{{len(payload)}}}").encode(), payload))
@@ -388,6 +399,25 @@ def test_get_message_decodes_plain_body(gmail_ctx, imap):
     assert "Note" in out
     assert "body text" in out
     assert imap.searches == [(("X-GM-MSGID", str(0xC1)), None)]
+
+
+@pytest.mark.parametrize(
+    ("handler", "args"),
+    [
+        (gmail._search_threads, {"query": "subject:Draft"}),
+        (gmail._get_message, {"message_id": "c1"}),
+        (gmail._get_thread, {"thread_id": "c1"}),
+    ],
+)
+@pytest.mark.parametrize("labels", [(r"\Drafts",), (r"\Inbox", r"\Sent"), ()])
+def test_mail_reads_expose_actual_labels_and_recipient(gmail_ctx, imap, handler, args, labels):
+    imap.add(
+        FakeIMAP.ALL, _raw(subject="Draft", to="recipient@example.com"),
+        msgid=0xC1, labels=labels,
+    )
+    out = handler(gmail_ctx, args)
+    assert f"labels={json.dumps(labels)}" in out
+    assert "to=recipient@example.com" in out
 
 
 def test_get_message_prefers_plain_and_strips_html_otherwise(gmail_ctx, imap):
@@ -690,10 +720,39 @@ def test_send_draft_without_recipient_keeps_the_draft(gmail_ctx, imap, smtp):
 
 
 def test_send_draft_unknown_or_missing_id(gmail_ctx, imap, smtp):
-    assert gmail._send_draft(gmail_ctx, {"draft_id": "99"}) == "error: no draft 99"
+    assert gmail._send_draft(gmail_ctx, {"draft_id": "99"}).startswith("error: no draft 99")
     out = gmail._send_draft(gmail_ctx, {})
     assert out.startswith("error:") and "draft_id" in out
     assert smtp.sent == []
+
+
+def test_stale_draft_id_does_not_send_or_substitute_another_draft(gmail_ctx, imap, smtp):
+    # Saving an edit replaces Gmail's message ID, even though the visible draft remains.
+    raw = _raw(to="bob@example.com", subject="Draft", body="Edited body")
+    imap.add(FakeIMAP.DRAFTS, raw, msgid=0x52)
+    out = gmail._send_draft(gmail_ctx, {"draft_id": "51"})
+    assert out.startswith("error: no draft 51")
+    assert "nothing was sent by this call" in out
+    assert "list_drafts" in out and "get_message" in out
+    assert "recipient" in out and "subject" in out and "body" in out
+    assert smtp.sent == []
+    assert len(imap.folders[FakeIMAP.DRAFTS]) == 1
+    assert "draft=52" in gmail._list_drafts(gmail_ctx, {})
+
+
+@pytest.mark.parametrize("error", [gmail.GmailError, imaplib.IMAP4.error, OSError])
+def test_send_draft_reports_accepted_send_when_cleanup_fails(gmail_ctx, imap, smtp, monkeypatch, error):
+    imap.add(FakeIMAP.DRAFTS, _raw(to="bob@example.com", subject="Draft"), msgid=0x61)
+
+    def failed_cleanup(self, uid):
+        raise error("could not delete the draft")
+
+    monkeypatch.setattr(gmail._Mailbox, "delete", failed_cleanup)
+    out = gmail._send_draft(gmail_ctx, {"draft_id": "61"})
+    assert out.startswith("ok: sent draft 61")
+    assert "cleanup failed" in out and "Do not resend" in out
+    assert len(smtp.sent) == 1
+    assert len(imap.folders[FakeIMAP.DRAFTS]) == 1
 
 
 # -- imaplib response parsing ---------------------------------------------------
@@ -714,6 +773,24 @@ def test_parse_fetch_handles_literals_bare_lines_and_trailing_flags():
         (7, 1278455344230334865, 1278455344230334865, b"hello"),
         (8, 42, None, b""),
     ]
+
+
+def test_parse_fetch_keeps_labels_before_or_after_body_literal():
+    rows = gmail._parse_fetch([
+        (b'1 (UID 7 X-GM-MSGID 42 X-GM-LABELS (\\Drafts "Project (draft)" "Say \\"hi\\"") BODY[] {5}', b"hello"),
+        b")",
+        (b"2 (UID 8 X-GM-MSGID 43 BODY[] {5}", b"world"),
+        b" X-GM-LABELS (\\Inbox \\Sent))",
+        b"3 (UID 9 X-GM-MSGID 44 X-GM-LABELS ())",
+        b"4 (UID 10 X-GM-MSGID 45)",
+    ])
+    assert [row["labels"] for row in rows] == [
+        [r"\Drafts", "Project (draft)", 'Say "hi"'],
+        [r"\Inbox", r"\Sent"],
+        [],
+        None,
+    ]
+    assert [row["data"] for row in rows[:2]] == [b"hello", b"world"]
 
 
 def test_folder_listing_parses_quoted_bare_and_literal_names():
