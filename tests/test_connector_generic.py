@@ -142,6 +142,22 @@ def test_twilio_uses_basic_auth(paths, monkeypatch):
     assert seen["auth"].startswith("Basic ")
 
 
+def test_360nrs_accepts_separate_username_and_legacy_pair(paths):
+    import base64
+
+    separate = _ctx(paths, type_="360nrs", secret="api-password", config={"username": "user"})
+    legacy = _ctx(paths, type_="360nrs", secret="user:api-password")
+    expected = "Basic " + base64.b64encode(b"user:api-password").decode()
+    assert generic._headers(separate, separate.secret())["Authorization"] == expected
+    assert generic._headers(legacy, legacy.secret())["Authorization"] == expected
+
+
+def test_360nrs_rejects_password_only_with_clear_setup_error(paths):
+    password_only = _ctx(paths, type_="360nrs", secret="api-password")
+    with pytest.raises(ValueError, match="enter the username in its separate field"):
+        generic._headers(password_only, password_only.secret())
+
+
 def test_configured_stub_gives_bot_tools(paths):
     Connectors(paths).add("mailchimp", "Mailchimp", secret="k-us1")
     tools = tools_for_bot(paths, "atlas")

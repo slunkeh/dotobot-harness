@@ -13,7 +13,7 @@ _ROWS: list[tuple[str, str, str, str]] = [
         "360nrs",
         "official",
         "https://apidocs.360nrs.com/",
-        "Store username:apiPassword as the secret, using the API password, not the platform login password. Allow the server IP in 360NRS settings. Paths are relative to https://dashboard.360nrs.com/api/rest; HTTP Basic authentication is used.",
+        "Enter your 360NRS username separately and paste the generated API password as the secret (APIs > Change API password > Save). Do not use the platform login password or the profile API key. Existing username:apiPassword secrets remain supported. Allow the server IP in 360NRS settings. Paths are relative to https://dashboard.360nrs.com/api/rest; HTTP Basic authentication is used.",
     ),
     (
         "4dem",

@@ -558,7 +558,7 @@ CASES = [
     ("cardly", {}, "/art", "https://api.card.ly/v2/art", "Api-key", "fixture-key"),
     (
         "360nrs",
-        {},
+        {"username": "test-user"},
         "/account",
         "https://dashboard.360nrs.com/api/rest/account",
         "Authorization",
@@ -644,9 +644,9 @@ CASES = [
 def test_bound_connector_read_and_write_contract(tmp_path, type_, config, path, url, header, value):
     paths = HarnessPaths(home=tmp_path)
     secret = (
-        "test-user:test-api-password"
-        if type_ in {"360nrs", "email_on_acid", "esputnik"}
-        else "fixture-key"
+        "test-api-password" if type_ == "360nrs" else
+        "test-user:test-api-password" if type_ in {"email_on_acid", "esputnik"} else
+        "fixture-key"
     )
     record = Connectors(paths).add(type_, type_, config=config, secret=secret)
     from harness import mcp_oauth

@@ -308,6 +308,12 @@ def _headers(ctx: ConnectorContext, secret: str) -> dict[str, str]:
         credentials = (
             secret + ":" + str(cat.get("basic_password", "")) if style == "basic_key" else secret
         )
+        if ctx.record["type"] == "360nrs":
+            username = str((ctx.record.get("config") or {}).get("username") or "").strip()
+            if username:
+                credentials = f"{username}:{secret}"
+            elif ":" not in secret:
+                raise ValueError("360NRS needs a username and API password; enter the username in its separate field")
         token = base64.b64encode(credentials.encode("utf-8")).decode("ascii")
         hdrs["Authorization"] = f"Basic {token}"
         return hdrs

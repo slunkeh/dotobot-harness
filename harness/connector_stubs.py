@@ -14,7 +14,7 @@ STUBS: list[dict] = [
         "type": "360nrs",
         "name": "360NRS",
         "auth": "api_key",
-        "fields": [],
+        "fields": ["username"],
         "api_base": "https://dashboard.360nrs.com/api/rest",
         "auth_style": "basic",
         "category": "Inbox And Collaboration",
