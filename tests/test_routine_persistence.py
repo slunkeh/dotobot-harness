@@ -110,14 +110,23 @@ def test_scheduler_preserves_corrupt_bot_and_runs_healthy_bot(paths, caplog):
     original = path.read_bytes()
     row = routines.add_routine(paths, "healthy", prompt="Run", when="8am", enabled=True)
     sent = []
+    now = datetime(2026, 9, 7, 8)
     fired = routines.fire_due(
         paths,
         ["broken", "healthy"],
-        now=datetime(2026, 9, 7, 8),
-        send=lambda bot, text: sent.append(bot),
+        now=now,
+        send=lambda bot, text, **metadata: sent.append((bot, text, metadata)),
     )
     assert [r["id"] for r in fired] == [row["id"]]
-    assert sent == ["healthy"]
+    assert [bot for bot, _, _ in sent] == ["healthy"]
+    scope, occurrence = sent[0][2]["task_scope"], sent[0][2]["routine"]
+    assert scope["routine_id"] == occurrence["id"] == row["id"]
+    assert scope["routine_revision"] == occurrence["revision"]
+    assert occurrence["run_id"] == fired[0]["last_run_id"]
+    assert scope["conversation"] == f"routine:{row['id']}:{occurrence['run_id']}"
+    assert occurrence["kind"] == "schedule"
+    assert occurrence["scheduled_at"] == now.timestamp()
+    assert occurrence["expires_at"] == now.timestamp() + 3600
     assert path.read_bytes() == original
     assert "cannot read routines" in caplog.text
 
