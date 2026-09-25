@@ -1178,7 +1178,8 @@ def _request_routine_credential_permission(ctx: ToolContext, args: dict[str, Any
     latest = current()
     if (not _approval_task_current(ctx) or latest is None
             or routine_revision(latest) != revision
-            or credential_fingerprint(name, ctx.paths) != fingerprint):
+            or credential_fingerprint(name, ctx.paths) != fingerprint
+            or ctx.approvals.credential_proposal_token(name, fingerprint) != token):
         return "error: task, routine or credential changed; no permission was saved"
     ctx.approvals.grant_routine_credential(ctx.task_conversation, rid, revision, name,
                                          source_task=ctx.task_id, fingerprint=fingerprint)

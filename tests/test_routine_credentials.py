@@ -289,3 +289,38 @@ def test_restoring_old_credential_does_not_revive_invalidated_consent(setup, mon
         monkeypatch.setenv("SERVICE_KEY", "fictional-original-value")
     monkeypatch.setattr(tools, "_confirm", Mock(return_value="user cancelled"))
     assert check(ctx).startswith("error:")
+
+
+@pytest.mark.parametrize("change", ["delete_and_restore", "revoke_existing"])
+def test_revocation_while_confirmation_waits_cannot_restore_consent(setup, monkeypatch, change):
+    paths, ctx, row = setup
+    permission = save_permission(setup, monkeypatch)
+    # A configuration edit requires another confirmation for this same key.
+    routines.update_routine(paths, "atlas", row["id"], prompt="Read updated inventory")
+    def confirm(*args, **kwargs):
+        if change == "delete_and_restore":
+            delete_secret("SERVICE_KEY", paths)
+            set_secret("SERVICE_KEY", "fictional-original-value", paths)
+        else:
+            assert ctx.approvals.revoke_standing("peer:user", permission["id"])
+        return "user confirmed"
+    monkeypatch.setattr(tools, "_confirm", confirm)
+    out = tools._request_routine_credential_permission(ctx, {"name": "SERVICE_KEY", "routine_id": row["id"]})
+    assert "changed" in out
+    assert ctx.approvals.standing_permissions("peer:user") == []
+
+
+def test_mount_observation_of_environment_rotation_invalidates_standing_consent(setup, monkeypatch):
+    paths, ctx, _ = setup
+    save_permission(setup, monkeypatch)
+    machine_secrets.grant(paths, "atlas", "SERVICE_KEY")
+    monkeypatch.setenv("SERVICE_KEY", "fictional-environment-rotation")
+    with machine_secrets.script_secret_scope(paths, "atlas"):
+        assert machine_secrets.credential_status(paths, "atlas", "SERVICE_KEY")["current"]
+    assert ctx.approvals.standing_permissions("peer:user") == []
+    monkeypatch.setenv("SERVICE_KEY", "fictional-original-value")
+    with machine_secrets.script_secret_scope(paths, "atlas"):
+        assert machine_secrets.credential_status(paths, "atlas", "SERVICE_KEY")["current"]
+    scheduled = routine_context(setup)
+    monkeypatch.setattr(tools, "_confirm", Mock(return_value="user cancelled"))
+    assert check(scheduled).startswith("error:")

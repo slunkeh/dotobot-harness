@@ -164,7 +164,7 @@ def refresh_grants(paths: HarnessPaths, name: str, *, remove: bool = False) -> N
 
 def _register_grants(paths: HarnessPaths, bot: str) -> None:
     from harness.redaction import register_secret, resolve_outbound
-    from harness.secrets import get_secret, valid_secret_name
+    from harness.secrets import _revoke_routine_consents, get_secret, valid_secret_name
 
     directory = directory_for_bot(paths, bot)
     if not directory.is_dir():
@@ -180,6 +180,7 @@ def _register_grants(paths: HarnessPaths, bot: str) -> None:
                     # Refresh only this bot's already-granted file, preserving
                     # the same capability boundary as a store-key rotation.
                     current = resolve_outbound(current, where="a rotated bot script credential file")
+                    _revoke_routine_consents(target.name, paths)
                     stage(paths, bot, target.name, current)
 
 
