@@ -15,6 +15,7 @@ import email.policy
 import email.utils
 import html
 import imaplib
+import json
 import re
 import smtplib
 import time
@@ -165,7 +166,16 @@ _LIST_LINE = re.compile(rb'^\((?P<attrs>[^)]*)\)\s+(?:"[^"]*"|NIL)\s+(?P<name>.*
 _META_UID = re.compile(rb"\bUID (\d+)")
 _META_MSGID = re.compile(rb"X-GM-MSGID (\d+)")
 _META_THRID = re.compile(rb"X-GM-THRID (\d+)")
+_META_LABELS = re.compile(rb'X-GM-LABELS \(((?:[^()"]|"(?:\\.|[^"\\])*")*)\)')
+_LABEL_TOKEN = re.compile(rb'"(?:\\.|[^"\\])*"|[^\s()]+')
 _APPENDUID = re.compile(rb"APPENDUID \d+ (\d+)")
+
+
+def _labels(line: bytes) -> list[str] | None:
+    match = _META_LABELS.search(line)
+    if match is None:
+        return None
+    return [_unquote(_text(token)) for token in _LABEL_TOKEN.findall(match.group(1))]
 
 
 def _meta(line: bytes) -> dict[str, Any]:
@@ -176,6 +186,7 @@ def _meta(line: bytes) -> dict[str, Any]:
         "uid": int(uid.group(1)) if uid else 0,
         "msgid": int(msgid.group(1)) if msgid else None,
         "thrid": int(thrid.group(1)) if thrid else None,
+        "labels": _labels(line),
         "data": b"",
     }
 
@@ -183,7 +194,7 @@ def _meta(line: bytes) -> dict[str, Any]:
 def _parse_fetch(data: list[Any]) -> list[dict[str, Any]]:
     """Rows from an imaplib FETCH response: `(meta, literal)` tuples carry a
     body/header literal, bare `b'N (...)'` lines carry only ids, and the
-    `b')'` closers (and any trailing FLAGS fragments) are noise."""
+    labels may follow the literal in a separate response fragment."""
     rows: list[dict[str, Any]] = []
     for item in data:
         if isinstance(item, tuple) and len(item) >= 2 and isinstance(item[0], bytes):
@@ -194,6 +205,8 @@ def _parse_fetch(data: list[Any]) -> list[dict[str, Any]]:
             line = item.strip()
             if line[:1].isdigit() and _META_UID.search(line):
                 rows.append(_meta(line))
+            elif rows and (labels := _labels(line)) is not None:
+                rows[-1]["labels"] = labels
     return rows
 
 
@@ -354,11 +367,16 @@ def _hdr(msg: EmailMessage, name: str) -> str:
     return re.sub(r"\s+", " ", str(value or "")).strip()
 
 
-def _fmt_headers(msg: EmailMessage, msgid: int | None, thrid: int | None) -> str:
+def _fmt_headers(
+    msg: EmailMessage, msgid: int | None, thrid: int | None,
+    labels: list[str] | None = None,
+) -> str:
     bits = [
         f"- id={_hex(msgid) or '?'}",
         f"thread={_hex(thrid)}" if thrid else "",
         _hdr(msg, "from"),
+        f"to={_hdr(msg, 'to') or '?'}",
+        f"labels={json.dumps(labels)}" if labels is not None else "labels=unknown",
         _hdr(msg, "date"),
         _hdr(msg, "subject") or "(no subject)",
     ]
@@ -462,8 +480,8 @@ def _compose(address: str, to: str, subject: str, body: str) -> EmailMessage:
     return msg
 
 
-_FULL = "(X-GM-MSGID X-GM-THRID BODY.PEEK[])"
-_LISTING = "(X-GM-MSGID X-GM-THRID BODY.PEEK[HEADER.FIELDS (FROM TO SUBJECT DATE)])"
+_FULL = "(X-GM-MSGID X-GM-THRID X-GM-LABELS BODY.PEEK[])"
+_LISTING = "(X-GM-MSGID X-GM-THRID X-GM-LABELS BODY.PEEK[HEADER.FIELDS (FROM TO SUBJECT DATE)])"
 
 
 # -- tools ---------------------------------------------------------------------
@@ -480,7 +498,7 @@ def _search_threads(ctx: ConnectorContext, args: dict[str, Any]) -> str:
     except GmailError as exc:
         return f"error: {exc}"
     rows.sort(key=lambda r: r["uid"], reverse=True)
-    lines = [_fmt_headers(_parse_message(r["data"]), r["msgid"], r["thrid"]) for r in rows]
+    lines = [_fmt_headers(_parse_message(r["data"]), r["msgid"], r["thrid"], r["labels"]) for r in rows]
     return "\n".join(lines) if lines else "(no messages matched)"
 
 
@@ -501,7 +519,7 @@ def _get_thread(ctx: ConnectorContext, args: dict[str, Any]) -> str:
     parts: list[str] = [f"thread {_hex(tid)} · {len(rows)} message(s)"]
     for row in rows:
         msg = _parse_message(row["data"])
-        parts.append(_fmt_headers(msg, row["msgid"], row["thrid"]))
+        parts.append(_fmt_headers(msg, row["msgid"], row["thrid"], row["labels"]))
         body = _body_text(msg)
         if body:
             parts.append(body.strip())
@@ -532,7 +550,7 @@ def _get_message(ctx: ConnectorContext, args: dict[str, Any]) -> str:
     if row is None:
         return f"error: no message {_hex(mid)}"
     msg = _parse_message(row["data"])
-    text = _fmt_headers(msg, row["msgid"], row["thrid"]).lstrip("- ").strip()
+    text = _fmt_headers(msg, row["msgid"], row["thrid"], row["labels"]).lstrip("- ").strip()
     body = _body_text(msg)
     if body:
         text = f"{text}\n\n{body}".strip()
@@ -724,7 +742,13 @@ def _send_draft(ctx: ConnectorContext, args: dict[str, Any]) -> str:
             mb.select(drafts, readonly=False)
             rows = mb.fetch(mb.search("X-GM-MSGID", str(did)), _FULL)
             if not rows:
-                return f"error: no draft {_hex(did)}"
+                return (
+                    f"error: no draft {_hex(did)}; nothing was sent by this call. "
+                    "Saving an edit can change a draft's message ID. Use list_drafts "
+                    "to find the current ID, then get_message to review its recipient, "
+                    "subject and body before requesting a send. Do not substitute or "
+                    "resend a message whose previous send outcome is uncertain."
+                )
             row = rows[0]
             msg = _parse_message(row["data"])
             to = _hdr(msg, "to")
@@ -739,7 +763,15 @@ def _send_draft(ctx: ConnectorContext, args: dict[str, Any]) -> str:
             _smtp_send(address, password, msg)
             # Sent: Gmail files the SMTP copy under Sent itself; the draft
             # would otherwise linger as a duplicate.
-            mb.delete(row["uid"])
+            try:
+                mb.delete(row["uid"])
+            except (GmailError, imaplib.IMAP4.error, OSError):
+                return (
+                    f"ok: sent draft {_hex(did)} to {to} from {address}; "
+                    "Gmail accepted the send, but draft cleanup failed. "
+                    "Do not resend. Check Sent and the remaining draft separately; "
+                    "SMTP acceptance alone does not confirm recipient delivery."
+                )
     except GmailError as exc:
         return f"error: {exc}"
     return f"ok: sent draft {_hex(did)} to {to} from {address} · {_hdr(msg, 'subject') or '(no subject)'}"
@@ -751,9 +783,11 @@ def tools() -> list[ConnectorTool]:
             ToolSpec(
                 name="gmail_search_threads",
                 description=(
-                    "Search this Gmail inbox with Gmail search syntax "
+                    "Search this Gmail mailbox with Gmail search syntax "
                     "(from:, to:, subject:, newer_than:7d, has:attachment, in:inbox, "
-                    "is:unread). Returns message ids and thread ids, newest first."
+                    "is:unread). Returns message ids, thread ids, recipients and labels, "
+                    "newest first. A subject match may be a draft; check labels before "
+                    "claiming a message is in Inbox or Sent."
                 ),
                 parameters={
                     "type": "object",
@@ -838,7 +872,7 @@ def tools() -> list[ConnectorTool]:
         ConnectorTool(
             ToolSpec(
                 name="gmail_list_drafts",
-                description="List Gmail drafts, newest first.",
+                description="List Gmail drafts with their current message IDs, newest first. Saving edits can change an ID.",
                 parameters={
                     "type": "object",
                     "properties": {
@@ -892,7 +926,10 @@ def tools() -> list[ConnectorTool]:
                 name="gmail_send_draft",
                 description=(
                     "Send an existing Gmail draft by draft_id. The draft is removed "
-                    "from Drafts once Gmail accepts the send."
+                    "from Drafts once Gmail accepts the send. Saving edits can change "
+                    "the draft ID: use list_drafts and review the recipient, subject and "
+                    "body with get_message before sending. Never automatically retry "
+                    "an uncertain send or a successful send with failed draft cleanup."
                 ),
                 parameters={
                     "type": "object",

@@ -118,7 +118,7 @@ def test_fire_due_uses_send_callback(tmp_path):
         paths,
         ["atlas"],
         now=datetime(2026, 8, 23, 8, 0),
-        send=lambda bot, text: sent.append((bot, text)),
+        send=lambda bot, text, **metadata: sent.append((bot, text)),
     )
     assert len(fired) == 1
     assert sent == [("atlas", "[Routine: Ping]\nsay hi")]
@@ -559,9 +559,9 @@ def test_london_routine_tracks_bst_and_gmt(tmp_path):
     for month, utc_hour in [(9, 7), (11, 8)]:
         wrong = datetime(2026, month, 5, utc_hour - 1, 0, tzinfo=UTC)
         due = datetime(2026, month, 5, utc_hour, 0, tzinfo=UTC)
-        assert fire_due(p, ["atlas"], now=wrong, send=lambda *a: sent.append(a)) == []
-        assert len(fire_due(p, ["atlas"], now=due, send=lambda *a: sent.append(a))) == 1
-        assert fire_due(p, ["atlas"], now=due, send=lambda *a: sent.append(a)) == []
+        assert fire_due(p, ["atlas"], now=wrong, send=lambda *a, **kw: sent.append(a)) == []
+        assert len(fire_due(p, ["atlas"], now=due, send=lambda *a, **kw: sent.append(a))) == 1
+        assert fire_due(p, ["atlas"], now=due, send=lambda *a, **kw: sent.append(a)) == []
     assert len(sent) == 2
     row = list_routines(p, "atlas")[0]
     assert row["timezone"] == "Europe/London"
@@ -594,24 +594,24 @@ def test_timezone_change_allows_same_day_slot(tmp_path):
         timezone="Europe/London",
     )
     london_due = datetime(2026, 9, 5, 7, 0, tzinfo=UTC)
-    assert len(fire_due(p, ["atlas"], now=london_due, send=lambda *a: None)) == 1
-    assert fire_due(p, ["atlas"], now=london_due, send=lambda *a: None) == []
+    assert len(fire_due(p, ["atlas"], now=london_due, send=lambda *a, **kw: None)) == 1
+    assert fire_due(p, ["atlas"], now=london_due, send=lambda *a, **kw: None) == []
     update_routine(p, "atlas", row["id"], timezone="Europe/London")
-    assert fire_due(p, ["atlas"], now=london_due, send=lambda *a: None) == []
+    assert fire_due(p, ["atlas"], now=london_due, send=lambda *a, **kw: None) == []
     update_routine(p, "atlas", row["id"], timezone="America/New_York")
     ny_due = datetime(2026, 9, 5, 12, 0, tzinfo=UTC)
-    assert len(fire_due(p, ["atlas"], now=ny_due, send=lambda *a: None)) == 1
-    assert fire_due(p, ["atlas"], now=ny_due, send=lambda *a: None) == []
+    assert len(fire_due(p, ["atlas"], now=ny_due, send=lambda *a, **kw: None)) == 1
+    assert fire_due(p, ["atlas"], now=ny_due, send=lambda *a, **kw: None) == []
 
 
 def test_adding_timezone_allows_same_day_slot(tmp_path):
     p = _paths(tmp_path)
     row = add_routine(p, "atlas", title="orders", prompt="report", when="0 8 * * *", enabled=True)
     local_due = datetime(2026, 9, 5, 8, 0)
-    assert len(fire_due(p, ["atlas"], now=local_due, send=lambda *a: None)) == 1
+    assert len(fire_due(p, ["atlas"], now=local_due, send=lambda *a, **kw: None)) == 1
     update_routine(p, "atlas", row["id"], timezone="America/New_York")
     ny_due = datetime(2026, 9, 5, 12, 0, tzinfo=UTC)
-    assert len(fire_due(p, ["atlas"], now=ny_due, send=lambda *a: None)) == 1
+    assert len(fire_due(p, ["atlas"], now=ny_due, send=lambda *a, **kw: None)) == 1
 
 
 def test_london_repeated_autumn_minute_fires_once(tmp_path):
@@ -628,8 +628,8 @@ def test_london_repeated_autumn_minute_fires_once(tmp_path):
     )
     first = datetime(2026, 10, 25, 0, 30, tzinfo=UTC)
     second = datetime(2026, 10, 25, 1, 30, tzinfo=UTC)
-    assert len(fire_due(p, ["atlas"], now=first, send=lambda *a: None)) == 1
-    assert fire_due(p, ["atlas"], now=second, send=lambda *a: None) == []
+    assert len(fire_due(p, ["atlas"], now=first, send=lambda *a, **kw: None)) == 1
+    assert fire_due(p, ["atlas"], now=second, send=lambda *a, **kw: None) == []
 
 
 def test_routine_timezone_round_trips_through_chat_api(tmp_path):

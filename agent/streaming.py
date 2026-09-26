@@ -924,6 +924,8 @@ def sync_stale_prompts(
                 payload=payload,
                 frm=row["bot"],
                 resolution=row["resolution"],
+                thread_id=row.get("thread_id"),
+                origin=row.get("origin"),
             )
         if writer is not None:
             writer.card_resolution(row["bot"], row["id"], kind, payload, row["resolution"])

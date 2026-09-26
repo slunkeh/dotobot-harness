@@ -28,7 +28,10 @@ shared later — is ON by default; `skills_prompt` reflects it.
 
 from __future__ import annotations
 
+import os
 import re
+import stat
+import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -167,6 +170,25 @@ def _helper_files(skill_md: Path) -> list[Path]:
 _DEFAULT_CITE = """\
 ---
 name: cite-sources
+description: Cite evidence in factual answers and review context
+when_to_use: factual research, source verification, or /cite-sources
+---
+1. Find relevant sources for factual claims in your answer to the user. Link or
+   quote the evidence and say when a claim cannot be verified.
+2. Keep supporting sources in the explanation or review context. Review context
+   is separate from an outgoing message and is not posted with it.
+3. Keep exact approved outgoing text unchanged. General citation guidance does
+   not authorize adding links, source annotations, or other text after approval.
+   Do not refuse an approved question solely because it has no citation.
+4. If the user explicitly requests citations in the outgoing message, include
+   them in the proposed text before approval. Adding a citation after approval
+   requires a revised proposal and new approval.
+"""
+
+# Exact bytes of the shipped seed, not a name-based claim that a file is ours.
+_LEGACY_CITE = """\
+---
+name: cite-sources
 description: Always cite sources when stating a fact
 when_to_use: user asks for a fact or /cite-sources
 ---
@@ -235,21 +257,47 @@ def default_skill_names() -> frozenset[str]:
     return frozenset(_default_skills())
 
 
+def _upgrade_citation_seed(path: Path, text: str) -> None:
+    """Replace only the old seed, atomically and with its existing read access."""
+    with path.open("rb") as original:
+        if original.read() != _LEGACY_CITE.encode("utf-8"):
+            return
+        mode = stat.S_IMODE(os.fstat(original.fileno()).st_mode)
+    fd, temporary = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}.")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as updated:
+            updated.write(text)
+            updated.flush()
+            os.fchmod(updated.fileno(), mode)
+        os.replace(temporary, path)
+    finally:
+        Path(temporary).unlink(missing_ok=True)
+
+
 def ensure_default_skills(paths: HarnessPaths) -> None:
     """Seed the shared default skills so `/` has something to pick.
 
-    Seeding is per-skill with an existence guard: a home that predates a
-    default gains it on the next start, and an edited SKILL.md is never
-    overwritten (so later edits to `agent/tips.py` reach an existing home's
-    skill only if its directory is removed first).
+    Only the exact old citation seed is upgraded. Other existing files, edited
+    skills and symlink destinations remain untouched; private skills and per-bot
+    enablement are stored separately and are never changed here.
     """
+    if paths.skills.is_symlink():
+        return
     paths.skills.mkdir(parents=True, exist_ok=True)
     for name, text in _default_skills().items():
         dest = paths.skills / name
-        if (dest / "SKILL.md").is_file():
+        skill_md = dest / "SKILL.md"
+        if dest.is_symlink() or skill_md.is_symlink():
+            continue
+        if skill_md.is_file():
+            if name == "cite-sources":
+                try:
+                    _upgrade_citation_seed(skill_md, text)
+                except OSError:
+                    pass  # A read-only skill must not prevent startup.
             continue
         dest.mkdir(parents=True, exist_ok=True)
-        (dest / "SKILL.md").write_text(text, encoding="utf-8")
+        skill_md.write_text(text, encoding="utf-8")
 
 
 def _load_from(root: Path, source: str) -> list[Skill]:

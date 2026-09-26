@@ -1154,6 +1154,23 @@ class StateStore:
                 return "conflict", row  # values only enter the separate secret store
             return "applied", self._save_prompt_resolution(conn, row, resolution)
 
+    def claim_prompt_execution(self, prompt_id: str, *, bot: str, task_id: str, revision: int) -> bool:
+        """Consume one admitted outgoing action before dispatch, including across workers."""
+        with self._tx() as conn:
+            raw = conn.execute("SELECT payload FROM agent_prompts WHERE prompt_id=?", (prompt_id,)).fetchone()
+            if raw is None:
+                return False
+            row = json.loads(raw[0])
+            if (row.get("execution_started") or row.get("bot") != bot
+                    or row.get("task_id") != task_id or row.get("task_revision") != revision
+                    or not self._prompt_current(conn, row)
+                    or (row.get("resolution") or {}).get("state") != "answered"
+                    or (row.get("resolution") or {}).get("responded_value") != "confirm"):
+                return False
+            row["execution_started"] = time.time()
+            conn.execute("UPDATE agent_prompts SET payload=? WHERE prompt_id=?", (json.dumps(row), prompt_id))
+            return True
+
     # -- prompt resolutions ------------------------------------------------
     def record_prompt_resolution(self, prompt_id: str, *, bot: str, resolution: dict) -> None:
         """Durable mirror of a settled prompt (records expire from

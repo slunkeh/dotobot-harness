@@ -19,7 +19,7 @@ def make_agent(tmp_path):
     return build_agent(paths, Bot(name="atlas", provider="echo"), stream_delay=0), paths
 
 
-def test_runtime_continuation_reuses_only_user_selected_connectors(tmp_path, monkeypatch):
+def test_runtime_chat_reuses_only_user_selected_connectors(tmp_path, monkeypatch):
     agent, paths = make_agent(tmp_path)
     records = [{"id": "n", "type": "notion", "name": "Notion", "oauth_configured": True}]
     monkeypatch.setattr(Connectors, "list", lambda self: records)
@@ -37,8 +37,68 @@ def test_runtime_continuation_reuses_only_user_selected_connectors(tmp_path, mon
     restarted._produce("user", "continue", turn_id="second")
     assert read_task(paths, "atlas", "peer:user")["task_id"] == first["task_id"]
     restarted._produce("user", "Explain photosynthesis", turn_id="third")
-    assert fetched == [{"n"}, {"n"}]
-    assert read_task(paths, "atlas", "peer:user")["connector_ids"] == []
+    assert fetched == [{"n"}, {"n"}, {"n"}]
+    assert read_task(paths, "atlas", "peer:user")["connector_ids"] == ["n"]
+
+
+@pytest.mark.parametrize("classifier_fails", [False, True])
+def test_mail_read_works_on_new_task_after_restart_without_reselection(
+    tmp_path, monkeypatch, classifier_fails
+):
+    from agent import continuity
+
+    agent, paths = make_agent(tmp_path)
+    records = [
+        {"id": "work-mail", "type": "gmail", "name": "Work mail", "oauth_configured": True},
+        {"id": "personal-mail", "type": "gmail", "name": "Personal mail", "oauth_configured": True},
+    ]
+    monkeypatch.setattr(Connectors, "list", lambda self: records)
+    monkeypatch.setattr(Connectors, "records", lambda self: records)
+    called = []
+
+    def fetch(*args, record_ids=None, **kwargs):
+        assert record_ids == {"work-mail"}
+        return {
+            "gmail_work_mail_search_threads": Tool(
+                ToolSpec("gmail_work_mail_search_threads", "Search mail"),
+                lambda ctx, args: called.append(args) or "No new reply.",
+            )
+        }
+
+    monkeypatch.setattr(runtime, "connector_tools", fetch)
+    agent._produce("user", "Use @connector:work-mail", turn_id="selection")
+    original = read_task(paths, "atlas", "peer:user")
+
+    def classify(*args, **kwargs):
+        if classifier_fails:
+            raise RuntimeError("classifier unavailable")
+        return False, {}
+
+    monkeypatch.setattr(continuity, "assess", classify)
+
+    class ReadMail(Provider):
+        n = 0
+
+        def complete(self, messages, tools=None, **kwargs):
+            assert "gmail_work_mail_search_threads" in {tool.name for tool in tools}
+            self.n += 1
+            if self.n == 1:
+                return Completion(tool_calls=[
+                    ToolCall("read-mail", "gmail_work_mail_search_threads", {"query": "newer_than:7d"})
+                ])
+            assert messages[-1].role == "tool"
+            assert messages[-1].content == "No new reply."
+            return Completion(text="No new reply.")
+
+    restarted = build_agent(paths, Bot(name="atlas", provider="echo"), stream_delay=0)
+    restarted.provider = ReadMail("test")
+    assert restarted._produce(
+        "user", "Check my inbox for replies this week", turn_id="new-request"
+    ) == "No new reply."
+    current = read_task(paths, "atlas", "peer:user")
+    assert current["task_id"] != original["task_id"]
+    assert current["connector_ids"] == ["work-mail"]
+    assert called == [{"query": "newer_than:7d"}]
 
 
 def test_github_followups_keep_tools_after_restart(tmp_path, monkeypatch):
@@ -84,6 +144,42 @@ def test_github_followups_keep_tools_after_restart(tmp_path, monkeypatch):
     assert fetched == [{"a1b2c3d4"}] * 4
 
 
+def test_saved_chat_selection_does_not_bypass_action_approval(tmp_path, monkeypatch):
+    from agent import policy
+
+    agent, paths = make_agent(tmp_path)
+    records = [{"id": "work", "type": "gmail", "name": "Work mail", "oauth_configured": True}]
+    monkeypatch.setattr(Connectors, "list", lambda self: records)
+    monkeypatch.setattr(Connectors, "records", lambda self: records)
+    sent, approvals = [], []
+    tool = Tool(ToolSpec("gmail_send", "Send mail"), lambda ctx, args: sent.append(args) or "Sent")
+    monkeypatch.setattr(runtime, "connector_tools", lambda *args, **kwargs: {"gmail_send": tool})
+    monkeypatch.setattr(
+        runtime, "require_approval",
+        lambda *args, **kwargs: approvals.append(args) or "error: approval required",
+    )
+    agent._produce("user", "Use @connector:work", turn_id="selection")
+    original = read_task(paths, "atlas", "peer:user")
+    agent._policy_cache = policy.parse({"ask": [{"intent": "write_tool"}]})
+
+    class AttemptSend(Provider):
+        n = 0
+
+        def complete(self, messages, tools=None, **kwargs):
+            assert "gmail_send" in {tool.name for tool in tools}
+            self.n += 1
+            if self.n == 1:
+                return Completion(tool_calls=[ToolCall("send", "gmail_send", {"body": "Draft"})])
+            assert "approval required" in messages[-1].content
+            return Completion(text="The message was not sent.")
+
+    agent.provider = AttemptSend("test")
+    assert agent._produce("user", "New task: prepare a reply", turn_id="reply") == "The message was not sent."
+    assert read_task(paths, "atlas", "peer:user")["task_id"] != original["task_id"]
+    assert len(approvals) == 1
+    assert sent == []
+
+
 @pytest.mark.parametrize("selected", [False, True])
 def test_missing_tools_are_not_reported_as_missing_auth(tmp_path, monkeypatch, selected):
     agent, _ = make_agent(tmp_path)
@@ -111,7 +207,7 @@ def test_missing_tools_are_not_reported_as_missing_auth(tmp_path, monkeypatch, s
             if selected:
                 assert "credentials are configured, but its MCP tools are not available" in system
             else:
-                assert "GitHub: credentials configured; not selected for this task" in system
+                assert "GitHub: credentials configured; outside the saved connector scope" in system
             assert not any(t.name.startswith("github_") for t in tools)
             return Completion(text="Tools unavailable; authentication has not failed.")
 

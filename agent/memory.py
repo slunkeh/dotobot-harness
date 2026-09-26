@@ -189,6 +189,8 @@ class Memory:
         frm: str,
         resolution: dict | None = None,
         peer: str = "user",
+        thread_id: str | None = None,
+        origin: str | None = None,
     ) -> None:
         """Append a durable card, or re-log the same id with a resolution.
 
@@ -201,6 +203,8 @@ class Memory:
             "card_type": card_type,
             "payload": dict(payload),
             "frm": frm,
+            "thread_id": thread_id,
+            "origin": origin,
         }
         if resolution:
             extra["resolution"] = dict(resolution)
