@@ -40,14 +40,16 @@ def accounts(chat, monkeypatch):
     "test @connector:work works", "Use Gmail Work", "Use gmail_work_search_threads",
     "Check Gmail. Use @connector:work for it", "Use @connector:work. Check Gmail",
 ])
-def test_account_choice_replaces_siblings_and_survives_generic_followup(accounts, selection):
+def test_explicit_account_limits_this_request_and_its_continuations(accounts, selection):
     paths, records = accounts
     records[0]["tools"] = ["gmail_search_threads"]
     selected = turn(paths, selection, "selected")
     assert selected["connector_ids"] == ["calendar-personal", "work"]
-    assert selected["chat_connector_state"]["connector_ids"] == selected["connector_ids"]
-    for index, followup in enumerate(["continue", "Check Gmail", "New task: check my inbox"]):
-        assert turn(paths, followup, str(index))["connector_ids"] == selected["connector_ids"]
+    assert selected["chat_connector_state"]["connector_ids"] == ["calendar-personal", "personal", "work"]
+    continued = turn(paths, "continue", "continued")
+    assert continued["connector_ids"] == selected["connector_ids"]
+    assert continued["revision"] == selected["revision"]
+    assert turn(paths, "Check Gmail", "steer", active_followup=True)["connector_ids"] == selected["connector_ids"]
 
 
 def test_wrong_account_is_neither_loaded_nor_authorized_after_choice(accounts):
@@ -66,11 +68,11 @@ def test_wrong_account_is_neither_loaded_nor_authorized_after_choice(accounts):
     assert tool_still_selected(paths, "atlas", task, "gmail_work_search_threads", bindings=bindings)
 
 
-def test_calendar_choice_replaces_old_calendar_without_losing_gmail(accounts):
+def test_calendar_tag_excludes_other_calendars_preserving_unrelated_chat_grants(accounts):
     paths, _ = accounts
     turn(paths, "Use @connector:work", "mail")
     selected = turn(paths, "now check calendar for @connector:calendar-work", "calendar")
-    assert selected["connector_ids"] == ["calendar-work", "work"]
+    assert selected["connector_ids"] == ["calendar-work", "personal", "work"]
 
 
 def test_two_explicit_accounts_can_be_selected_together(accounts):
@@ -94,10 +96,10 @@ def test_disabled_explicit_account_never_falls_back_to_sibling(accounts):
     paths, records = accounts
     records[0]["enabled_for"] = ["nova"]
     for index, instruction in enumerate(["Use @connector:work", "continue", "Check Gmail"]):
-        task = turn(paths, instruction, str(index))
+        task = turn(paths, instruction, str(index), active_followup=True)
         assert task["connector_ids"] == ["calendar-personal"]
     records[0].pop("enabled_for")
-    assert turn(paths, "Check Gmail", "enabled")["connector_ids"] == ["calendar-personal", "work"]
+    assert turn(paths, "Check Gmail", "enabled", active_followup=True)["connector_ids"] == ["calendar-personal", "work"]
 
 
 def test_quoted_account_cannot_replace_saved_choice(accounts):
@@ -106,20 +108,32 @@ def test_quoted_account_cannot_replace_saved_choice(accounts):
     assert task["connector_ids"] == ["calendar-personal", "personal"]
 
 
-def test_existing_additive_chat_is_narrowed_to_latest_explicit_choice(accounts):
+def test_tagged_request_does_not_replace_saved_choices_for_unrelated_tasks(accounts):
     paths, _ = accounts
-    first = turn(paths, "Use @connector:work", "work")
-    latest = turn(paths, "Use @connector:personal", "personal")
-    with store_for(paths)._tx() as conn:
-        old = latest["chat_connector_state"]
-        old.pop("selection_version")
-        old["connector_ids"].append("work")
-        old["provenance"].extend(p for p in first["provenance"] if p["connector_id"] == "work")
-        conn.execute("UPDATE agent_tasks SET data=?", (json.dumps(latest),))
-        conn.execute("DELETE FROM transcripts")
-    task = turn(paths, "Check Gmail", "after-upgrade")
+    selected = turn(paths, "Use @connector:work", "work")
+    task = turn(paths, "New task: explain a rainbow", "unrelated")
+    assert task["chat_connector_state"] == selected["chat_connector_state"]
+    assert task["connector_ids"] == ["calendar-personal", "personal", "work"]
+    assert task["connector_choices"] == {}
+
+
+def test_missing_tagged_account_cannot_fall_back_to_remembered_accounts(accounts):
+    paths, _ = accounts
+    task = turn(paths, "Check @connector:removed-account", "missing")
+    assert task["connector_ids"] == []
+    assert task["unavailable_connector_ids"] == ["removed-account"]
+    assert turn(paths, "continue", "continue")["connector_ids"] == []
+    corrected = turn(paths, "Use @connector:work", "corrected", active_followup=True)
+    assert corrected["connector_ids"] == ["calendar-personal", "work"]
+    assert corrected["unavailable_connector_ids"] == []
+
+
+@pytest.mark.parametrize("text", ['Summarize "Use @connector:missing"', "Do not use @connector:missing"])
+def test_quoted_or_excluded_unknown_tag_does_not_select_an_account(accounts, text):
+    paths, _ = accounts
+    task = turn(paths, text, "ignored")
     assert task["connector_ids"] == ["calendar-personal", "personal"]
-    assert task["chat_connector_state"]["selection_version"] == 2
+    assert task["unavailable_connector_ids"] == []
 
 
 def test_new_task_keeps_chat_account_after_restart_and_stop(chat):
