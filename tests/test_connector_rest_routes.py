@@ -681,6 +681,35 @@ def test_bound_connector_read_and_write_contract(tmp_path, type_, config, path, 
         assert "fixture-key" not in request.full_url
 
 
+@pytest.mark.parametrize("path", ["/users/me/calendarList", "/calendars/primary/events"])
+def test_calendar_schema_routes_reads_with_selected_account(tmp_path, monkeypatch, path):
+    paths = HarnessPaths(home=tmp_path)
+    store = Connectors(paths)
+    selected = store.add("google_calendar", "Work")
+    store.add("google_calendar", "Personal")
+    token_accounts = []
+
+    def token(_paths, record):
+        token_accounts.append(record["id"])
+        return "fixture-token"
+
+    monkeypatch.setattr("harness.delegated_oauth.token", token)
+    bound = tools_for_bot(paths, "atlas", record_ids={selected["id"]})
+    assert "google_calendar_personal_get" not in bound
+    spec, run = bound["google_calendar_work_get"]
+    assert path in spec.parameters["properties"]["path"]["description"]
+    response = io.BytesIO(b'{"items":[]}')
+    response.status = 200
+    with patch("connectors.generic._open", return_value=response) as send:
+        result = run({"path": path, "query": {"maxResults": 1}})
+    assert result.startswith("HTTP 200")
+    assert token_accounts == [selected["id"]]
+    assert send.call_args.args[0].full_url == (
+        "https://www.googleapis.com/calendar/v3" + path + "?maxResults=1"
+    )
+    assert send.call_args.args[0].get_header("Authorization") == "Bearer fixture-token"
+
+
 @pytest.mark.parametrize(
     "domain",
     [
