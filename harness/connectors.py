@@ -127,7 +127,7 @@ CATALOG: list[dict] = [
         "name": "HubSpot",
         "auth": "oauth",
         "mcp_url": "https://mcp.hubspot.com/anthropic",
-        "fields": [],
+        "fields": ["client_id"],
         "category": "Sales And CRM",
         "description": "Search and update HubSpot contacts, companies, and deals.",
         "icon": "person.2",
