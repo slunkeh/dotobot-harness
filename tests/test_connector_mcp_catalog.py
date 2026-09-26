@@ -45,7 +45,7 @@ PROMOTED_MCP = {
     "cufinder": "https://mcp.cufinder.io/mcp",
     "heyreach": "https://mcp.heyreach.io/mcp",
     "xero": "https://mcp.xero.com/mcp",
-    "pipedrive": "https://mcp.pipedrive.com/mcp",
+    "pipedrive": "https://mcp.pipedrive.ai/mcp",
 }
 
 STATIC_RUNTIME = {"linear", "github", "gmail"}
