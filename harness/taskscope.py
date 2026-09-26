@@ -4,6 +4,7 @@ This deliberately does not classify arbitrary natural-language intent. A new
 message starts a task unless it is an explicit continuation or the runtime says
 it is a live follow-up. Quoted/generated context is never searched for grants.
 Selected accounts persist independently of task identity within the same chat.
+Choosing an account replaces older choices for the same service.
 The tool gate remains responsible for every execution and approval decision.
 """
 
@@ -235,6 +236,7 @@ def pending_catalog_types(task: dict, records: list[dict], *, bot: str | None = 
 
 def _chat_state(bindings: dict, pending: dict) -> dict:
     return {
+        "selection_version": 2,
         "connector_ids": sorted(bindings),
         "provenance": [bindings[cid] for cid in sorted(bindings)],
         "pending_catalog": [pending[k] for k in sorted(pending)],
@@ -250,6 +252,38 @@ def _saved_chat_state(value: Any) -> dict:
     ):
         raise ValueError("invalid saved chat connector state")
     return _chat_state(_human_bindings(value), _pending_catalog(value))
+
+
+def _specific_accounts(delta: dict, records: list[dict]) -> dict[str, set[str]]:
+    by_id = {str(r.get("id")): r for r in records}
+    choices: dict[str, set[str]] = {}
+    for match in delta["matches"]:
+        cid = match["connector_id"]
+        type_ = by_id[cid]["type"]
+        if match["matched_name"].casefold() not in {
+            name.casefold() for name in mention_titles(type_, "")
+        }:
+            choices.setdefault(type_, set()).add(cid)
+    return choices
+
+
+def _narrow_legacy_accounts(conn, bot: str, conversation: str, saved: dict, records: list[dict]) -> dict:
+    """Remove superseded choices from old additive snapshots, never add grants."""
+    choices: dict[str, set[str]] = {}
+    for raw in conn.execute(
+        "SELECT data FROM agent_task_inputs WHERE bot=? AND conversation=? ORDER BY rowid",
+        (bot, conversation),
+    ):
+        row = json.loads(raw[0])
+        if row.get("source_id"):
+            delta = connector_scope_delta(str(row.get("latest_instruction") or ""), records)
+            choices.update(_specific_accounts(delta, records))
+    types = {str(r.get("id")): r.get("type") for r in records}
+    bindings = {
+        cid: grant for cid, grant in _human_bindings(saved).items()
+        if types.get(cid) not in choices or cid in choices[types[cid]]
+    }
+    return _chat_state(bindings, _pending_catalog(saved))
 
 
 def _legacy_transcript_bindings(conn, bot: str, conversation: str, records: list[dict]) -> tuple:
@@ -296,7 +330,10 @@ def _legacy_transcript_bindings(conn, bot: str, conversation: str, records: list
 
 def _load_chat_state(conn, bot: str, conversation: str, previous: dict | None, records: list[dict]) -> dict:
     if previous is not None and "chat_connector_state" in previous:
-        return _saved_chat_state(previous["chat_connector_state"])
+        saved = _saved_chat_state(previous["chat_connector_state"])
+        if previous["chat_connector_state"].get("selection_version") == 2:
+            return saved
+        return _narrow_legacy_accounts(conn, bot, conversation, saved, records)
     if not is_user_chat(conversation):
         return _chat_state({}, {})
     history = [json.loads(row[0]) for row in conn.execute(
@@ -366,7 +403,7 @@ def _load_chat_state(conn, bot: str, conversation: str, previous: dict | None, r
         )["excluded_ids"]
         for type_ in excluded:
             pending.pop(type_, None)
-    return _chat_state(bindings, pending)
+    return _narrow_legacy_accounts(conn, bot, conversation, _chat_state(bindings, pending), records)
 
 
 def begin_task(
@@ -431,7 +468,6 @@ def begin_task(
         bindings = _human_bindings(source_scope)
         chat_bindings = dict(bindings) if use_chat else {}
         before = set(bindings)
-        bindings = {cid: p for cid, p in bindings.items() if cid in visible}
         pending_catalog = _pending_catalog(source_scope) if use_chat or same else {}
         # An explicit request for an unadded service can select its first
         # account once it exists. Consume the provisional selection so later
@@ -448,9 +484,28 @@ def begin_task(
             else {"matches": [], "excluded_ids": []}
         )
         all_delta = connector_scope_delta(text, all_records) if trusted_user else delta
+        by_id = {str(r.get("id")): r for r in all_records}
+        choices = _specific_accounts(all_delta, all_records)
+        specific = set().union(*choices.values()) if choices else set()
+        # A fresh account selection replaces older choices for that service.
+        # Remember an explicitly chosen disabled account as dormant, so neither
+        # this turn nor a generic follow-up can fall back to a different account.
+        for cid in list(bindings):
+            if by_id.get(cid, {}).get("type") in choices and cid not in specific:
+                bindings.pop(cid)
+                chat_bindings.pop(cid, None)
+        saved_types = {by_id[cid]["type"] for cid in bindings if cid in by_id}
+        delta["matches"] = [
+            m for m in all_delta["matches"]
+            if m["connector_id"] in specific
+            or (m["connector_id"] in visible and (
+                by_id[m["connector_id"]]["type"] not in saved_types
+                or m["connector_id"] in bindings
+            ))
+        ]
         if use_chat:
             # Disabling an account prevents execution, not revocation of a
-            # saved choice. Names of disabled accounts can only remove scope.
+            # saved choice. Also apply exclusions to dormant accounts.
             delta["excluded_ids"] = all_delta["excluded_ids"]
         for match in delta["matches"]:
             cid = match["connector_id"]
@@ -504,6 +559,7 @@ def begin_task(
                 pending_catalog.pop(type_, None)
         if use_chat:
             chat_state = _chat_state(chat_bindings, pending_catalog)
+        bindings = {cid: p for cid, p in bindings.items() if cid in visible}
         stopped = trusted_user and bool(_STOP.fullmatch(instruction_text(text).strip()))
         if stopped:
             bindings = {}

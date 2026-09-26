@@ -72,6 +72,15 @@ def tools(type_: str) -> list[ConnectorTool]:
         "relative to the connector's API host."
     )
     get_path_description = "path under the API host, e.g. /accounts"
+    if t == "google_calendar":
+        get_description = (
+            "Read Google Calendar. List this account's calendars with GET /users/me/calendarList. "
+            "List events with GET /calendars/primary/events, or replace primary with a "
+            "URL-encoded calendar ID from the calendar list. For upcoming events, pass "
+            "query timeMin as an RFC3339 timestamp, singleEvents=true and orderBy=startTime. "
+            "Paths omit /calendar/v3. /calendarList alone is not a valid endpoint."
+        )
+        get_path_description = "/users/me/calendarList or /calendars/primary/events"
     if t == "google_docs":
         # Docs has no account/list route. Operation words also let deferred
         # tool discovery find writes from queries such as "google docs create".

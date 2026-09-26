@@ -23,6 +23,105 @@ def turn(paths, text, input_id, **kwargs):
     return begin_task(paths, "atlas", "peer:user", text=text, input_id=input_id, **kwargs)
 
 
+@pytest.fixture
+def accounts(chat, monkeypatch):
+    paths, records = chat
+    records.extend([
+        {"id": "personal", "type": "gmail", "name": "Gmail Personal"},
+        {"id": "calendar-work", "type": "google_calendar", "name": "Calendar Work"},
+        {"id": "calendar-personal", "type": "google_calendar", "name": "Calendar Personal"},
+    ])
+    monkeypatch.setattr(Connectors, "records", lambda self: records)
+    turn(paths, "Use @connector:personal and @connector:calendar-personal", "old")
+    return paths, records
+
+
+@pytest.mark.parametrize("selection", [
+    "test @connector:work works", "Use Gmail Work", "Use gmail_work_search_threads",
+    "Check Gmail. Use @connector:work for it", "Use @connector:work. Check Gmail",
+])
+def test_account_choice_replaces_siblings_and_survives_generic_followup(accounts, selection):
+    paths, records = accounts
+    records[0]["tools"] = ["gmail_search_threads"]
+    selected = turn(paths, selection, "selected")
+    assert selected["connector_ids"] == ["calendar-personal", "work"]
+    assert selected["chat_connector_state"]["connector_ids"] == selected["connector_ids"]
+    for index, followup in enumerate(["continue", "Check Gmail", "New task: check my inbox"]):
+        assert turn(paths, followup, str(index))["connector_ids"] == selected["connector_ids"]
+
+
+def test_wrong_account_is_neither_loaded_nor_authorized_after_choice(accounts):
+    from connectors.registry import tools_for_bot
+    from harness.taskscope import connector_bindings, tool_still_selected
+
+    paths, records = accounts
+    task = turn(paths, "test @connector:work works", "selected")
+    tools = tools_for_bot(paths, "atlas", record_ids=set(task["connector_ids"]))
+    assert "gmail_work_search_threads" in tools
+    assert "gmail_personal_search_threads" not in tools
+    bindings = connector_bindings(records, "atlas")
+    assert not tool_still_selected(
+        paths, "atlas", task, "gmail_personal_search_threads", bindings=bindings
+    )
+    assert tool_still_selected(paths, "atlas", task, "gmail_work_search_threads", bindings=bindings)
+
+
+def test_calendar_choice_replaces_old_calendar_without_losing_gmail(accounts):
+    paths, _ = accounts
+    turn(paths, "Use @connector:work", "mail")
+    selected = turn(paths, "now check calendar for @connector:calendar-work", "calendar")
+    assert selected["connector_ids"] == ["calendar-work", "work"]
+
+
+def test_two_explicit_accounts_can_be_selected_together(accounts):
+    paths, _ = accounts
+    task = turn(paths, "Compare @connector:work and @connector:personal", "compare")
+    assert task["connector_ids"] == ["calendar-personal", "personal", "work"]
+    narrowed = turn(paths, "Use @connector:work", "narrow")
+    assert narrowed["connector_ids"] == ["calendar-personal", "work"]
+
+
+def test_account_switch_while_running_invalidates_pending_actions(accounts):
+    paths, _ = accounts
+    first = turn(paths, "Check my inbox", "first")
+    switched = turn(paths, "Use @connector:work", "switch", active_followup=True)
+    assert switched["task_id"] == first["task_id"]
+    assert switched["revision"] > first["revision"]
+    assert switched["connector_ids"] == ["calendar-personal", "work"]
+
+
+def test_disabled_explicit_account_never_falls_back_to_sibling(accounts):
+    paths, records = accounts
+    records[0]["enabled_for"] = ["nova"]
+    for index, instruction in enumerate(["Use @connector:work", "continue", "Check Gmail"]):
+        task = turn(paths, instruction, str(index))
+        assert task["connector_ids"] == ["calendar-personal"]
+    records[0].pop("enabled_for")
+    assert turn(paths, "Check Gmail", "enabled")["connector_ids"] == ["calendar-personal", "work"]
+
+
+def test_quoted_account_cannot_replace_saved_choice(accounts):
+    paths, _ = accounts
+    task = turn(paths, 'Summarize "Use @connector:work"', "quote")
+    assert task["connector_ids"] == ["calendar-personal", "personal"]
+
+
+def test_existing_additive_chat_is_narrowed_to_latest_explicit_choice(accounts):
+    paths, _ = accounts
+    first = turn(paths, "Use @connector:work", "work")
+    latest = turn(paths, "Use @connector:personal", "personal")
+    with store_for(paths)._tx() as conn:
+        old = latest["chat_connector_state"]
+        old.pop("selection_version")
+        old["connector_ids"].append("work")
+        old["provenance"].extend(p for p in first["provenance"] if p["connector_id"] == "work")
+        conn.execute("UPDATE agent_tasks SET data=?", (json.dumps(latest),))
+        conn.execute("DELETE FROM transcripts")
+    task = turn(paths, "Check Gmail", "after-upgrade")
+    assert task["connector_ids"] == ["calendar-personal", "personal"]
+    assert task["chat_connector_state"]["selection_version"] == 2
+
+
 def test_new_task_keeps_chat_account_after_restart_and_stop(chat):
     paths, _ = chat
     first = turn(paths, "Use Gmail Work", "one")

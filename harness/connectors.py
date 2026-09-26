@@ -989,6 +989,7 @@ def connector_scope_delta(text: str, records: list[dict]) -> dict[str, Any]:
     clean = instruction_text(text)
     prefixes = tool_prefixes(records, Counter(str(r.get("type") or "") for r in records))
     matches: dict[str, dict] = {}
+    specific_ids: set[str] = set()
     excluded: set[str] = set()
     for clause in _SCOPE_CLAUSE.split(clean):
         candidates: list[tuple[dict, str, bool]] = []
@@ -1024,9 +1025,18 @@ def connector_scope_delta(text: str, records: list[dict]) -> dict[str, Any]:
             if matched.lower() in negative_names:
                 excluded.add(cid)
             else:
-                matches[cid] = {"connector_id": cid, "matched_name": matched}
+                if exact or cid not in specific_ids:
+                    matches[cid] = {"connector_id": cid, "matched_name": matched}
+                if exact:
+                    specific_ids.add(cid)
     for cid in excluded:
         matches.pop(cid, None)
+    # An account choice applies to the whole input, including separate clauses
+    # that mention the service generically before or after the selected chip.
+    specific_types = {r.get("type") for r in records if r.get("id") in specific_ids - excluded}
+    for rec in records:
+        if rec.get("type") in specific_types and rec.get("id") not in specific_ids:
+            matches.pop(str(rec.get("id")), None)
     return {"matches": list(matches.values()), "excluded_ids": sorted(excluded)}
 
 
