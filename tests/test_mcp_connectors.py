@@ -186,6 +186,35 @@ def test_static_client_skips_dcr(paths):
     assert t.token_forms[0]["client_secret"] == "slack-app-secret"
 
 
+def test_hubspot_catalog_exposes_manual_oauth_setup_and_retry(paths):
+    hubspot = next(item for item in catalog() if item["type"] == "hubspot")
+    assert hubspot["fields"] == ["client_id"]
+    assert "Client Secret" in hubspot["notes"]
+    assert "http://127.0.0.1:18765/callback" in hubspot["notes"]
+
+    class NoDCR(FakeAuth):
+        def get_json(self, url):
+            meta = super().get_json(url)
+            meta.pop("registration_endpoint", None)
+            return meta
+
+    record = Connectors(paths).add(
+        "hubspot", "HubSpot", {"client_id": "test-hubspot-client"}
+    )
+    transport = NoDCR()
+    start = mcp_oauth.start_authorize(
+        paths, record, MCP_URL, "http://127.0.0.1:18765/callback", transport,
+        client_secret="test-hubspot-secret",
+    )
+    query = urllib.parse.parse_qs(urllib.parse.urlparse(start["authorize_url"]).query)
+    assert query["client_id"] == ["test-hubspot-client"]
+    assert query["code_challenge_method"] == ["S256"]
+    assert transport.registered == []
+    assert "test-hubspot-secret" not in json.dumps(record)
+    assert mcp_oauth.exchange(paths, start["state"], "test-code", transport)["status"] == "connected"
+    assert transport.token_forms[0]["client_secret"] == "test-hubspot-secret"
+
+
 def test_asana_v2_uses_registered_client_without_dynamic_registration(paths):
     entry = next(item for item in catalog() if item["type"] == "asana")
     assert entry["mcp_url"] == "https://mcp.asana.com/v2/mcp"

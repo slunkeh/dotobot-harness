@@ -835,8 +835,11 @@ _ROWS: list[tuple[str, str, str, str]] = [
     (
         "hubspot",
         "official",
-        "https://developers.hubspot.com/mcp",
-        "Official public beta. Dotobot uses mcp.hubspot.com/anthropic.",
+        "https://developers.hubspot.com/docs/apps/developer-platform/build-apps/integrate-with-the-remote-hubspot-mcp-server",
+        "Create a HubSpot MCP Connector under Development > MCP Connectors. Add "
+        "http://127.0.0.1:18765/callback to its Redirect URLs, then copy its "
+        "Client ID and Client Secret into Dotobot and connect. Dotobot handles "
+        "PKCE; HubSpot's Test URL and one-time PKCE values are not needed.",
     ),
     (
         "humanitix",
